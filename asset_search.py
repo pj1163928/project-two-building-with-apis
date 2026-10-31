@@ -18,13 +18,14 @@ TYPE_CHOICES = [
 
 # ---------------------------------------------------------------- prompts
 
+
 def ask(prompt):
     """input() that treats Ctrl+C / Ctrl+Z as a request to quit."""
     try:
         return input(prompt).strip()
     except (EOFError, KeyboardInterrupt):
         print()
-        raise SystemExit(0)
+        raise SystemExit(0) from None
 
 
 def ask_nonblank(prompt):
@@ -78,6 +79,7 @@ def ask_yes_no(prompt):
 
 # ---------------------------------------------------------------- output
 
+
 def clip(text, width):
     text = str(text)
     return text if len(text) <= width else text[: width - 1] + "…"
@@ -89,12 +91,16 @@ def print_results(rows):
         [str(n), clip(r["name"], 34), clip(r["type"], 10), clip(r["info"], 36), r["license"]]
         for n, r in enumerate(rows, start=1)
     ]
-    widths = [max(len(title), *(len(row[i]) for row in table)) for i, (title, _) in enumerate(columns)]
+    widths = [
+        max(len(title), *(len(row[i]) for row in table)) for i, (title, _) in enumerate(columns)
+    ]
     print()
-    print("  ".join(title.ljust(w) for (title, _), w in zip(columns, widths)).rstrip())
+    print(
+        "  ".join(title.ljust(w) for (title, _), w in zip(columns, widths, strict=False)).rstrip()
+    )
     print("  ".join("-" * w for w in widths))
     for row in table:
-        print("  ".join(cell.ljust(w) for cell, w in zip(row, widths)).rstrip())
+        print("  ".join(cell.ljust(w) for cell, w in zip(row, widths, strict=False)).rstrip())
 
 
 def print_field(label, value):
@@ -108,14 +114,19 @@ def show_ambientcg(d):
     print_field("Maps", ", ".join(d["maps"]))
     if dims:
         # ambientCG doesn't document the unit, so print the numbers as given.
-        print_field("Dimensions", f"{dims.get('width')} x {dims.get('height')} x {dims.get('depth')} (W x H x D)")
+        print_field(
+            "Dimensions",
+            f"{dims.get('width')} x {dims.get('height')} x {dims.get('depth')} (W x H x D)",
+        )
     print_field("Tags", ", ".join(d["tags"]))
     print_field("License", d["license"])
     print_field("Page", d["url"])
     print(f"\n  Downloads ({len(d['downloads'])}):")
     for dl in d["downloads"]:
-        print(f"    {dl.get('attributes', '?'):<16} .{dl.get('extension', '?'):<5} "
-              f"{human_size(dl.get('size')):>10}  {dl.get('url')}")
+        print(
+            f"    {dl.get('attributes', '?'):<16} .{dl.get('extension', '?'):<5} "
+            f"{human_size(dl.get('size')):>10}  {dl.get('url')}"
+        )
 
 
 def show_polyhaven(d):
@@ -126,7 +137,9 @@ def show_polyhaven(d):
     print_field("Authors", authors)
     print_field("Categories", ", ".join(d["categories"]))
     print_field("Tags", ", ".join(d["tags"]))
-    print_field("Downloads", f"{d['download_count']:,}" if d["download_count"] is not None else None)
+    print_field(
+        "Downloads", f"{d['download_count']:,}" if d["download_count"] is not None else None
+    )
     print_field("Description", d["description"])
     print_field("License", d["license"])
     print_field("Page", d["url"])
@@ -137,7 +150,9 @@ def show_polyhaven(d):
     if d["maps"]:
         print("\n  Map files, total size per format:")
         for res in by_resolution(d["maps"]):
-            formats = ", ".join(f"{fmt} {human_size(size)}" for fmt, size in sorted(d["maps"][res].items()))
+            formats = ", ".join(
+                f"{fmt} {human_size(size)}" for fmt, size in sorted(d["maps"][res].items())
+            )
             print(f"    {res:>4}  {formats}")
     if d["bundles"]:
         print("\n  Bundles (file plus included textures):")
@@ -163,7 +178,9 @@ def show_openverse(d):
         print("\n  Other formats:")
         for alt in d["alt_files"]:
             rate = f"{alt['sample_rate']:,} Hz" if alt.get("sample_rate") else ""
-            print(f"    {alt.get('filetype', '?'):<5} {human_size(alt.get('filesize')):>10}  {rate:<10} {alt.get('url')}")
+            print(
+                f"    {alt.get('filetype', '?'):<5} {human_size(alt.get('filesize')):>10}  {rate:<10} {alt.get('url')}"
+            )
 
 
 DETAIL_PRINTERS = {ambientcg: show_ambientcg, polyhaven: show_polyhaven, openverse: show_openverse}
@@ -177,6 +194,7 @@ def show_details(provider, asset_id):
 
 
 # ---------------------------------------------------------------- flow
+
 
 def run_search(provider):
     print(f"\n{provider.NAME}: search by phrase, or look up one asset by ID.")
@@ -196,7 +214,9 @@ def run_search(provider):
         return
 
     print_results(rows)
-    choice = ask_number(f"\nShow details for # (1-{len(rows)}) [Enter = skip]: ", len(rows), allow_blank=True)
+    choice = ask_number(
+        f"\nShow details for # (1-{len(rows)}) [Enter = skip]: ", len(rows), allow_blank=True
+    )
     if choice:
         show_details(provider, rows[choice - 1]["id"])
 

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Packs{% endblock %}
+{% block breadcrumb %}{% url 'packs:list' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="packs" icon="pack" current=True %}{% endblock %}
+{% block content %}
+  <section class="space-y-5">
+    {% include "partials/page_header.html" with label="Packs" heading="Your packs." lead="Group saved assets into kits for a project, then export them for the engine." compact=True %}
+    {% include "partials/empty_state.html" with title="You have no packs yet." body="Packs you create will be listed here." %}
+  </section>
+{% endblock %}

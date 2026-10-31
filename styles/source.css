@@ -1,0 +1,488 @@
+/*
+  Axcenity Toolbox styles: the Tailwind source that django-tailwind-cli
+  builds into static/css/tailwind.css.
+
+  Colour rules (see docs/FRONTEND.md):
+  - Only the axcenity palette exists. Tailwind's own colours are reset and
+    DaisyUI's built-in themes are off, so a stray `bg-red-500` or
+    `data-theme="dracula"` produces nothing.
+  - The chrome is monochrome. Primary buttons are white with dark text.
+  - The four type colours mean asset type and nothing else.
+  - tests/test_theme.py checks every hex value in this file.
+*/
+
+@import "tailwindcss";
+
+@plugin "daisyui" {
+  themes: false;
+}
+
+/* The editor's dark theme (Axcenity Engine, crates/editor/src/theme.rs). */
+@plugin "daisyui/theme" {
+  name: "axcenity";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #1E1E1E;
+  --color-base-200: #171717;
+  --color-base-300: #2A2A2A;
+  --color-base-content: #E8E8EA;
+  --color-primary: #FAFAFA;
+  --color-primary-content: #171717;
+  --color-secondary: #2A2A2A;
+  --color-secondary-content: #E8E8EA;
+  --color-accent: #FAFAFA;
+  --color-accent-content: #171717;
+  --color-neutral: #2A2A2A;
+  --color-neutral-content: #E8E8EA;
+  --color-info: #A1A1AA;
+  --color-info-content: #171717;
+  --color-success: #4CC38A;
+  --color-success-content: #171717;
+  --color-warning: #E5B454;
+  --color-warning-content: #171717;
+  --color-error: #F07178;
+  --color-error-content: #171717;
+
+  --radius-selector: 0.25rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@theme {
+  /* Drop Tailwind's default palette; only these colours exist. */
+  --color-*: initial;
+  --color-white: #FFFFFF;
+  --color-black: #000000;
+
+  /* Contrast tokens that flip with the colour scheme (see "Light mode" below).
+     ink: the strongest contrast to the chrome, used for hover inversion,
+     current-page marks and tooltips. on-ink: what sits on ink. shade: what
+     goes behind text to keep it readable over the glow. */
+  --color-ink: #FFFFFF;
+  --color-on-ink: #000000;
+  --color-shade: #000000;
+
+  /* Editor palette. */
+  --color-app: #171717;
+  --color-panel: #1E1E1E;
+  --color-surface: #242424;
+  --color-elevated: #292929;
+  --color-inset: #191919;
+  --color-control: #2A2A2A;
+  --color-control-hover: #323232;
+  --color-control-active: #3A3A3A;
+  --color-line: #303030;
+  --color-line-strong: #424242;
+  --color-fg: #E8E8EA;
+  --color-fg-strong: #FAFAFA;
+  --color-fg-secondary: #A1A1AA;
+  --color-fg-weak: #8E8E96;
+  --color-fg-muted: #63636B;
+
+  /* Asset-type tokens (four of the editor's accents). Type only. */
+  --color-texture: #F2A15A;
+  --color-hdri: #6C8CFF;
+  --color-model: #4CC38A;
+  --color-sound: #A48AFF;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Best guess at the wordmark's font; swap it here. */
+  --font-display: "Plus Jakarta Sans", "Inter", ui-sans-serif, sans-serif;
+}
+
+/* Fonts are served from static/fonts (paths are relative to static/css). */
+/* The chrome's mono labels and display headlines block (stay invisible for the few
+   ms until their font arrives) rather than swap, so they never paint in a fallback
+   font and then jump. base.html preloads them. Body text (Inter) still swaps. */
+@font-face { font-family: "Inter"; src: url("../fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("../fonts/Inter-Medium.ttf") format("truetype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("../fonts/Inter-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("../fonts/Inter-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("../fonts/JetBrainsMono-Regular.ttf") format("truetype"); font-weight: 400; font-display: block; }
+@font-face { font-family: "JetBrains Mono"; src: url("../fonts/JetBrainsMono-Bold.ttf") format("truetype"); font-weight: 700; font-display: block; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("../fonts/PlusJakartaSans-Variable.ttf") format("truetype"); font-weight: 200 800; font-display: block; }
+
+@layer base {
+  html, body { font-family: var(--font-sans); }
+  :root { --grid-dot: color-mix(in srgb, var(--color-ink) 4%, transparent); }
+}
+
+@layer components {
+  .display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.035em; }
+  /* Page headlines: a step lighter and looser than .display, balanced over lines. */
+  .headline { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; text-wrap: balance; }
+  .micro { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+
+  /* Logo primitives: CSS masks, so the logo takes the text colour. The
+     image URLs come from {% static %} on <html> in base.html. */
+  .mark, .word { display: inline-block; background: currentColor;
+    -webkit-mask: var(--mark-url) center / contain no-repeat; mask: var(--mark-url) center / contain no-repeat; }
+  .mark { aspect-ratio: 1; }
+  .word { -webkit-mask-image: var(--word-url); mask-image: var(--word-url); aspect-ratio: 3.2215; }
+
+  /* Hover is a full inversion: dark chrome turns white with black content,
+     and white buttons turn black with white content (see the unlayered
+     .btn rules below). Chrome corners are square throughout. */
+
+  /* The current page is marked the same way everywhere: white text, a
+     slightly lifted fill and a 2px white bar (left edge in the activity bar
+     and side panel, bottom edge on title-bar chips). */
+
+  /* Activity bar entries: grey, white when current, inverted on hover. */
+  .act { position: relative; color: var(--color-fg-weak); transition: color 0.15s, background-color 0.15s; }
+  .act[aria-current="page"] { color: var(--color-fg-strong); background: var(--color-surface); }
+  html[data-pointer] .act:hover, .act:focus-visible { color: var(--color-on-ink); background: var(--color-ink); }
+  .act[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--color-ink); }
+
+  /* Icon tooltips: a white label that slides out to the right of the
+     activity bar after a short pause. */
+  .tip { position: absolute; left: calc(100% + 8px); top: 50%; z-index: 30; white-space: nowrap; pointer-events: none;
+    padding: 0.45rem 0.6rem 0.35rem; font-family: var(--font-mono); font-size: 10.5px; line-height: 1; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--color-on-ink); background: var(--color-ink);
+    opacity: 0; transform: translate(-4px, -50%); transition: opacity 0.12s ease, transform 0.12s ease; }
+  .panel-toggle > .tip { left: calc(100% + 16px); } /* the toggle is inset 8px in its cell */
+  html[data-pointer] .act:hover > .tip, .act:focus-visible > .tip { opacity: 1; transform: translate(0, -50%); transition-delay: 0.2s; }
+
+  /* Side-panel rows: the same height as activity-bar entries, so they line up. */
+  .panel-row { position: relative; display: flex; align-items: center; height: 2.75rem; padding-inline: 1.25rem;
+    font-size: 15px; font-weight: 500; color: var(--color-fg-secondary); transition: color 0.15s, background-color 0.15s; }
+  .panel-row[aria-current="page"] { color: var(--color-fg-strong); font-weight: 600; background: var(--color-control); }
+  .panel-row[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--color-ink); }
+  html[data-pointer] .panel-row:hover, .panel-row:focus-visible { color: var(--color-on-ink); background: var(--color-ink); }
+
+  /* Title-bar chips: one height (h-8) and line-height 1, so the labels, icons
+     and wordmark share a centre line. */
+  .bar-item, .crumb { display: inline-flex; align-items: center; gap: 0.4rem; height: 2rem; padding-inline: 0.625rem;
+    border-radius: 0; font-family: var(--font-mono); font-size: 10.5px; line-height: 1; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--color-fg-weak); transition: color 0.15s, background-color 0.15s, box-shadow 0.15s; }
+  /* Mono caps sit ~2px above the wordmark's letters at line-height 1; this
+     drops the text (not the icons) onto the wordmark's centre line. */
+  .bar-item > span, .crumb > span, .crumb-sep { padding-top: 4px; }
+  .bar-item > span, .crumb > span { text-indent: 0.07em; } /* balance the tracking after the last letter */
+  .bar-item-app { color: var(--color-fg-secondary); } /* "TOOLBOX": a step brighter than the other chips */
+  html[data-pointer] .bar-item:hover, .bar-item:focus-visible, html[data-pointer] .crumb:hover, .crumb:focus-visible { color: var(--color-on-ink); background: var(--color-ink); }
+  .bar-item-user { color: var(--color-fg-strong); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line); }
+  html[data-pointer] .bar-item-user:hover, .bar-item-user:focus-visible { box-shadow: inset 0 0 0 1px var(--color-ink); }
+  .crumb { color: var(--color-fg-muted); padding-inline: 0.5rem; }
+  .bar-item[aria-current="page"], .crumb[aria-current="page"] { color: var(--color-fg-strong); background: var(--color-surface);
+    box-shadow: inset 0 -2px 0 var(--color-ink); }
+  .crumb-sep { font-family: var(--font-mono); font-size: 10.5px; line-height: 1; color: var(--color-line-strong); padding-inline: 0.125rem; }
+
+  /* Label-to-icon swap: the label and icon share one grid cell, so the chip
+     keeps the label's width and the icon fades up in its place on hover. */
+  .chip-swap { display: inline-grid; place-items: center; }
+  .chip-swap > span { grid-area: 1 / 1; transition: opacity 0.18s ease, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .chip-swap > .chip-icon { display: grid; padding-top: 0; text-indent: 0; opacity: 0; transform: translateY(6px) scale(0.7); }
+  html[data-pointer] .chip-swap:hover > .chip-label, .chip-swap:focus-visible > .chip-label { opacity: 0; transform: translateY(-6px); }
+  html[data-pointer] .chip-swap:hover > .chip-icon, .chip-swap:focus-visible > .chip-icon { opacity: 1; transform: none; }
+
+  /* The wordmark is a white image, so it inverts to black with the chip. */
+  .brand-link { transition: background-color 0.15s; }
+  .brand-link img { filter: var(--logo-filter, none); transition: filter 0.15s; }
+  html[data-pointer] .brand-link:hover, .brand-link:focus-visible { background: var(--color-ink); }
+  html[data-pointer] .brand-link:hover img, .brand-link:focus-visible img { filter: var(--logo-filter-hover, invert(1)); }
+
+  .panel-toggle { transition: color 0.15s, background-color 0.15s; }
+
+  /* Home hero search: the page's one prominent, primary action. Square, to
+     match the geometric chrome. */
+  .hero-search { display: flex; align-items: center; gap: 0.75rem; max-width: 42rem; height: 3.5rem; padding: 0 0.5rem 0 1.1rem;
+    color: var(--color-fg-weak); background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line-strong);
+    transition: box-shadow 0.15s, color 0.15s; }
+  .hero-search:focus-within { color: var(--color-fg-strong); box-shadow: inset 0 0 0 1px var(--color-ink); }
+  .hero-search input { flex: 1; min-width: 0; height: 100%; background: transparent; outline: none; font-size: 16px; color: var(--color-fg-strong); }
+  .hero-search input::placeholder { color: var(--color-fg-muted); }
+
+  /* Working-surface toolbar (Library): search, sort and view in one square,
+     bordered strip directly under the page header. Disabled controls stay
+     visible so the layout is set before there's anything to control. */
+  .work-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem;
+    background: var(--color-app); border: 1px solid var(--color-line); }
+  .toolbar-search, .toolbar-field { display: flex; align-items: center; gap: 0.6rem; height: 2.5rem; padding: 0 0.85rem;
+    color: var(--color-fg-muted); background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); }
+  .toolbar-search { flex: 1 1 18rem; }
+  .toolbar-search input, .toolbar-field select { min-width: 0; background: transparent; outline: none; font-size: 14px; color: var(--color-fg-strong); }
+  .toolbar-search input { flex: 1; }
+  .toolbar-search input::placeholder { color: var(--color-fg-muted); }
+  .toolbar-field select { color: var(--color-fg-secondary); }
+  .toolbar-seg { display: flex; box-shadow: inset 0 0 0 1px var(--color-line); }
+  .toolbar-seg button { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; color: var(--color-fg-muted); }
+  .toolbar-seg button[aria-pressed="true"] { color: var(--color-fg-strong); background: var(--color-control); }
+  .work-toolbar :disabled { cursor: not-allowed; }
+
+  /* Side-panel filter groups (Library): a mono label over a row of square chips. */
+  .filter-group { display: grid; gap: 0.5rem; }
+  .filter-chip { height: 1.75rem; padding: 0 0.6rem; font-size: 12.5px; color: var(--color-fg-secondary);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong); transition: color 0.15s, background-color 0.15s; }
+  .filter-chip:hover:not(:disabled) { color: var(--color-on-ink); background: var(--color-ink); }
+  .filter-chip:disabled { color: var(--color-fg-muted); box-shadow: inset 0 0 0 1px var(--color-line); cursor: not-allowed; }
+
+  /* Sign-in and sign-up: one bordered container holding a plain form column
+     and the branding panel, which sits on a soft monochrome radial glow. */
+  .auth-card { border: 1px solid var(--color-line-strong); background: var(--color-panel); }
+  /* A step larger than the default inputs: the form is the page's focal point. */
+  .auth-form .input { height: 3rem; font-size: 15px; }
+  .auth-brand { border-left: 1px solid var(--color-line);
+    background:
+      radial-gradient(70% 55% at 50% 42%, color-mix(in srgb, var(--color-white) 7%, transparent), transparent 70%),
+      radial-gradient(120% 80% at 50% 120%, color-mix(in srgb, var(--color-white) 4%, transparent), transparent 60%),
+      var(--color-app); }
+
+  /* Password inputs: room on the right for the show/hide toggle. */
+  .password-field { position: relative; }
+  .password-field > .input { padding-right: 2.75rem; }
+  .password-toggle { position: absolute; top: 0; right: 0; height: 100%; width: 2.75rem; display: grid; place-items: center;
+    color: var(--color-fg-weak); transition: color 0.15s; }
+  .password-toggle:hover, .password-toggle:focus-visible { color: var(--color-fg-strong); }
+  .password-toggle .when-shown, .password-toggle[aria-pressed="true"] .when-hidden { display: none; }
+  .password-toggle[aria-pressed="true"] .when-shown { display: grid; }
+  .password-toggle .when-hidden { display: grid; }
+
+  /* Errors: the whole-form alert (wrong username or password) and each field's own. */
+  .form-alert { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.75rem 0.9rem; font-size: 14px;
+    color: var(--color-fg-strong); background: color-mix(in srgb, var(--color-error) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-error) 45%, transparent); }
+  .form-alert > svg { flex: none; margin-top: 1px; color: var(--color-error); }
+  .field-errors { display: grid; gap: 0.25rem; font-size: 13px; color: var(--color-error); }
+  .field-errors li { display: flex; gap: 0.4rem; align-items: center; }
+
+  /* The giant footer watermark, faint, filling the empty space above the signature. */
+  .watermark { opacity: 0.06; }
+
+  .grid-bg { background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+    background-size: 20px 20px; background-attachment: local; }
+}
+
+/* Font gate (see the inline script in base.html): until the mono font is ready,
+   the title-bar chips are hidden whole, so their fill and underline never show
+   without their text. The wordmark and the Sign-up button stay put. */
+html[data-fonts="loading"] #title-bar :is(.bar-item, .crumb, .crumb-sep) { visibility: hidden; }
+
+/* ---------- Side panel: slides shut to zero width and back ----------
+   The state is set on <html data-panel> before first paint. shell.js adds
+   data-panel-ready after the first frame, so a page load never animates. */
+#side-panel { width: 16rem; overflow: hidden; visibility: visible; }
+html[data-panel="collapsed"] #side-panel { width: 0; border-right-width: 0; visibility: hidden; }
+html[data-panel="collapsed"] .side-panel-inner { opacity: 0; transform: translateX(-1.5rem); }
+/* Expanding: the width eases out over 0.5 s, then the contents fade in a
+   beat later and each row slides in on a short stagger. Collapsing is
+   quicker and all at once. */
+html[data-panel-ready] #side-panel { transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s; }
+html[data-panel-ready][data-panel="collapsed"] #side-panel {
+  transition: width 0.42s cubic-bezier(0.22, 0.8, 0.24, 1), border-right-width 0s linear 0.42s, visibility 0s linear 0.42s; }
+html[data-panel-ready] .side-panel-inner { transition: opacity 0.35s ease 0.08s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+html[data-panel-ready][data-panel="collapsed"] .side-panel-inner { transition: opacity 0.2s ease, transform 0.42s cubic-bezier(0.22, 0.8, 0.24, 1); }
+html[data-panel="collapsed"] .panel-row { opacity: 0; transform: translateX(-0.75rem); }
+html[data-panel-ready] .panel-row { transition: color 0.15s, background-color 0.15s,
+  opacity 0.3s ease var(--row-delay, 0s), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1) var(--row-delay, 0s); }
+html[data-panel-ready]:not([data-panel="collapsed"]) li:nth-child(1) > .panel-row { --row-delay: 0.1s; }
+html[data-panel-ready]:not([data-panel="collapsed"]) li:nth-child(2) > .panel-row { --row-delay: 0.15s; }
+html[data-panel-ready]:not([data-panel="collapsed"]) li:nth-child(3) > .panel-row { --row-delay: 0.2s; }
+html[data-panel-ready]:not([data-panel="collapsed"]) li:nth-child(n+4) > .panel-row { --row-delay: 0.25s; }
+.when-collapsed { display: none; }
+html[data-panel="collapsed"] .when-open { display: none; }
+html[data-panel="collapsed"] .when-collapsed { display: grid; }
+
+/* ---------- Button hover: a full inversion ----------
+   Unlayered, so it wins over DaisyUI's own (layered) hover tint. Dark
+   buttons turn white with black text; white primary buttons turn black
+   with white text, keeping a white edge so they stay visible. */
+.btn-quiet { border-radius: 0; background-color: transparent; color: var(--color-fg); border-color: var(--color-line-strong); box-shadow: none; } /* secondary: outlined, square */
+.btn:hover, .btn:focus-visible { background-color: var(--color-ink); color: var(--color-on-ink); border-color: var(--color-ink); }
+.btn-primary:hover, .btn-primary:focus-visible { background-color: var(--color-on-ink); color: var(--color-ink); border-color: var(--color-ink); }
+
+/* ---------- Inputs: square, with a subtle focus ring ----------
+   Unlayered, to replace DaisyUI's thick offset outline. An invalid input
+   (Django sets aria-invalid) keeps a red edge and a red-tinted ring. */
+.input { border-radius: 0; background-color: var(--color-inset); border-color: var(--color-line-strong); }
+.input:focus, .input:focus-within { outline: none; border-color: var(--color-fg-secondary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ink) 12%, transparent); }
+.input[aria-invalid="true"] { border-color: var(--color-error); }
+.input[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 25%, transparent); }
+
+/* ---------- "Water drop" glow: footer and hero ----------
+   Three soft ink blobs, each drifting on its own path, with ripple rings
+   pulsing over them. The footer glow rises from the bottom of each page,
+   and a fainter mirrored copy (.page-glow) hangs from the top of the
+   content behind the hero, so the page reads as one piece. Neither glow
+   layer moves: the blobs are anchored well past the layer's edge, so no
+   bare strip ever shows there. Both are translucent, so the dot grid stays
+   visible. The colours are set per page on <main id="content">. They are
+   decoration only, used nowhere but these rules, and never one of the four
+   asset-type colours. The chrome (bars and side panel) stays monochrome. */
+#content[data-drop="home"]     { --drop-a: #FF4FA3; --drop-b: #FFC23D; --drop-c: #2EE6C5; }
+#content[data-drop="discover"] { --drop-a: #2ED8FF; --drop-b: #B04DFF; --drop-c: #FF5CC8; }
+#content[data-drop="library"]  { --drop-a: #FFD93D; --drop-b: #FF6A4D; --drop-c: #FF3D8B; }
+#content[data-drop="packs"]    { --drop-a: #9BF03B; --drop-b: #2FC8FF; --drop-c: #C15CFF; }
+#content[data-drop="account"]  { --drop-a: #FF5C8A; --drop-b: #8F5CFF; --drop-c: #3EE6E0; }
+#content[data-drop="settings"] { --drop-a: #4DE1FF; --drop-b: #FF7AD9; --drop-c: #B8FF4D; }
+
+.drop-glow { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to top, black 40%, transparent 100%);
+  mask-image: linear-gradient(to top, black 40%, transparent 100%); }
+.drop-blob { position: absolute; bottom: -45%; width: 52%; height: 125%; border-radius: 50%;
+  filter: blur(48px); mix-blend-mode: screen; opacity: 0.55; will-change: transform; }
+.drop-blob-a { left: -10%; background: radial-gradient(closest-side, var(--drop-a), transparent);
+  animation: drop-a 9s ease-in-out infinite alternate; }
+.drop-blob-b { left: 24%; background: radial-gradient(closest-side, var(--drop-b), transparent);
+  animation: drop-b 11s ease-in-out infinite alternate; }
+.drop-blob-c { right: -10%; background: radial-gradient(closest-side, var(--drop-c), transparent);
+  animation: drop-c 13s ease-in-out infinite alternate; }
+.drop-glow::after { content: ""; position: absolute; inset: -10% -10% 0; transform-origin: 50% 100%;
+  background: repeating-radial-gradient(circle at 50% 115%, transparent 0 30px,
+    color-mix(in srgb, var(--drop-b) 30%, transparent) 31px 32px);
+  -webkit-mask-image: radial-gradient(60% 90% at 50% 100%, black, transparent 75%);
+  mask-image: radial-gradient(60% 90% at 50% 100%, black, transparent 75%);
+  animation: drop-ripple 6s ease-in-out infinite; }
+/* The hero copy: the same layer flipped upside down, shorter and fainter, without rings. */
+.page-glow { inset: 0 0 auto; height: 26rem; transform: scaleY(-1); opacity: 0.4; }
+.page-glow::after { content: none; }
+@keyframes drop-a {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(28%, -16%) scale(1.3); }
+  100% { transform: translate(55%, -4%) scale(0.95); } }
+@keyframes drop-b {
+  0%   { transform: translate(0, 4%) scale(1.15); }
+  50%  { transform: translate(-40%, -18%) scale(0.9); }
+  100% { transform: translate(35%, -10%) scale(1.35); } }
+@keyframes drop-c {
+  0%   { transform: translate(0, 0) scale(0.95); }
+  50%  { transform: translate(-45%, -12%) scale(1.3); }
+  100% { transform: translate(-15%, -20%) scale(1.05); } }
+@keyframes drop-ripple {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50%      { transform: scale(1.12); opacity: 1; } }
+
+/* ---------- Two moods: showcase and work ----------
+   <main data-surface> picks one. Showcase surfaces (Home, Discover) are for
+   discovery: a taller, stronger hero glow with its ripple rings, a soft
+   light from the top, and an oversized cropped mark behind the hero. Work
+   surfaces (Library, Packs, Account, the default) are for getting things
+   done: no hero glow or mark, and a dimmer, slower footer glow without
+   rings, so the content carries the page. */
+.hero-atmosphere { display: none; }
+#content[data-surface="showcase"] .hero-atmosphere { display: block; position: absolute; inset: 0 0 auto; height: 40rem;
+  overflow: hidden; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 55%, transparent 100%); }
+.hero-mark { position: absolute; top: -5rem; right: -7rem; width: min(46rem, 62%); color: var(--color-ink); opacity: 0.05; }
+#content[data-surface="showcase"] {
+  background-image: radial-gradient(90% 60% at 50% -10%, color-mix(in srgb, var(--color-white) 6%, transparent), transparent 70%),
+    radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: 100% 40rem, 20px 20px; background-repeat: no-repeat, repeat; }
+#content[data-surface="showcase"] .page-glow { height: 40rem; opacity: 0.75; }
+#content[data-surface="showcase"] .page-glow::after { content: ""; }
+#content[data-surface="work"] .page-glow { display: none; }
+#content[data-surface="work"] #page-footer .drop-glow { opacity: 0.35; }
+#content[data-surface="work"] #page-footer .drop-glow::after { content: none; }
+#content[data-surface="work"] .drop-blob { animation-duration: 22s; }
+
+/* Keep the brand signature readable over the brightest ink. The filter
+   sits on the wrapper because the wordmark's own mask would clip it. */
+.brand-signature { filter: drop-shadow(0 1px 8px color-mix(in srgb, var(--color-shade) 80%, transparent)); }
+
+@media (prefers-reduced-motion: reduce) {
+  #side-panel, .side-panel-inner { transition: none !important; }
+  .chip-swap > span { transition: none; }
+  .drop-blob, .drop-glow::after { animation: none; }
+  .panel-row { transition: color 0.15s, background-color 0.15s !important; }
+  .tip { transition: none; }
+}
+
+/* ---------- Light mode ----------
+   The site follows the system's colour scheme. These are the light values of
+   the engine's own palette (crates/editor/src/theme.rs, Palette::new with
+   dark = false), so it's still the one axcenity theme: same tokens, flipped.
+   Every utility and component reads the tokens, so they all follow.
+   Unlayered, so it beats Tailwind's @theme layer and DaisyUI's theme. */
+@media (prefers-color-scheme: light) {
+  :root, [data-theme="axcenity"] {
+    color-scheme: light;
+    /* Editor palette (light). */
+    --color-app: #F4F4F5;
+    --color-panel: #FFFFFF;
+    --color-surface: #F7F7F8;
+    --color-elevated: #FFFFFF;
+    --color-inset: #FFFFFF;
+    --color-control: #F1F1F3;
+    --color-control-hover: #E9E9EC;
+    --color-control-active: #E0E0E4;
+    --color-line: #E4E4E7;
+    --color-line-strong: #D1D1D6;
+    --color-fg: #27272A;
+    --color-fg-strong: #18181B;
+    --color-fg-secondary: #52525B;
+    --color-fg-weak: #6B6B73;
+    --color-fg-muted: #A1A1AA;
+    /* Asset-type tokens: the engine's on-light accents (4.5:1 on white). */
+    --color-texture: #A8460B;
+    --color-hdri: #3451D1;
+    --color-model: #1C7547;
+    --color-sound: #6741D9;
+    /* Contrast tokens: hover inverts to near-black with white content. */
+    --color-ink: #18181B;
+    --color-on-ink: #FFFFFF;
+    --color-shade: #FFFFFF;
+    --grid-dot: color-mix(in srgb, var(--color-ink) 7%, transparent);
+    --logo-filter: invert(1);
+    --logo-filter-hover: none;
+    /* DaisyUI roles: primary buttons turn near-black with white text. */
+    --color-base-100: #FFFFFF;
+    --color-base-200: #F4F4F5;
+    --color-base-300: #E4E4E7;
+    --color-base-content: #27272A;
+    --color-primary: #18181B;
+    --color-primary-content: #FFFFFF;
+    --color-secondary: #F1F1F3;
+    --color-secondary-content: #27272A;
+    --color-accent: #18181B;
+    --color-accent-content: #FFFFFF;
+    --color-neutral: #F1F1F3;
+    --color-neutral-content: #27272A;
+    --color-info: #52525B;
+    --color-info-content: #FFFFFF;
+    --color-success: #1C7547;
+    --color-success-content: #FFFFFF;
+    --color-warning: #8F5F00;
+    --color-warning-content: #FFFFFF;
+    --color-error: #C42B2B;
+    --color-error-content: #FFFFFF;
+  }
+  /* Screen blending lightens, so on white it would wash the ink out; multiply
+     keeps the glow's colour as a soft tint instead. */
+  .drop-blob { mix-blend-mode: multiply; opacity: 0.4; }
+}
+
+/* ---------- Page transitions ----------
+   Boosted navigation runs each swap through the View Transitions API
+   (htmx-config globalViewTransitions in base.html). The content area fades
+   out and rises back in, and the current-page marks (activity bar, side
+   panel, title bar) glide from the old item to the new one, because the
+   current element on each page shares a view-transition-name. Browsers
+   without View Transitions just swap. Each name is used once per page: only
+   one item in each bar is ever current. */
+#content { view-transition-name: content; }
+.act[aria-current="page"] { view-transition-name: current-act; }
+.panel-row[aria-current="page"] { view-transition-name: current-row; }
+.bar-item[aria-current="page"], .crumb[aria-current="page"] { view-transition-name: current-chip; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.18s; }
+::view-transition-old(content) { animation: page-out 0.16s ease-in both; }
+::view-transition-new(content) { animation: page-in 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) 0.06s both; }
+::view-transition-group(current-act), ::view-transition-group(current-row), ::view-transition-group(current-chip) {
+  animation-duration: 0.32s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes page-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes page-in { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-control-active); border: 3px solid var(--color-panel); border-radius: 8px; }

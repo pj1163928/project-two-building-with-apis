@@ -1,0 +1,8 @@
+{# Page heading: a mono micro-label above a display-font title.                    #}
+{# Pass compact=True on working surfaces (Library, Packs, Account): a smaller      #}
+{# headline sitting tight to its controls, so the content leads, not the header.   #}
+<div class="page-hero {% if compact %}space-y-3 max-w-2xl{% else %}space-y-4 max-w-3xl{% endif %}">
+  <div class="micro text-fg-secondary flex items-center gap-2"><i class="mark w-3" aria-hidden="true"></i>{{ label }}</div>
+  <h1 class="headline {% if compact %}text-[1.75rem] md:text-[2rem]{% else %}text-[2.25rem] md:text-[2.75rem]{% endif %} text-fg-strong">{{ heading }}</h1>
+  {% if lead %}<p class="{% if compact %}text-sm{% else %}text-[15px]{% endif %} leading-relaxed text-fg-secondary max-w-xl">{{ lead }}</p>{% endif %}
+</div>

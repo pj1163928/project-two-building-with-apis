@@ -26,8 +26,7 @@ def get_json(url, params=None, provider="The provider"):
         )
     except requests.Timeout:
         raise ProviderError(
-            f"{provider} did not respond within {TIMEOUT_SECONDS} seconds. "
-            "Try again in a moment."
+            f"{provider} did not respond within {TIMEOUT_SECONDS} seconds. Try again in a moment."
         ) from None
     except requests.ConnectionError:
         raise ProviderError(
@@ -51,9 +50,7 @@ def get_json(url, params=None, provider="The provider"):
             "If you entered an asset ID, check it and try again."
         )
     if status >= 500:
-        raise ProviderError(
-            f"{provider} had a server error (HTTP {status}). Try again later."
-        )
+        raise ProviderError(f"{provider} had a server error (HTTP {status}). Try again later.")
     if status >= 400:
         raise ProviderError(f"{provider} rejected the request (HTTP {status}).")
 

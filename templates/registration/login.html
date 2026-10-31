@@ -1,0 +1,19 @@
+{% extends "registration/auth_base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block breadcrumb %}{% url 'accounts:login' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="account" icon="user" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'accounts:login' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="sign in" icon="login" current=True %}{% endblock %}
+{% block auth_heading %}Sign in.{% endblock %}
+{% block auth_lead %}Pick up where you left off with your library and packs.{% endblock %}
+{% block auth_form %}
+  {# Password recovery is out of scope (PRD). The link appears by itself once an #}
+  {# accounts:password_reset URL exists; until then this resolves to nothing.    #}
+  {% url 'accounts:password_reset' as forgot_url %}
+  <form method="post" action="{% url 'accounts:login' %}" class="auth-form space-y-5" novalidate>
+    {% csrf_token %}
+    {% include "partials/form_fields.html" with forgot_url=forgot_url %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="pt-4">
+      <button type="submit" class="btn btn-primary w-full h-12 text-[15px] rounded-none">Sign in</button>
+    </div>
+  </form>
+{% endblock %}
+{% block auth_switch %}New here? <a class="link text-fg-strong" href="{% url 'accounts:signup' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Create an account</a>{% endblock %}

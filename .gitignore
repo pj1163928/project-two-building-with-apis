@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Axcenity Toolbox: Tailwind build output and the downloaded standalone CLI
+static/css/tailwind.css
+.django_tailwind_cli/

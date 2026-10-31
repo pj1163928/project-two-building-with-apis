@@ -1,0 +1,201 @@
+{% load static tailwind_cli django_htmx %}<!doctype html>
+<html lang="en" data-theme="axcenity"
+      style="--mark-url: url('{% static 'brand/mark-white.png' %}'); --word-url: url('{% static 'brand/wordmark-white.png' %}');">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Axcenity Toolbox{% endblock %} · Axcenity Toolbox</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'brand/favicon-32.png' %}">
+  {# Fetch the chrome's fonts with the stylesheet, so the title bar never paints in a #}
+  {# fallback font and then jumps when the real one arrives.                        #}
+  <link rel="preload" href="{% static 'fonts/JetBrainsMono-Regular.ttf' %}" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="{% static 'fonts/Inter-Regular.ttf' %}" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="{% static 'fonts/Inter-Medium.ttf' %}" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="{% static 'fonts/PlusJakartaSans-Variable.ttf' %}" as="font" type="font/ttf" crossorigin>
+  {% tailwind_css %}
+  <script>
+    // Apply the saved side-panel state before first paint so it never flashes.
+    (function () {
+      var state = localStorage.getItem("ax-panel");
+      if (!state) state = matchMedia("(max-width: 767px)").matches ? "collapsed" : "open";
+      document.documentElement.dataset.panel = state;
+    })();
+    // Font gate, for a first full page load only (boosted navigation keeps the
+    // fonts loaded after that). A fresh document can paint before its fonts
+    // arrive, even from the cache. The title-bar chips' mono text is then
+    // invisible while their fill and white current-page underline still show: a
+    // stray white bar. Until JetBrains Mono is ready, <html data-fonts="loading">
+    // hides the chips whole. A 3 s cap (the browser's own limit for hiding
+    // block-display text) means a font that never loads can't hide the
+    // navigation for good.
+    (function () {
+      var root = document.documentElement, fonts = document.fonts, face = '10.5px "JetBrains Mono"';
+      if (!fonts || fonts.check(face)) return;
+      root.dataset.fonts = "loading";
+      function ready() { delete root.dataset.fonts; }
+      // The load promise can settle a frame before the text repaints in the new
+      // font, so wait two frames before showing the chips.
+      function settled() { requestAnimationFrame(function () { requestAnimationFrame(ready); }); }
+      fonts.load(face).then(settled, ready);
+      setTimeout(ready, 3000);
+    })();
+  </script>
+  {# Boosted navigation (hx-boost on <body>): links and forms fetch the next page and swap #}
+  {# its <body> in, so the document, stylesheet, fonts and scripts stay loaded. History    #}
+  {# snapshots are off, so Back refetches the page instead of restoring stale HTML, and   #}
+  {# error pages (404, 403, 500) swap in too, rather than a click silently doing nothing. #}
+  <meta name="htmx-config" content='{"globalViewTransitions": true, "historyCacheSize": 0, "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "[45]..", "swap": true, "error": true}]}'>
+  {% htmx_script %}
+  {# Scripts load once, here, for every page: a boosted swap doesn't run a new page's <head>. #}
+  <script src="{% static 'js/shell.js' %}" defer></script>
+  <script src="{% static 'js/password-toggle.js' %}" defer></script>
+</head>
+<body class="bg-app text-fg" hx-boost="true">
+{# The CSRF header lives on #app, not <body>: a boosted swap replaces #app but keeps <body>, #}
+{# and Django rotates the token at sign-in, so the header must come from the newest page.   #}
+<div id="app" class="h-screen flex flex-col" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
+  {# ---------- Title bar: every item is a square h-8 chip, so they share one centre line ---------- #}
+  {# Text chips marked chip-swap trade their label for an icon on hover.                        #}
+  <header id="title-bar" class="h-12 shrink-0 flex items-center gap-1 px-3 border-b border-line bg-app">
+    {# hx-preserve keeps this exact element across boosted swaps, so the logo never re-decodes #}
+    {# (a blank frame with the chips sliding left). width/height reserve its space on first load. #}
+    <a href="{% url 'packs:home' %}" id="brand-link" hx-preserve class="brand-link flex items-center h-8 px-1.5" aria-label="Axcenity Toolbox home">
+      <img src="{% static 'brand/wordmark-white.png' %}" alt="Axcenity" width="103" height="32" class="h-8 w-auto">
+    </a>
+    <span class="w-px h-5 mx-2 bg-line-strong" aria-hidden="true"></span>
+    <a href="{% url 'packs:home' %}" id="home-button" class="bar-item chip-swap"{% if active_nav == "home" %} aria-current="page"{% endif %}><span class="chip-label">Home</span><span class="chip-icon" aria-hidden="true">{% include "partials/icon.html" with name="home" size=16 %}</span></a>
+    <a href="{% url 'packs:home' %}" class="bar-item bar-item-app chip-swap"><span class="chip-label">Toolbox</span><span class="chip-icon" aria-hidden="true">{% include "partials/icon.html" with name="toolbox" size=16 %}</span></a>
+    {% block breadcrumb_nav %}
+      <nav aria-label="Breadcrumb" class="hidden lg:flex items-center ml-1">
+        <span class="crumb-sep" aria-hidden="true">/</span>
+        {% block breadcrumb %}{% endblock %}
+      </nav>
+    {% endblock %}
+
+    <div class="ml-auto flex items-center gap-1">
+      {% if user.is_authenticated %}
+        <a href="{% url 'accounts:profile' %}" class="bar-item bar-item-user" title="Your account">
+          {% include "partials/icon.html" with name="user" size=16 %}<span>{{ user.username }}</span>
+        </a>
+        <form method="post" action="{% url 'accounts:logout' %}" class="flex">
+          {% csrf_token %}
+          <button type="submit" class="bar-item">
+            {% include "partials/icon.html" with name="logout" size=16 %}<span>Sign out</span>
+          </button>
+        </form>
+      {% else %}
+        {# On the sign-in or sign-up page its own action would only repeat the breadcrumb, so it's left out. #}
+        {% with view_name=request.resolver_match.view_name %}
+          {% if view_name != "accounts:login" %}
+            <a href="{% url 'accounts:login' %}{% if request.path != '/' and view_name != 'accounts:signup' %}?next={{ request.path|urlencode }}{% endif %}" class="bar-item">
+              {% include "partials/icon.html" with name="login" size=16 %}<span>Sign in</span>
+            </a>
+          {% endif %}
+          {% if view_name != "accounts:signup" %}
+            <a href="{% url 'accounts:signup' %}" class="btn btn-primary btn-sm h-8 min-h-8 gap-1.5 ml-1 rounded-none">
+              {% include "partials/icon.html" with name="user-plus" size=16 %}<span>Sign up</span>
+            </a>
+          {% endif %}
+        {% endwith %}
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="flex flex-1 min-h-0">
+
+    {# ---------- Activity bar ---------- #}
+    {# Its top slot holds the panel toggle and is as tall as the panel's   #}
+    {# header (h-14); entries then match the panel's rows (h-11, gap-1,   #}
+    {# pt-1). Each icon shows a .tip tooltip on hover; z-20 lifts the      #}
+    {# tooltips over the side panel.                                       #}
+    <nav id="activity-bar" aria-label="Main" class="relative z-20 w-14 shrink-0 flex flex-col bg-app border-r border-line">
+      <div class="h-14 shrink-0 grid place-items-center border-b border-line">
+        <button type="button" id="panel-toggle" class="act panel-toggle w-10 h-10 grid place-items-center"
+                aria-controls="side-panel" aria-expanded="true">
+          <span class="when-open">{% include "partials/icon.html" with name="panel-close" size=20 %}</span>
+          <span class="when-collapsed">{% include "partials/icon.html" with name="panel-open" size=20 %}</span>
+          <span class="sr-only">Toggle side panel</span>
+          <span class="tip" aria-hidden="true">Collapse panel</span>
+        </button>
+      </div>
+      <div class="flex flex-col gap-1 pt-1">
+        <a href="{% url 'catalog:discover' %}" aria-label="Discover" class="act w-14 h-11 grid place-items-center"
+           {% if active_nav == "discover" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="search" size=20 %}<span class="tip" aria-hidden="true">Discover</span></a>
+        <a href="{% url 'catalog:library' %}" aria-label="Library" class="act w-14 h-11 grid place-items-center"
+           {% if active_nav == "library" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="library" size=20 %}<span class="tip" aria-hidden="true">Library</span></a>
+        <a href="{% url 'packs:list' %}" aria-label="Packs" class="act w-14 h-11 grid place-items-center"
+           {% if active_nav == "packs" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="pack" size=20 %}<span class="tip" aria-hidden="true">Packs</span></a>
+      </div>
+      <div class="flex-1"></div>
+      <div class="flex flex-col gap-1 pb-2">
+        <a href="{% if user.is_authenticated %}{% url 'accounts:profile' %}{% else %}{% url 'accounts:login' %}{% endif %}"
+           aria-label="Account" class="act w-14 h-11 grid place-items-center"
+           {% if active_nav == "account" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="user" size=20 %}<span class="tip" aria-hidden="true">Account</span></a>
+        <a href="{% url 'accounts:settings' %}" aria-label="Settings" class="act w-14 h-11 grid place-items-center"
+           {% if active_nav == "settings" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="gear" size=20 %}<span class="tip" aria-hidden="true">Settings</span></a>
+      </div>
+    </nav>
+
+    {# ---------- Side panel (collapsible, slides open and shut) ---------- #}
+    <aside id="side-panel" aria-label="Side panel" class="shrink-0 bg-panel border-r border-line">
+      <div class="side-panel-inner w-64 h-full overflow-y-auto">
+        <div class="h-14 flex items-center px-5 border-b border-line">
+          <span class="micro text-fg-secondary">{% block panel_title %}Explorer{% endblock %}</span>
+        </div>
+        {% block side_panel %}
+          <ul class="flex flex-col gap-1 pt-1">
+            <li><a class="panel-row" href="{% url 'catalog:discover' %}" {% if active_nav == "discover" %}aria-current="page"{% endif %}>Discover</a></li>
+            <li><a class="panel-row" href="{% url 'catalog:library' %}" {% if active_nav == "library" %}aria-current="page"{% endif %}>Library</a></li>
+            <li><a class="panel-row" href="{% url 'packs:list' %}" {% if active_nav == "packs" %}aria-current="page"{% endif %}>Packs</a></li>
+          </ul>
+        {% endblock %}
+      </div>
+    </aside>
+
+    {# ---------- Content ---------- #}
+    {# data-drop picks this page's glow colours, shared by the hero glow and the footer glow. #}
+    {# data-surface sets the mood: "showcase" pages (Home, Discover) get the expressive       #}
+    {# hero glow and oversized mark; "work" pages (the default) stay restrained.             #}
+    <main id="content" class="relative flex-1 min-w-0 overflow-auto bg-panel grid-bg flex flex-col" data-drop="{{ active_nav|default:'home' }}" data-surface="{% block surface %}work{% endblock %}">
+      <div class="drop-glow page-glow" aria-hidden="true">
+        <span class="drop-blob drop-blob-a"></span><span class="drop-blob drop-blob-b"></span><span class="drop-blob drop-blob-c"></span>
+      </div>
+      <div class="hero-atmosphere" aria-hidden="true"><i class="mark hero-mark"></i></div>
+      <div class="relative w-full max-w-[1500px] mx-auto px-8 lg:px-12 pt-14 pb-12 space-y-8">
+        {% block content %}{% endblock %}
+      </div>
+
+      {# Footer: the "water drop" glow over the dot grid, the giant faint watermark #}
+      {# filling the empty space, and a small brand signature below it.          #}
+      <footer id="page-footer" class="relative mt-auto overflow-hidden">
+        <div class="drop-glow" aria-hidden="true">
+          <span class="drop-blob drop-blob-a"></span><span class="drop-blob drop-blob-b"></span><span class="drop-blob drop-blob-c"></span>
+        </div>
+        <div class="relative w-full max-w-[1500px] mx-auto px-8 lg:px-12 pt-24 pb-6">
+          {% block watermark %}<i class="word watermark w-full text-ink block" aria-hidden="true"></i>{% endblock %}
+          <div class="brand-signature grid grid-cols-[1fr_auto_1fr] items-center gap-4 micro text-fg-secondary mt-6">
+            <span>Built for Axcenity Engine</span>
+            <i class="word w-20 text-fg-strong" aria-hidden="true"></i>
+            <span class="text-right">Axcenity Studios · 2026</span>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  {# ---------- Status bar (monochrome; live provider status comes later) ---------- #}
+  <footer id="status-bar" class="h-6 shrink-0 flex items-center gap-4 px-3 text-[11.5px] bg-app border-t border-line text-fg-secondary">
+    <span class="flex items-center gap-1.5 text-fg-strong"><i class="mark w-3" aria-hidden="true"></i>Toolbox</span>
+    {% for name in status_providers %}
+      <span class="flex items-center gap-1.5" title="{{ name }}: status unknown">
+        <span class="w-1.5 h-1.5 rounded-full bg-fg-muted" aria-hidden="true"></span>{{ name }}
+      </span>
+    {% endfor %}
+    {% if user.is_authenticated %}
+      <span class="ml-auto">Library · <b class="text-fg-strong">—</b> saved</span>
+    {% endif %}
+  </footer>
+</div>
+</body>
+</html>

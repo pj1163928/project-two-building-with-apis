@@ -29,14 +29,16 @@ def search(query, asset_type=None, limit=5):
     data = get_json(API_URL, {"q": query.strip(), "page_size": limit}, provider=NAME)
     rows = []
     for item in data.get("results", []):
-        rows.append({
-            "id": item["id"],
-            "name": item.get("title") or item["id"],
-            "type": item.get("category") or "audio",
-            "info": f"{duration(item.get('duration'))}, {item.get('filetype') or '?'}, "
-                    f"by {item.get('creator') or 'unknown'}",
-            "license": license_label(item.get("license"), item.get("license_version")),
-        })
+        rows.append(
+            {
+                "id": item["id"],
+                "name": item.get("title") or item["id"],
+                "type": item.get("category") or "audio",
+                "info": f"{duration(item.get('duration'))}, {item.get('filetype') or '?'}, "
+                f"by {item.get('creator') or 'unknown'}",
+                "license": license_label(item.get("license"), item.get("license_version")),
+            }
+        )
     return rows
 
 

@@ -72,6 +72,10 @@ These decisions apply to every phase:
   - The custom DaisyUI theme is `axcenity`.
   - HTMX runs through django-htmx. A view checks `request.htmx` to choose
     between returning a fragment and a full page.
+  - Navigation is boosted (`hx-boost` on `<body>`, added in the Phase 1
+    polish). A boosted request also carries `HX-Request`, so a view that
+    returns fragments checks `request.htmx and not request.htmx.boosted`.
+    See docs/FRONTEND.md.
 - **Testing:**
   - All tests live in one top-level test folder with one shared conftest.
   - An autouse fixture clears the cache before each test.
@@ -132,28 +136,28 @@ the console script.
 
 ### Acceptance criteria
 
-- [ ] A visitor can sign up with a username and password and ends up
+- [x] A visitor can sign up with a username and password and ends up
   signed in.
-- [ ] A member can sign in and sign out. Sign-out is a POST that's
+- [x] A member can sign in and sign out. Sign-out is a POST that's
   protected by CSRF.
-- [ ] A signed-out visitor who opens a members-only page is sent to
+- [x] A signed-out visitor who opens a members-only page is sent to
   sign-in with `next` set, and returns to that page after signing in.
-- [ ] Every page renders inside the shell, and the side panel can be
+- [x] Every page renders inside the shell, and the side panel can be
   collapsed.
-- [ ] The fonts, logos and favicon load from static files. The chrome is
+- [x] The fonts, logos and favicon load from static files. The chrome is
   monochrome, primary buttons are white with dark text, and type colour
   appears nowhere yet.
-- [ ] The theme picks up no Tailwind or DaisyUI colours outside the
+- [x] The theme picks up no Tailwind or DaisyUI colours outside the
   `axcenity` palette.
-- [ ] A test proves that the network guard fails any unmocked request.
-- [ ] The console script's regression tests, using `responses`, pass
+- [x] A test proves that the network guard fails any unmocked request.
+- [x] The console script's regression tests, using `responses`, pass
   against the unchanged `search()` and `get_details()` in each provider.
-- [ ] Ruff is configured in `pyproject.toml` and the repo is clean
+- [x] Ruff is configured in `pyproject.toml` and the repo is clean
   against it.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: the members-only page
+- [x] Standard gate (see top). Access rules: the members-only page
   redirects signed-out visitors to sign-in. Sign-up, sign-in and sign-out
   forms reject requests without a CSRF token.
 
@@ -171,6 +175,10 @@ existing `search()` and `get_details()` stay untouched.
 
 `/discover/` shows four type tiles and a command-bar search, and pressing
 `/` focuses the search. The page is open to signed-out visitors.
+
+> **Already in place (Phase 1 polish):** the home page's hero search
+> already sends `/discover/?q=<query>`. Read the query from `q` so it
+> lands in the command bar.
 
 Each matching provider's shelf is its own HTMX request, fired on page
 load, so the page appears before any shelf finishes:
@@ -354,6 +362,19 @@ The filters live in the side panel. HTMX swaps only the results, and
 `hx-push-url` keeps the address bar in step. Loading the same URL
 directly renders the same view as a full page, and Back works. An empty
 library and an empty result each say what to do next.
+
+> **Already in place (Phase 1 polish):** `catalog/library.html` already
+> renders the controls, disabled:
+>
+> - `#library-toolbar` holds the search (`q`), the sort select with the
+>   four sorts, and a grid/list view toggle.
+> - `#library-filters` in the side panel holds the type, provider, status
+>   and minimum-rating chips.
+> - `#library-results` holds the empty state.
+>
+> Wire these up rather than adding new ones, and keep them disabled while
+> the library is empty. The view toggle isn't in the PRD, which describes
+> only a card grid: either build a list view or remove the toggle.
 
 ### Acceptance criteria
 
@@ -780,6 +801,12 @@ The site gets its motion, all in CSS plus a little plain JavaScript:
 - a cursor spotlight on cards and tiles
 - staggered blur-up entry for cards
 - View Transitions on HTMX swaps
+
+> **Already in place (Phase 1 polish, 2026-10-31):** boosted swaps already
+> run as View Transitions. The content fades and rises, and the current-page
+> marks glide between items, with reduced motion turning it off (see
+> docs/FRONTEND.md, "Page transitions"). This phase only needs to extend
+> them to HTMX fragment swaps.
 
 When the system asks for reduced motion (`prefers-reduced-motion`), all
 of it is turned off.

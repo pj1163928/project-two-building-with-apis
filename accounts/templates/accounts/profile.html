@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block breadcrumb %}{% url 'accounts:profile' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="account" icon="user" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'accounts:profile' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label=user.username icon="user" current=True %}{% endblock %}
+{% block panel_title %}Account{% endblock %}
+{% block side_panel %}
+  <ul class="flex flex-col gap-1">
+    <li><a class="panel-row" href="{% url 'accounts:profile' %}" aria-current="page">Profile</a></li>
+    <li><a class="panel-row" href="{% url 'accounts:settings' %}">Settings</a></li>
+  </ul>
+{% endblock %}
+{% block content %}
+<div class="max-w-xl space-y-8">
+  {% include "partials/page_header.html" with label="Account" heading=user.username compact=True %}
+  <dl class="bg-surface border border-line rounded-xl divide-y divide-line">
+    <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Username</dt><dd class="text-fg-strong">{{ user.username }}</dd></div>
+    <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Member since</dt><dd>{{ user.date_joined|date:"j M Y" }}</dd></div>
+  </dl>
+  <form method="post" action="{% url 'accounts:logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-sm">Sign out</button>
+  </form>
+</div>
+{% endblock %}

@@ -33,6 +33,19 @@ called anonymously. Openverse caps anonymous clients at 20 requests per
 minute and 200 per day. `.env` files and secrets handling will arrive
 later with Freesound, which does need a key.
 
+### Website test account
+
+A regular (non-staff) account for trying the Axcenity Toolbox website by
+hand:
+
+| Username | Password |
+|---|---|
+| `test_user` | `5eMN9sKdr6cvJB` |
+
+The account lives in the local `db.sqlite3`, which is git-ignored and never
+committed. On a fresh clone, run `uv run python manage.py migrate`, start the
+site, and create the account at `/accounts/signup/` with these details.
+
 ## How to run
 
 The project uses [uv](https://docs.astral.sh/uv/) and Python 3.13.

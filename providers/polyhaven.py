@@ -55,13 +55,15 @@ def search(query, asset_type=None, limit=5):
         details = [f"max {_resolution_text(info)}"]
         if size := _physical_size(info):
             details.append(size)
-        rows.append({
-            "id": hit["slug"],
-            "name": info.get("name") or hit["slug"],
-            "type": TYPE_NAMES.get(info.get("type"), "unknown"),
-            "info": ", ".join(details),
-            "license": LICENSE,
-        })
+        rows.append(
+            {
+                "id": hit["slug"],
+                "name": info.get("name") or hit["slug"],
+                "type": TYPE_NAMES.get(info.get("type"), "unknown"),
+                "info": ", ".join(details),
+                "license": LICENSE,
+            }
+        )
     return rows
 
 

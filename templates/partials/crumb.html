@@ -1,0 +1,4 @@
+{# A breadcrumb chip whose label swaps to an icon on hover.                                  #}
+{# Usage: {% url 'catalog:discover' as href %}                                               #}
+{#        {% include "partials/crumb.html" with href=href label="discover" icon="search" current=True %} #}
+<a class="crumb chip-swap" href="{{ href }}"{% if current %} aria-current="page"{% endif %}><span class="chip-label">{{ label }}</span><span class="chip-icon" aria-hidden="true">{% include "partials/icon.html" with name=icon size=16 %}</span></a>

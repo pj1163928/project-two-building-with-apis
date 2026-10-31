@@ -1,0 +1,16 @@
+{% extends "registration/auth_base.html" %}
+{% block title %}Sign up{% endblock %}
+{% block breadcrumb %}{% url 'accounts:login' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="account" icon="user" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'accounts:signup' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="sign up" icon="user-plus" current=True %}{% endblock %}
+{% block auth_heading %}Create your account.{% endblock %}
+{% block auth_lead %}A username and password is all it takes to start your asset library.{% endblock %}
+{% block auth_form %}
+  <form method="post" action="{% url 'accounts:signup' %}" class="auth-form space-y-5" novalidate>
+    {% csrf_token %}
+    {% include "partials/form_fields.html" %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="pt-4">
+      <button type="submit" class="btn btn-primary w-full h-12 text-[15px] rounded-none">Sign up</button>
+    </div>
+  </form>
+{% endblock %}
+{% block auth_switch %}Already have an account? <a class="link text-fg-strong" href="{% url 'accounts:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Sign in</a>{% endblock %}

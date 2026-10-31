@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block breadcrumb %}{% url 'accounts:profile' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="account" icon="user" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'accounts:settings' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="settings" icon="gear" current=True %}{% endblock %}
+{% block panel_title %}Account{% endblock %}
+{% block side_panel %}
+  <ul class="flex flex-col gap-1">
+    <li><a class="panel-row" href="{% url 'accounts:profile' %}">Profile</a></li>
+    <li><a class="panel-row" href="{% url 'accounts:settings' %}" aria-current="page">Settings</a></li>
+  </ul>
+{% endblock %}
+{% block content %}
+<div class="max-w-xl space-y-8">
+  {% include "partials/page_header.html" with label="Settings" heading="Settings." compact=True %}
+  <dl class="bg-surface border border-line rounded-xl divide-y divide-line">
+    <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Theme</dt><dd class="text-fg-strong">Axcenity, following your system (dark or light)</dd></div>
+    <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Side panel</dt><dd>Toggle it with the panel button at the top of the sidebar</dd></div>
+  </dl>
+</div>
+{% endblock %}

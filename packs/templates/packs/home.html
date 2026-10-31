@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block surface %}showcase{% endblock %}
+{# Home has no breadcrumb: the Home chip before TOOLBOX already marks it. #}
+{% block breadcrumb_nav %}{% endblock %}
+{% block content %}
+  <section class="space-y-8">
+    {% include "partials/page_header.html" with label="Axcenity Toolbox" heading="The asset toolbox for Axcenity Engine." lead="Find free textures, HDRIs, models and sounds, keep them in your own library, and build packs your projects can import." %}
+    {# The one primary action. Discover reads the query once Phase 2a builds search. #}
+    <form id="hero-search" method="get" action="{% url 'catalog:discover' %}" role="search" class="hero-search">
+      <label for="hero-search-input" class="sr-only">Search free assets</label>
+      {% include "partials/icon.html" with name="search" size=20 %}
+      <input id="hero-search-input" type="search" name="q" autocomplete="off"
+             placeholder="Search textures, HDRIs, models and sounds">
+      <button type="submit" class="btn btn-primary rounded-none h-10 min-h-10 px-5">Search</button>
+    </form>
+    <div class="flex flex-wrap gap-3">
+      {% if user.is_authenticated %}
+        <a href="{% url 'catalog:discover' %}" class="btn btn-quiet">Browse Discover</a>
+        <a href="{% url 'catalog:library' %}" class="btn btn-quiet">Open your library</a>
+      {% else %}
+        <a href="{% url 'accounts:signup' %}" class="btn btn-quiet">Sign up</a>
+        <a href="{% url 'accounts:login' %}" class="btn btn-quiet">Sign in</a>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

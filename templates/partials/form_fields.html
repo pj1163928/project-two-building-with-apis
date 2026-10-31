@@ -1,0 +1,37 @@
+{# Renders a form's errors and fields in the shell's style.                                   #}
+{# - Errors the form as a whole raises (a wrong username or password) show first, as an alert. #}
+{# - Each field's own errors sit right under it. Their id matches the aria-describedby that    #}
+{#   Django puts on an invalid input, so screen readers read the error with the field.         #}
+{# - Password inputs get a show/hide toggle (static/js/password-toggle.js).                    #}
+{# - Pass forgot_url to put a "Forgot password?" link beside the "password" field's label.     #}
+{% if form.non_field_errors %}
+  <div id="form-errors" role="alert" class="form-alert">
+    {% include "partials/icon.html" with name="alert" size=18 %}
+    <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+  </div>
+{% endif %}
+{% for field in form %}
+  <div class="form-field space-y-2">
+    <div class="flex items-baseline justify-between gap-3">
+      <label for="{{ field.id_for_label }}" class="micro text-fg-secondary block">{{ field.label }}</label>
+      {% if forgot_url and field.name == "password" %}<a href="{{ forgot_url }}" class="text-xs text-fg-weak link link-hover">Forgot password?</a>{% endif %}
+    </div>
+    {% if field.widget_type == "password" %}
+      <div class="password-field">
+        {{ field }}
+        <button type="button" class="password-toggle" data-password-toggle aria-controls="{{ field.id_for_label }}" aria-pressed="false" aria-label="Show password">
+          <span class="when-hidden">{% include "partials/icon.html" with name="eye" size=18 %}</span>
+          <span class="when-shown">{% include "partials/icon.html" with name="eye-off" size=18 %}</span>
+        </button>
+      </div>
+    {% else %}
+      {{ field }}
+    {% endif %}
+    {% if field.errors %}
+      <ul id="{{ field.auto_id }}_error" class="field-errors">
+        {% for error in field.errors %}<li>{% include "partials/icon.html" with name="alert" size=14 %}<span>{{ error }}</span></li>{% endfor %}
+      </ul>
+    {% endif %}
+    {% if field.help_text %}<div id="{{ field.auto_id }}_helptext" class="text-xs text-fg-weak [&_ul]:list-disc [&_ul]:pl-4">{{ field.help_text|safe }}</div>{% endif %}
+  </div>
+{% endfor %}

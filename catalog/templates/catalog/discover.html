@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Discover{% endblock %}
+{% block surface %}showcase{% endblock %}
+{% block breadcrumb %}{% url 'catalog:discover' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="discover" icon="search" current=True %}{% endblock %}
+{% block content %}
+  {% include "partials/page_header.html" with label="Discover" heading="Find assets for your next pack." lead="Search free CC0 and Creative Commons libraries, save what fits, and build packs your Axcenity projects can import." %}
+  {% include "partials/empty_state.html" with title="Provider search is not connected yet." body="Textures, HDRIs, models and sounds from ambientCG, Poly Haven and Openverse will appear here." %}
+{% endblock %}
