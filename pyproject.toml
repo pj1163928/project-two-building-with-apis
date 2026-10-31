@@ -1,0 +1,8 @@
+[project]
+name = "project-two-building-with-apis"
+version = "0.1.0"
+description = "Game asset collection and management center (CIDM 3312 Project 2)"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.34.2",
+]
