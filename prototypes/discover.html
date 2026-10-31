@@ -1,0 +1,520 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Answers one question:
+  "How should the Discover (asset search) page be laid out inside the VSCode-style shell?"
+  Data is a canned snapshot of real ambientCG / Poly Haven / Openverse results (2026-10-30).
+  Nothing here is production code. Open the file directly in a browser.
+-->
+<html lang="en" data-theme="axcenity">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE · Discover · Axcenity Toolbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+</style>
+<style>
+  :root {
+    --tex: #f5a524;  /* textures: amber */
+    --hdr: #3b8eea;  /* HDRIs: blue */
+    --mdl: #3fb950;  /* models: green */
+    --snd: #b083f0;  /* sounds: violet */
+  }
+  [data-theme="axcenity"] {
+    color-scheme: dark;
+    --color-base-100: #1e1e1e;
+    --color-base-200: #181818;
+    --color-base-300: #2a2a2a;
+    --color-base-content: #cccccc;
+    --color-primary: #3b8eea;  --color-primary-content: #ffffff;
+    --color-secondary: #b083f0; --color-secondary-content: #ffffff;
+    --color-accent: #f5a524;   --color-accent-content: #1e1e1e;
+    --color-neutral: #2d2d2d;  --color-neutral-content: #d4d4d4;
+    --color-info: #3b8eea;     --color-info-content: #ffffff;
+    --color-success: #3fb950;  --color-success-content: #0d1117;
+    --color-warning: #d29922;  --color-warning-content: #111111;
+    --color-error: #f14c4c;    --color-error-content: #ffffff;
+    --radius-selector: .25rem; --radius-field: .25rem; --radius-box: .375rem;
+    --size-selector: .25rem; --size-field: .25rem;
+    --border: 1px; --depth: 0; --noise: 0;
+  }
+  html, body { font-family: "Inter", ui-sans-serif, system-ui, sans-serif; background: #181818; }
+  input[name="q"] { outline: none !important; border: 0; box-shadow: none; }
+  .mono  { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .micro { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10.5px;
+           letter-spacing: .14em; text-transform: uppercase; }
+  .hair  { border-color: #2b2b2b; }
+  .panel { background: #1b1b1b; }
+  .tc       { color: var(--tc); }
+  .tc-bg    { background: color-mix(in srgb, var(--tc) 14%, transparent); }
+  .tc-dot   { background: var(--tc); box-shadow: 0 0 8px var(--tc); }
+
+  /* Activity bar */
+  .act { position: relative; color: #858585; transition: color .15s; }
+  .act:hover { color: #e5e5e5; }
+  .act.on { color: #ffffff; }
+  .act.on::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: #fff; }
+
+  /* Editor-style tabs */
+  .etab { border-top: 2px solid transparent; color: #8b8b8b; background: #181818; }
+  .etab:hover { color: #ddd; }
+  .etab.on { border-top-color: var(--tc); color: #fff; background: #1e1e1e; }
+
+  /* Cards */
+  .acard { background: #202020; border: 1px solid #2b2b2b; border-radius: .5rem; overflow: hidden;
+           transition: transform .2s cubic-bezier(.2,.7,.2,1), box-shadow .2s, border-color .2s; }
+  .acard:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--tc) 60%, #2b2b2b);
+           box-shadow: 0 10px 30px -12px color-mix(in srgb, var(--tc) 55%, transparent); }
+  .acard .thumb img { transition: transform .5s cubic-bezier(.2,.7,.2,1); }
+  .acard:hover .thumb img { transform: scale(1.06); }
+  .overlay { opacity: 0; transition: opacity .2s; }
+  .acard:hover .overlay, .acard:focus-within .overlay { opacity: 1; }
+
+  .rise { animation: rise .45s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+  .fade { animation: fade .3s ease both; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  .wave rect { transform-origin: center; }
+  .playing .wave rect { animation: eq .9s ease-in-out infinite alternate; }
+  @keyframes eq { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
+
+  .row-sel { background: color-mix(in srgb, #3b8eea 22%, transparent); box-shadow: inset 2px 0 0 #3b8eea; }
+  .cmd { background: #232323; border: 1px solid #333; box-shadow: 0 20px 60px -20px #000; }
+  .cmd:focus-within { border-color: #3b8eea; }
+  .grid-bg { background-image: radial-gradient(#ffffff0d 1px, transparent 1px); background-size: 18px 18px; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #3a3a3a; border: 3px solid #1e1e1e; border-radius: 8px; }
+
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  /* Prototype chrome: deliberately NOT part of the design being judged */
+  #proto { font-family: system-ui, sans-serif; }
+</style>
+</head>
+<body class="text-base-content">
+<div id="app"></div>
+
+<!-- ============ PROTOTYPE SWITCHER (not part of the design) ============ -->
+<div id="proto" class="fixed z-50 right-4 bottom-10 w-80 rounded-lg border-2 border-dashed border-yellow-300 bg-yellow-200 text-black shadow-2xl text-[13px]">
+  <div class="flex items-center gap-2 px-3 py-2">
+    <b class="text-[11px] tracking-widest">PROTOTYPE</b>
+    <button class="px-2 rounded bg-black/10 hover:bg-black/20" onclick="step(-1)">◀</button>
+    <span id="pv" class="flex-1 text-center font-semibold"></span>
+    <button class="px-2 rounded bg-black/10 hover:bg-black/20" onclick="step(1)">▶</button>
+    <button class="px-2 rounded bg-black/10 hover:bg-black/20" onclick="toggleProto()" title="Simulate / state">⚙</button>
+  </div>
+  <div id="pbody" class="hidden border-t border-black/20 px-3 py-2 space-y-1">
+    <div class="text-[11px] opacity-70">← / → switch variants · 1–4 switch type · try searching <i>zzqqxx</i></div>
+    <label class="flex gap-2"><input type="checkbox" data-sim="failPH"> Poly Haven unreachable</label>
+    <label class="flex gap-2"><input type="checkbox" data-sim="failOV"> Openverse times out</label>
+    <label class="flex gap-2"><input type="checkbox" data-sim="emptyACG"> ambientCG returns nothing</label>
+    <label class="flex gap-2"><input type="checkbox" data-sim="slow"> Slow network (×3 delays)</label>
+    <button class="mt-1 px-2 py-0.5 rounded bg-black/10 hover:bg-black/20" onclick="S.saved.clear(); render()">Clear saved</button>
+    <pre id="pstate" class="mt-2 max-h-48 overflow-auto bg-black/80 text-green-300 text-[11px] p-2 rounded"></pre>
+  </div>
+</div>
+
+<script>
+const DATA = {"textures": {"q": "brick", "ambientcg": [{"id": "Ground111", "name": "Ground 111", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/Ground111.png", "tags": ["111", "brick", "brown", "construction"], "license": "CC0", "author": "ambientCG", "variants": ["1K-JPG", "2K-JPG", "4K-JPG", "8K-JPG", "1K-PNG", "2K-PNG"], "size": 9761806}, {"id": "Ground107", "name": "Ground 107", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/Ground107.png", "tags": ["107", "brick", "brown", "debris"], "license": "CC0", "author": "ambientCG", "variants": ["1K-JPG", "2K-JPG", "4K-JPG", "8K-JPG", "1K-PNG", "2K-PNG"], "size": 9788283}, {"id": "Bricks097", "name": "Bricks 097", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/Bricks097.png", "tags": ["97", "brick", "bricks", "brown"], "license": "CC0", "author": "ambientCG", "variants": ["1K-JPG", "2K-JPG", "4K-JPG", "8K-JPG", "1K-PNG", "2K-PNG"], "size": 5172084}, {"id": "Bricks060", "name": "Bricks 060", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/Bricks060.png", "tags": ["60", "brick", "bricks", "bright"], "license": "CC0", "author": "ambientCG", "variants": ["1K-JPG", "2K-JPG", "4K-JPG", "8K-JPG", "1K-PNG", "2K-PNG"], "size": 7852794}, {"id": "Bricks100", "name": "Bricks 100", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/Bricks100.png", "tags": ["100", "beige", "brick", "bricks"], "license": "CC0", "author": "ambientCG", "variants": ["1K-JPG", "2K-JPG", "4K-JPG", "8K-JPG", "12K-JPG", "16K-JPG"], "size": 4827385}, {"id": "Bricks089", "name": "Bricks 089", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/Bricks089.png", "tags": ["89", "brick", "bricks", "dark"], "license": "CC0", "author": "ambientCG", "variants": ["1K-JPG", "2K-JPG", "4K-JPG", "8K-JPG", "1K-PNG", "2K-PNG"], "size": 5317280}], "polyhaven": [{"id": "patterned_brick_wall_03", "name": "Patterned Brick Wall 03", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/patterned_brick_wall_03.png?width=256&height=256", "tags": ["rough", "brick", "bricks", "patterned"], "license": "CC0", "author": "Charlotte Baglioni", "maxres": "8192x8192"}, {"id": "church_bricks_03", "name": "Church Bricks 03", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/church_bricks_03.png?width=256&height=256", "tags": ["rough", "red", "uneven", "industrial"], "license": "CC0", "author": "Rob Tuytel", "maxres": "8192x8192"}, {"id": "red_bricks_02", "name": "Red Bricks 02", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/red_bricks_02.png?width=256&height=256", "tags": ["rough", "broken", "red", "bricks"], "license": "CC0", "author": "Rob Tuytel", "maxres": "8192x8192"}, {"id": "brick_wall_02", "name": "Brick Wall 02", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/brick_wall_02.png?width=256&height=256", "tags": ["weathered", "cracked", "concrete", "scratched"], "license": "CC0", "author": "Dimitrios Savva", "maxres": "8192x8192"}, {"id": "red_bricks_04", "name": "Red Bricks 04", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/red_bricks_04.png?width=256&height=256", "tags": ["textured", "bricks", "baked", "rough"], "license": "CC0", "author": "Rob Tuytel", "maxres": "8192x8192"}, {"id": "floor_bricks_02", "name": "Floor Bricks 02", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/floor_bricks_02.png?width=256&height=256", "tags": ["bricks", "moss", "pavement", "scattered plants "], "license": "CC0", "author": "Rob Tuytel", "maxres": "16384x16384"}]}, "hdris": {"q": "sunset", "ambientcg": [{"id": "EveningSkyHDRI046B", "name": "Evening Sky HDRI 046 B", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/EveningSkyHDRI046B.png", "tags": ["046", "46", "calm", "clouds"], "license": "CC0", "author": "ambientCG", "variants": ["1K", "2K", "4K", "8K", "12K", "16K"], "size": 2758978}, {"id": "EveningSkyHDRI046A", "name": "Evening Sky HDRI 046 A", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/EveningSkyHDRI046A.png", "tags": ["046", "46", "calm", "cloudy"], "license": "CC0", "author": "ambientCG", "variants": ["1K", "2K", "4K", "8K", "12K", "16K"], "size": 3718875}, {"id": "EveningSkyHDRI032A", "name": "Evening Sky HDRI 032 A", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/EveningSkyHDRI032A.png", "tags": ["32", "clouds", "evening", "hdri"], "license": "CC0", "author": "ambientCG", "variants": ["1K", "2K", "4K", "8K", "12K", "16K"], "size": 3664714}, {"id": "EveningSkyHDRI022B", "name": "Evening Sky HDRI 022 B", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/EveningSkyHDRI022B.png", "tags": ["22", "dusk", "evening", "hdri"], "license": "CC0", "author": "ambientCG", "variants": ["1K", "2K", "4K", "8K", "12K", "16K"], "size": 2512197}, {"id": "EveningSkyHDRI045A", "name": "Evening Sky HDRI 045 A", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/EveningSkyHDRI045A.png", "tags": ["045", "45", "autumn", "clouds"], "license": "CC0", "author": "ambientCG", "variants": ["1K", "2K", "4K", "8K", "12K", "16K"], "size": 3737293}, {"id": "EveningSkyHDRI044B", "name": "Evening Sky HDRI 044 B", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/EveningSkyHDRI044B.png", "tags": ["044", "44", "autumn", "calm"], "license": "CC0", "author": "ambientCG", "variants": ["1K", "2K", "4K", "8K", "12K", "16K"], "size": 2429102}], "polyhaven": [{"id": "rogland_sunset", "name": "Rogland Sunset", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/rogland_sunset.png?width=256&height=256", "tags": ["rocky", "arid", "desert", "sun"], "license": "CC0", "author": "Greg Zaal", "maxres": "24576x12288"}, {"id": "sunset_meadow_path", "name": "Sunset Meadow Path", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/sunset_meadow_path.png?width=256&height=256", "tags": ["grass", "field", "path", "dirt road"], "license": "CC0", "author": "Elvis Posa", "maxres": "24576x12288"}, {"id": "kiara_8_sunset", "name": "Kiara 8 Sunset", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/kiara_8_sunset.png?width=256&height=256", "tags": ["sun", "mountain", "valley", "rock"], "license": "CC0", "author": "Greg Zaal", "maxres": "16384x8192"}, {"id": "toposcope_sunset", "name": "Toposcope Sunset", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/toposcope_sunset.png?width=256&height=256", "tags": ["hilltop", "vista", "valley", "view"], "license": "CC0", "author": "Dario Barresi", "maxres": "24576x12288"}, {"id": "belfast_sunset", "name": "Belfast Sunset", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/belfast_sunset.png?width=256&height=256", "tags": ["grass", "hill", "hilltop", "field"], "license": "CC0", "author": "Greg Zaal, Dimitrios Savva", "maxres": "24576x12288"}, {"id": "safari_sunset", "name": "Safari Sunset", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/safari_sunset.png?width=256&height=256", "tags": ["veld", "bush", "safari", "dense"], "license": "CC0", "author": "Dimitrios Savva, Jarod Guest", "maxres": "20480x10240"}]}, "models": {"q": "wood", "ambientcg": [{"id": "3DTreeStump001", "name": "3D Tree Stump 001", "thumb": "https://acg-media.struffelproductions.com/file/ambientCG-Web/media/thumbnail/256-PNG/3DTreeStump001.png", "tags": ["1", "3d", "stump", "tree"], "license": "CC0", "author": "ambientCG", "variants": ["LQ-1K-JPG", "LQ-2K-JPG", "LQ-4K-JPG", "LQ-1K-PNG", "LQ-2K-PNG", "LQ-4K-PNG"], "size": 5694798}], "polyhaven": [{"id": "wooden_bookshelf_worn", "name": "Wooden Bookshelf Worn", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_bookshelf_worn.png?width=256&height=256", "tags": ["old", "wooden", "wood", "worn"], "license": "CC0", "author": "Ulan Cabanilla", "maxres": "4096x4096"}, {"id": "WoodenTable_03", "name": "Wooden Table 03", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/WoodenTable_03.png?width=256&height=256", "tags": ["vintage", "wood", "prop", "table"], "license": "CC0", "author": "Gabriel Radić", "maxres": "4096x4096"}, {"id": "wooden_axe_03", "name": "Wooden Axe 03", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_axe_03.png?width=256&height=256", "tags": ["forest", "gardening", "garden", "lumberjack"], "license": "CC0", "author": "Ulan Cabanilla", "maxres": "4096x4096"}, {"id": "dry_branches_medium_01", "name": "Dry Branches Medium 01", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/dry_branches_medium_01.png?width=256&height=256", "tags": ["branches", "dead", "dry", "plants"], "license": "CC0", "author": "Rico Cilliers", "maxres": "8192x8192"}, {"id": "Shelf_01", "name": "Shelf 01", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/Shelf_01.png?width=256&height=256", "tags": ["wood", "shelf", "furniture", "storage"], "license": "CC0", "author": "Gabriel Radić", "maxres": "4096x4096"}, {"id": "fir_tree_01", "name": "Fir Tree 01", "thumb": "https://cdn.polyhaven.com/asset_img/thumbs/fir_tree_01.png?width=256&height=256", "tags": ["fir", "tree", "geometry nodes", "woodland"], "license": "CC0", "author": "Rob Tuytel, Rico Cilliers", "maxres": "8192x8192"}]}, "sounds": {"q": "footsteps", "openverse": [{"id": "a8783d20-f1af-4c4b-b9ec-a8c212f67fee", "name": "Footsteps, Stones, A.wav", "tags": ["Footstep", "Footsteps", "Stone", "Stones"], "license": "CC BY 4.0", "author": "InspectorJ", "duration": 18944, "filetype": "mp3"}, {"id": "a049cdee-e8d0-4b88-990e-4735d3c9b1d8", "name": "Footsteps, Concrete, A.wav", "tags": ["Concrete", "Dusty", "Foot", "Footstep"], "license": "CC BY 4.0", "author": "InspectorJ", "duration": 39802, "filetype": "mp3"}, {"id": "761c4f5f-a805-4e52-b4a3-64b3eb5c1044", "name": "footstep on wood foley.wav", "tags": ["foley", "footstep", "heels", "walking"], "license": "CC0", "author": "martian", "duration": 17000, "filetype": "mp3"}, {"id": "25ad5880-931b-4f71-8947-87a319c9feca", "name": "Footsteps on Tiles.wav", "tags": ["floor", "foot", "footsteps", "ground"], "license": "CC0", "author": "RutgerMuller", "duration": 24188, "filetype": "mp3"}, {"id": "34f44ef1-1dd7-4be8-a229-49da97be42e7", "name": "Footsteps, Dry Leaves, G.wav", "tags": ["Dry", "Footstep", "Footsteps", "Leaf"], "license": "CC BY 4.0", "author": "InspectorJ", "duration": 28760, "filetype": "mp3"}, {"id": "b77b844c-d1a5-457f-801b-7c007bc92fa0", "name": "Footsteps, Snow, A.wav", "tags": ["Foot", "Footstep", "Footsteps", "Snow"], "license": "CC BY 4.0", "author": "InspectorJ", "duration": 33718, "filetype": "mp3"}]}};
+
+const TYPES = [
+  { key: "textures", label: "Textures", kind: "texture", c: "var(--tex)", providers: ["ambientcg", "polyhaven"] },
+  { key: "hdris",    label: "HDRIs",    kind: "hdri",    c: "var(--hdr)", providers: ["ambientcg", "polyhaven"] },
+  { key: "models",   label: "Models",   kind: "model",   c: "var(--mdl)", providers: ["ambientcg", "polyhaven"] },
+  { key: "sounds",   label: "Sounds",   kind: "sound",   c: "var(--snd)", providers: ["openverse"] },
+];
+const PROV = {
+  ambientcg: { name: "ambientCG",       credit: "Assets from ambientCG · CC0", delay: 500,  url: "https://ambientcg.com/a/" },
+  polyhaven: { name: "Poly Haven",      credit: "Powered by Poly Haven",       delay: 1400, url: "https://polyhaven.com/a/" },
+  openverse: { name: "Openverse Audio", credit: "Made with Openverse",         delay: 2200, url: "https://openverse.org/audio/" },
+};
+const VARIANTS = [
+  { key: "A", name: "Split editor" },
+  { key: "B", name: "Gallery shelves" },
+  { key: "C", name: "Search view + preview" },
+];
+
+const S = {
+  v: "ABC".includes(location.hash.slice(1)) && location.hash.length === 2 ? "ABC".indexOf(location.hash.slice(1)) : Number(localStorage.getItem("ax-proto-variant") || 0),
+  type: "textures",
+  query: DATA.textures.q,
+  sections: {},
+  saved: new Set(),
+  saving: new Set(),
+  sim: { failPH: false, failOV: false, emptyACG: false, slow: false },
+  panel: [true, false, true],
+  sel: null,
+  playing: null,
+  collapsed: {},
+  token: 0,
+};
+const T = () => TYPES.find(t => t.key === S.type);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const mb = b => b ? (b > 1e9 ? (b / 1e9).toFixed(2) + " GB" : (b / 1e6).toFixed(1) + " MB") : "";
+const mss = ms => ms ? `${Math.floor(ms / 60000)}:${String(Math.round(ms / 1000) % 60).padStart(2, "0")}` : "?";
+
+/* ---------------- search simulation (stands in for one HTMX request per provider) ---------------- */
+function runSearch() {
+  const tok = ++S.token;
+  S.sel = null;
+  for (const p of T().providers) {
+    S.sections[p] = { status: "loading", items: [] };
+    const d = PROV[p].delay * (S.sim.slow ? 3 : 1);
+    setTimeout(() => {
+      if (tok !== S.token) return;
+      S.sections[p] = resolve(p);
+      if (S.v === 2 && !S.sel) { const first = firstItem(); if (first) S.sel = first; }
+      render();
+    }, d);
+  }
+  render();
+}
+function resolve(p) {
+  if (p === "polyhaven" && S.sim.failPH)
+    return { status: "error", msg: "Could not connect to Poly Haven. Check your internet connection, or try again in a minute." };
+  if (p === "openverse" && S.sim.failOV)
+    return { status: "error", msg: "Openverse Audio timed out after 10 s. New searches can be slow; try again shortly or use a different phrase." };
+  const block = DATA[S.type];
+  let items = (block[p] || []).map(it => ({ ...it, provider: p, kind: T().kind }));
+  if (p === "ambientcg" && S.sim.emptyACG) items = [];
+  const q = S.query.trim().toLowerCase();
+  if (q && q !== block.q) {
+    const words = q.split(/\s+/);
+    items = items.filter(it => words.some(w => (it.name + " " + it.tags.join(" ")).toLowerCase().includes(w)));
+  }
+  return items.length ? { status: "ok", items, fresh: true } : { status: "empty", items: [] };
+}
+function firstItem() {
+  for (const p of T().providers) { const s = S.sections[p]; if (s?.status === "ok") return s.items[0]; }
+  return null;
+}
+function allItems() { return T().providers.flatMap(p => S.sections[p]?.status === "ok" ? S.sections[p].items : []); }
+
+function save(id) {
+  if (S.saved.has(id) || S.saving.has(id)) return;
+  S.saving.add(id); render();
+  setTimeout(() => { S.saving.delete(id); S.saved.add(id); render(); }, 450);
+}
+function setType(k) { S.type = k; S.query = DATA[k].q; runSearch(); }
+function submit(e) { e.preventDefault(); S.query = e.target.q.value; runSearch(); }
+function retry(p) { S.sections[p] = { status: "loading", items: [] }; render();
+  setTimeout(() => { S.sections[p] = resolve(p); render(); }, PROV[p].delay); }
+function play(id) { S.playing = S.playing === id ? null : id; render(); }
+function select(id) { S.sel = allItems().find(i => i.id === id) || null; render(); }
+function togglePanel() { S.panel[S.v] = !S.panel[S.v]; render(); }
+window.imgFail = img => { const k = img.dataset.kind; img.replaceWith(Object.assign(document.createElement("div"), {
+  className: "w-full h-full grid place-items-center tc-bg tc", innerHTML: icon(k, 36) })); };
+
+/* ---------------- shared pieces ---------------- */
+function icon(kind, s = 18) {
+  const p = {
+    texture: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+    hdri:    '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    model:   '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+    sound:   '<path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 11v2"/>',
+    home:    '<path d="M3 11 12 3l9 8v10h-6v-6H9v6H3z"/>',
+    search:  '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+    library: '<path d="M4 4h4v16H4zM10 4h4v16h-4zM16 5l3.5-1 3 15.5-3.5 1z"/>',
+    pack:    '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8M7.5 5.5l9 5"/>',
+    user:    '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    panel:   '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+    ext:     '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>',
+  }[kind];
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+}
+function wave(id, w = 120, h = 40, bars = 28) {
+  let x = 0; for (const ch of id) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
+  let out = ""; const bw = w / bars;
+  for (let i = 0; i < bars; i++) {
+    x = (x * 1103515245 + 12345) >>> 0;
+    const bh = Math.max(3, ((x >>> 16) % 100) / 100 * h * (0.4 + 0.6 * Math.sin(Math.PI * i / bars)));
+    out += `<rect x="${i * bw + 1}" y="${(h - bh) / 2}" width="${bw - 2}" height="${bh}" rx="1" fill="currentColor" style="animation-delay:${(i % 7) * 70}ms"/>`;
+  }
+  return `<svg class="wave" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" width="100%" height="100%">${out}</svg>`;
+}
+function thumb(it) {
+  if (it.kind === "sound") return `<div class="w-full h-full grid place-items-center tc-bg tc p-3 ${S.playing === it.id ? "playing" : ""}">${wave(it.id)}</div>`;
+  return `<img src="${esc(it.thumb)}" alt="" loading="lazy" data-kind="${it.kind}" onerror="imgFail(this)" class="w-full h-full object-cover">`;
+}
+function meta(it) {
+  if (it.kind === "sound") return `${mss(it.duration)} · ${esc(it.filetype || "?")} · by ${esc(it.author || "unknown")}`;
+  if (it.provider === "polyhaven") return `max ${esc(it.maxres || "?")} · ${esc(it.author || "")}`;
+  return `${(it.variants || []).length}+ downloads · from ${mb(it.size)}`;
+}
+function saveBtn(it, cls = "btn-xs") {
+  if (S.saved.has(it.id)) return `<button class="btn ${cls} btn-success btn-soft no-animation pointer-events-none">✓ In library</button>`;
+  if (S.saving.has(it.id)) return `<button class="btn ${cls} btn-soft"><span class="loading loading-spinner loading-xs"></span>Saving</button>`;
+  return `<button class="btn ${cls} btn-outline border-[#3a3a3a] hover:border-primary hover:bg-primary hover:text-white" onclick="event.stopPropagation(); save('${esc(it.id)}')">+ Save to library</button>`;
+}
+function typeBadge(it) { return `<span class="micro px-1.5 py-0.5 rounded tc bg-black/75 backdrop-blur border border-white/10">${it.kind}</span>`; }
+function tags(it, n = 3) { return it.tags.filter(t => !/^\d+$/.test(t)).slice(0, n).map(t => `<span class="mono text-[10.5px] px-1.5 py-0.5 rounded bg-[#2a2a2a] text-[#9a9a9a]">${esc(t)}</span>`).join(""); }
+
+function statusLine(p) {
+  const s = S.sections[p];
+  if (!s) return "";
+  if (s.status === "loading") return `<span class="loading loading-dots loading-xs text-warning"></span>`;
+  if (s.status === "error") return `<span class="text-error micro">failed</span>`;
+  if (s.status === "empty") return `<span class="micro opacity-50">0 results</span>`;
+  return `<span class="micro opacity-60">${s.items.length} results</span>`;
+}
+function stateBlock(p, layout) {
+  const s = S.sections[p];
+  if (!s || s.status === "loading") {
+    const n = layout === "rows" ? 4 : 6;
+    return layout === "rows"
+      ? Array.from({ length: n }, () => `<div class="flex gap-3 items-center p-2"><div class="skeleton w-24 h-12 shrink-0"></div><div class="flex-1 space-y-2"><div class="skeleton h-3 w-2/3"></div><div class="skeleton h-3 w-1/3"></div></div></div>`).join("")
+      : `<div class="grid gap-3 ${layout}">${Array.from({ length: n }, () => `<div class="rounded-lg overflow-hidden border hair"><div class="skeleton aspect-square rounded-none"></div><div class="p-3 space-y-2"><div class="skeleton h-3 w-3/4"></div><div class="skeleton h-3 w-1/2"></div></div></div>`).join("")}</div>`;
+  }
+  if (s.status === "error") return `<div role="alert" class="alert alert-error alert-soft fade items-start">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>
+      <div><div class="font-semibold">${PROV[p].name} is unavailable</div><div class="text-sm opacity-90">${esc(s.msg)}</div>
+      <div class="text-xs opacity-70 mt-1">Your library still works. Saved assets are stored locally.</div></div>
+      <button class="btn btn-sm btn-ghost" onclick="retry('${p}')">Retry</button></div>`;
+  if (s.status === "empty") return `<div class="fade rounded-lg border border-dashed hair p-6 text-center text-sm opacity-70">No ${PROV[p].name} matches for '<span class="mono">${esc(S.query)}</span>'. Try a different or broader phrase.</div>`;
+  return null;
+}
+
+/* ---------------- shell ---------------- */
+function shell(side, main) {
+  const t = T();
+  const open = S.panel[S.v];
+  return `
+  <div class="h-screen flex flex-col" style="--tc:${t.c}">
+    <header class="h-9 shrink-0 flex items-center gap-3 px-3 border-b hair bg-[#181818]">
+      <span class="text-white">${logo()}</span>
+      <span class="micro text-white">Axcenity <span class="opacity-50">Toolbox</span></span>
+      <span class="micro opacity-40 ml-4 hidden md:inline">discover <span class="mx-1">›</span> ${t.key} <span class="mx-1">›</span> <span class="tc">'${esc(S.query)}'</span></span>
+      <div class="ml-auto flex items-center gap-3">
+        <span class="micro opacity-50 hidden md:inline">Docs</span><span class="micro opacity-50 hidden md:inline">API</span>
+        <span class="micro bg-white text-black px-2 py-1">demo_alice</span>
+      </div>
+    </header>
+    <div class="flex flex-1 min-h-0">
+      <nav class="w-12 shrink-0 flex flex-col items-center py-1 bg-[#181818] border-r hair">
+        ${[["home", "Home"], ["search", "Discover"], ["library", "Library"], ["pack", "Packs"]].map(([k, l]) =>
+          `<button title="${l}" class="act ${k === "search" ? "on" : ""} w-12 h-12 grid place-items-center" ${k === "search" ? 'onclick="togglePanel()"' : ""}>${icon(k, 22)}</button>`).join("")}
+        <div class="flex-1"></div>
+        <button title="Account" class="act w-12 h-12 grid place-items-center">${icon("user", 22)}</button>
+      </nav>
+      ${open && side ? `<aside class="${S.v === 2 ? "w-80" : "w-64"} shrink-0 panel border-r hair flex flex-col min-h-0">${side}</aside>` : ""}
+      <main class="flex-1 min-w-0 flex flex-col bg-[#1e1e1e]">${main}</main>
+    </div>
+    <footer class="h-6 shrink-0 flex items-center gap-4 px-3 text-[11.5px] bg-primary text-white">
+      ${t.providers.map(p => { const s = S.sections[p]?.status; const col = { ok: "#7ee787", loading: "#ffd866", error: "#ff7b72", empty: "#c9d1d9" }[s] || "#c9d1d9";
+        return `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:${col}"></span>${PROV[p].name}</span>`; }).join("")}
+      <span class="opacity-80">Openverse: 200 req/day (anon)</span>
+      <span class="ml-auto">Library · ${S.saved.size} saved</span>
+    </footer>
+  </div>`;
+}
+function logo() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 21h5l5-10 5 10h5z"/><path d="M8.5 15h7"/></svg>`; }
+function panelHead(title) {
+  return `<div class="h-9 flex items-center px-4 micro opacity-70 shrink-0">${title}<button class="ml-auto act" title="Collapse panel" onclick="togglePanel()">${icon("panel", 15)}</button></div>`;
+}
+function searchForm(big = false) {
+  return `<form onsubmit="submit(event)" class="${big ? "cmd rounded-xl flex items-center gap-3 px-4 h-14" : "flex items-center gap-2 px-3 h-8 rounded border border-[#333] bg-[#252525] focus-within:border-primary"}">
+    <span class="opacity-50">${icon("search", big ? 20 : 14)}</span>
+    <input name="q" value="${esc(S.query)}" autocomplete="off" placeholder="Search ${T().label.toLowerCase()}…" class="flex-1 bg-transparent outline-none ${big ? "text-lg" : "text-[13px]"}">
+    ${big ? `<span class="micro opacity-40 hidden md:inline">${T().providers.map(p => PROV[p].name).join(" + ")}</span><kbd class="kbd kbd-sm">Enter</kbd>` : ""}
+  </form>`;
+}
+
+/* ---------------- Variant A: split editor ---------------- */
+function vA() {
+  const t = T();
+  const side = `${panelHead("Discover")}
+    <div class="px-3 space-y-5 overflow-auto pb-4">
+      ${searchForm()}
+      <div><div class="micro opacity-50 px-1 mb-1">Asset type</div>
+        ${TYPES.map((x, i) => `<button onclick="setType('${x.key}')" style="--tc:${x.c}" class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-[13px] ${x.key === S.type ? "bg-[#2a2d2e] text-white" : "opacity-70 hover:opacity-100 hover:bg-[#232323]"}">
+          <span class="w-2 h-2 rounded-full tc-dot"></span><span class="tc">${icon(x.kind, 15)}</span>${x.label}<span class="ml-auto micro opacity-40">${i + 1}</span></button>`).join("")}</div>
+      <div><div class="micro opacity-50 px-1 mb-1">Providers</div>
+        ${t.providers.map(p => `<div class="flex items-center justify-between px-2 py-1.5 text-[13px]"><span>${PROV[p].name}</span>${statusLine(p)}</div>`).join("")}</div>
+      <p class="text-[11.5px] leading-relaxed opacity-45 px-1">Each provider loads on its own. A provider that fails never blocks the other's results.</p>
+    </div>`;
+  const tabs = `<div class="flex h-9 shrink-0 bg-[#181818] border-b hair overflow-x-auto">${TYPES.map(x =>
+    `<button onclick="setType('${x.key}')" style="--tc:${x.c}" class="etab ${x.key === S.type ? "on" : ""} px-4 flex items-center gap-2 text-[13px] border-r hair"><span class="tc">${icon(x.kind, 14)}</span>${x.label}</button>`).join("")}</div>`;
+  const group = (p, wide) => {
+    const s = S.sections[p];
+    const body = stateBlock(p, t.kind === "sound" ? "rows" : (wide ? "grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6" : "grid-cols-2 2xl:grid-cols-3"))
+      ?? (t.kind === "sound" ? soundRows(s) : `<div class="grid gap-3 ${wide ? "grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6" : "grid-cols-2 2xl:grid-cols-3"}">${s.items.map((it, i) => cardA(it, i, s.fresh)).join("")}</div>`);
+    return `<section class="flex-1 min-w-0 flex flex-col min-h-0 ${wide ? "" : "border-r hair last:border-r-0"}">
+      <div class="h-8 shrink-0 flex items-center gap-3 px-4 border-b hair bg-[#1b1b1b]"><span class="micro text-white">${PROV[p].name}</span>${statusLine(p)}
+        <a class="ml-auto micro opacity-40 hover:opacity-80" href="#">${PROV[p].credit}</a></div>
+      <div class="flex-1 overflow-auto p-4">${body}</div></section>`;
+  };
+  const main = `${tabs}<div class="flex-1 flex min-h-0">${t.providers.map(p => group(p, t.providers.length === 1)).join("")}</div>`;
+  return shell(side, main);
+}
+function cardA(it, i, fresh) {
+  return `<article class="acard ${fresh ? "rise" : ""}" style="animation-delay:${i * 45}ms">
+    <div class="thumb aspect-square relative overflow-hidden bg-[#151515]">${thumb(it)}<div class="absolute top-2 left-2">${typeBadge(it)}</div></div>
+    <div class="p-3 space-y-2">
+      <div><h3 class="text-[13.5px] font-medium text-white truncate">${esc(it.name)}</h3>
+        <p class="mono text-[10.5px] opacity-45 truncate">${esc(it.id)}</p></div>
+      <p class="text-[11.5px] opacity-60 truncate">${meta(it)}</p>
+      <div class="flex flex-wrap gap-1">${tags(it)}</div>
+      <div class="flex items-center justify-between pt-1"><span class="micro opacity-50">${esc(it.license)}</span>${saveBtn(it)}</div>
+    </div></article>`;
+}
+function soundRows(s) {
+  return `<div class="divide-y divide-[#2b2b2b] border hair rounded-lg overflow-hidden">${s.items.map((it, i) => `
+    <div class="flex items-center gap-4 p-3 bg-[#202020] hover:bg-[#252525] ${s.fresh ? "rise" : ""}" style="animation-delay:${i * 45}ms">
+      <button class="btn btn-circle btn-sm tc-bg tc border-0" onclick="play('${esc(it.id)}')">${S.playing === it.id ? "❚❚" : "▶"}</button>
+      <div class="w-40 h-10 shrink-0 tc ${S.playing === it.id ? "playing" : ""}">${wave(it.id)}</div>
+      <div class="min-w-0 flex-1"><div class="text-[13.5px] text-white truncate">${esc(it.name)}</div><div class="text-[11.5px] opacity-55 truncate">${meta(it)}</div></div>
+      <div class="hidden lg:flex gap-1">${tags(it, 2)}</div>
+      <span class="micro opacity-60 w-24 text-right">${esc(it.license)}</span>${saveBtn(it)}
+    </div>`).join("")}</div>`;
+}
+
+/* ---------------- Variant B: gallery shelves ---------------- */
+function vB() {
+  const t = T();
+  const side = `${panelHead("Recent searches")}
+    <div class="px-3 space-y-1 text-[13px]">${["brick · textures", "sunset · hdris", "wood · models", "footsteps · sounds"].map(r =>
+      `<div class="px-2 py-1.5 rounded hover:bg-[#232323] opacity-70">${r}</div>`).join("")}</div>`;
+  const tiles = `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">${TYPES.map((x, i) => `
+    <button onclick="setType('${x.key}')" style="--tc:${x.c}" class="text-left rounded-lg p-3 border transition ${x.key === S.type ? "tc-bg border-[color:var(--tc)]" : "border-[#2b2b2b] hover:border-[#444] bg-[#1b1b1b]"}">
+      <div class="flex items-center justify-between"><span class="tc">${icon(x.kind, 20)}</span><span class="micro opacity-40">0${i + 1}</span></div>
+      <div class="mt-3 font-semibold text-white">${x.label}</div>
+      <div class="micro opacity-50 mt-0.5">${x.providers.map(p => PROV[p].name).join(" + ")}</div></button>`).join("")}</div>`;
+  const shelf = (p, n) => {
+    const s = S.sections[p];
+    const cols = t.kind === "sound" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6";
+    const body = stateBlock(p, cols) ?? `<div class="grid gap-4 ${cols}">${s.items.map((it, i) => it.kind === "sound" ? soundCardB(it, i, s.fresh) : cardB(it, i, s.fresh)).join("")}</div>`;
+    return `<section class="space-y-4">
+      <div class="flex items-center gap-4"><span class="micro opacity-40">0${n}</span><span class="micro text-white">${PROV[p].name}</span>
+        <div class="flex-1 h-px bg-[#2b2b2b]"></div>${statusLine(p)}<a href="#" class="micro opacity-40 hover:opacity-80">${PROV[p].credit}</a></div>
+      ${body}</section>`;
+  };
+  const main = `<div class="flex-1 overflow-auto grid-bg">
+    <div class="max-w-[1500px] mx-auto px-8 py-8 space-y-8">
+      <div class="space-y-1"><div class="micro tc">Discover · ${t.label}</div>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white">Find assets for your next pack.</h1></div>
+      ${searchForm(true)}
+      ${tiles}
+      ${t.providers.map((p, i) => shelf(p, i + 1)).join("")}
+    </div></div>`;
+  return shell(side, main);
+}
+function cardB(it, i, fresh) {
+  return `<article class="acard group ${fresh ? "rise" : ""}" style="animation-delay:${i * 50}ms">
+    <div class="thumb aspect-[4/3] relative overflow-hidden bg-[#151515]">${thumb(it)}
+      <div class="absolute top-2 left-2">${typeBadge(it)}</div>
+      ${S.saved.has(it.id) ? `<div class="absolute top-2 right-2 badge badge-success badge-sm">✓</div>` : ""}
+      <div class="overlay absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-3 gap-2">
+        <div class="flex flex-wrap gap-1">${tags(it)}</div>${saveBtn(it, "btn-sm w-full")}</div>
+    </div>
+    <div class="px-3 py-2.5"><h3 class="text-[13.5px] font-medium text-white truncate">${esc(it.name)}</h3>
+      <div class="flex justify-between gap-2"><p class="text-[11.5px] opacity-55 truncate">${meta(it)}</p><span class="micro opacity-50 shrink-0">${esc(it.license)}</span></div></div>
+  </article>`;
+}
+function soundCardB(it, i, fresh) {
+  return `<article class="acard p-4 space-y-3 ${fresh ? "rise" : ""}" style="animation-delay:${i * 50}ms">
+    <div class="flex items-center gap-3"><button class="btn btn-circle tc-bg tc border-0" onclick="play('${esc(it.id)}')">${S.playing === it.id ? "❚❚" : "▶"}</button>
+      <div class="min-w-0"><h3 class="text-[14px] font-medium text-white truncate">${esc(it.name)}</h3><p class="text-[11.5px] opacity-55 truncate">${meta(it)}</p></div></div>
+    <div class="h-14 tc rounded tc-bg p-2 ${S.playing === it.id ? "playing" : ""}">${wave(it.id, 240, 40, 48)}</div>
+    <div class="flex items-center justify-between"><div class="flex gap-1">${tags(it, 2)}</div><span class="micro opacity-60">${esc(it.license)}</span></div>
+    ${saveBtn(it, "btn-sm w-full")}</article>`;
+}
+
+/* ---------------- Variant C: search view + preview ---------------- */
+function vC() {
+  const t = T();
+  const rows = p => {
+    const s = S.sections[p];
+    const coll = S.collapsed[p];
+    const head = `<button onclick="S.collapsed['${p}']=!S.collapsed['${p}'];render()" class="w-full flex items-center gap-2 px-3 h-7 hover:bg-[#232323]">
+      <span class="opacity-60 text-[10px] w-3">${coll ? "▸" : "▾"}</span><span class="micro text-white">${PROV[p].name}</span><span class="ml-auto">${statusLine(p)}</span></button>`;
+    if (coll) return head;
+    let body;
+    if (!s || s.status === "loading") body = `<div class="px-7 py-2 text-[12px] opacity-60 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span>Searching ${PROV[p].name}…</div>`;
+    else if (s.status === "error") body = `<div class="mx-3 my-1 p-2 rounded border border-error/40 bg-error/10 text-[12px] text-error fade">${esc(s.msg)} <button class="underline ml-1" onclick="retry('${p}')">Retry</button></div>`;
+    else if (s.status === "empty") body = `<div class="px-7 py-2 text-[12px] opacity-50">No matches for '${esc(S.query)}'.</div>`;
+    else body = s.items.map((it, i) => `<button onclick="select('${esc(it.id)}')" style="animation-delay:${i * 30}ms"
+        class="w-full flex items-center gap-2.5 pl-7 pr-3 h-11 text-left hover:bg-[#232323] ${s.fresh ? "fade" : ""} ${S.sel?.id === it.id ? "row-sel" : ""}">
+        <div class="w-8 h-8 rounded overflow-hidden shrink-0 bg-[#151515]">${thumb(it)}</div>
+        <div class="min-w-0 flex-1"><div class="text-[13px] text-white truncate">${esc(it.name)}</div><div class="text-[11px] opacity-45 truncate">${it.tags.filter(x => !/^\d+$/.test(x)).slice(0, 3).join(" · ")}</div></div>
+        ${S.saved.has(it.id) ? `<span class="text-success text-xs">✓</span>` : ""}</button>`).join("");
+    return head + body;
+  };
+  const side = `${panelHead("Search")}
+    <div class="px-3 space-y-2 pb-2">${searchForm()}
+      <div class="flex gap-1">${TYPES.map(x => `<button onclick="setType('${x.key}')" style="--tc:${x.c}" title="${x.label}"
+        class="flex-1 h-7 rounded flex items-center justify-center gap-1 text-[11.5px] border ${x.key === S.type ? "tc-bg tc border-[color:var(--tc)]" : "border-[#333] opacity-60 hover:opacity-100"}">${icon(x.kind, 13)}${x.label}</button>`).join("")}</div>
+      <div class="text-[11px] opacity-45">${allItems().length} results · ↑/↓ to move</div></div>
+    <div class="flex-1 overflow-auto pb-2">${t.providers.map(rows).join("")}</div>`;
+  const it = S.sel;
+  const main = !it ? `<div class="flex-1 grid place-items-center grid-bg"><div class="text-center space-y-3 opacity-60">
+      <div class="tc inline-block">${icon(t.kind, 48)}</div><div class="text-sm">Select a result to preview it.</div>
+      <div class="micro opacity-60">↑ / ↓ to move · Enter to save</div></div></div>`
+    : `<div class="h-9 shrink-0 flex items-center gap-2 px-4 border-b hair bg-[#181818]"><span class="tc">${icon(it.kind, 14)}</span><span class="text-[13px] text-white">${esc(it.name)}</span><span class="mono text-[11px] opacity-40">${esc(it.id)}</span></div>
+      <div class="flex-1 overflow-auto"><div class="max-w-5xl mx-auto p-8 grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8 fade" style="--tc:${t.c}">
+        <div class="rounded-xl overflow-hidden border hair bg-[#151515] ${it.kind === "sound" ? "h-64" : "aspect-square"}">${it.kind === "sound"
+          ? `<div class="w-full h-full grid place-items-center tc-bg tc p-8 ${S.playing === it.id ? "playing" : ""}">${wave(it.id, 400, 120, 64)}</div>`
+          : `<img src="${esc(it.thumb.replace("256", "512").replace("width=256&height=256", "width=640&height=640"))}" data-kind="${it.kind}" onerror="imgFail(this)" class="w-full h-full object-cover">`}</div>
+        <div class="space-y-5">
+          <div>${typeBadge(it)}<h2 class="mt-2 text-2xl font-bold text-white leading-tight">${esc(it.name)}</h2>
+            <div class="mono text-[11.5px] opacity-45 mt-1">${PROV[it.provider].name} · ${esc(it.id)}</div></div>
+          <div class="flex gap-2">${saveBtn(it, "btn-md flex-1")}${it.kind === "sound" ? `<button class="btn btn-md tc-bg tc border-0" onclick="play('${esc(it.id)}')">${S.playing === it.id ? "❚❚" : "▶"}</button>` : ""}
+            <a class="btn btn-md btn-ghost border-[#333]" href="${PROV[it.provider].url}${esc(it.id)}" target="_blank" title="Open on provider">${icon("ext", 16)}</a></div>
+          <dl class="text-[13px] divide-y divide-[#2b2b2b] border-y hair">
+            ${[["Author", it.author], ["License", it.license], ["Details", meta(it)]].map(([k, v]) => `<div class="flex py-2 gap-4"><dt class="micro opacity-50 w-20 pt-0.5">${k}</dt><dd class="flex-1">${v ? (k === "Details" ? v : esc(v)) : "—"}</dd></div>`).join("")}
+          </dl>
+          <div><div class="micro opacity-50 mb-2">Tags</div><div class="flex flex-wrap gap-1">${tags(it, 8)}</div></div>
+          ${it.variants ? `<div><div class="micro opacity-50 mb-2">Variants (pick one per pack later)</div><div class="flex flex-wrap gap-1">${it.variants.map(v => `<span class="mono text-[11px] px-2 py-1 rounded border hair">${esc(v)}</span>`).join("")}</div></div>` : ""}
+          <p class="micro opacity-35">${PROV[it.provider].credit}</p>
+        </div></div></div>`;
+  return shell(side, main);
+}
+
+/* ---------------- render & controls ---------------- */
+function render() {
+  const ae = document.activeElement, hadQ = ae && ae.name === "q", pos = hadQ ? ae.selectionStart : 0;
+  document.getElementById("app").innerHTML = [vA, vB, vC][S.v]();
+  for (const p of Object.keys(S.sections)) if (S.sections[p].fresh) S.sections[p].fresh = false;
+  if (hadQ) { const q = document.querySelector('input[name="q"]'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
+  document.getElementById("pv").textContent = `${VARIANTS[S.v].key} · ${VARIANTS[S.v].name}`;
+  document.getElementById("pstate").textContent = JSON.stringify({
+    variant: VARIANTS[S.v].key, type: S.type, query: S.query,
+    sections: Object.fromEntries(T().providers.map(p => [p, { status: S.sections[p]?.status, count: S.sections[p]?.items?.length ?? 0 }])),
+    selected: S.sel?.id ?? null, saved: [...S.saved], sim: S.sim,
+  }, null, 1);
+}
+function step(d) {
+  S.v = (S.v + d + VARIANTS.length) % VARIANTS.length;
+  localStorage.setItem("ax-proto-variant", S.v);
+  history.replaceState(null, "", "#" + VARIANTS[S.v].key);
+  for (const p of Object.keys(S.sections)) if (S.sections[p].status === "ok") S.sections[p].fresh = true;
+  if (S.v === 2 && !S.sel) S.sel = firstItem();
+  render();
+}
+function toggleProto() { document.getElementById("pbody").classList.toggle("hidden"); }
+document.querySelectorAll("[data-sim]").forEach(cb => cb.addEventListener("change", () => { S.sim[cb.dataset.sim] = cb.checked; runSearch(); }));
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, textarea")) return;
+  if (e.key === "ArrowRight") step(1);
+  else if (e.key === "ArrowLeft") step(-1);
+  else if (/^[1-4]$/.test(e.key)) setType(TYPES[+e.key - 1].key);
+  else if (S.v === 2 && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+    e.preventDefault();
+    const list = allItems(); if (!list.length) return;
+    const i = list.findIndex(x => x.id === S.sel?.id);
+    S.sel = list[Math.max(0, Math.min(list.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]; render();
+  } else if (S.v === 2 && e.key === "Enter" && S.sel) save(S.sel.id);
+});
+runSearch();
+</script>
+</body>
+</html>
