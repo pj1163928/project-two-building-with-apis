@@ -1,19 +1,22 @@
 {# One library entry, drawn only from the Toolbox's stored Asset, so it renders with   #}
 {# every provider down. The thumbnail is the provider's URL (linked, never copied),    #}
 {# over the type icon that shows when it's missing or broken. The type's icon takes    #}
-{# its type colour, because it shows the asset's type. The title opens the provider's  #}
-{# page until the drawer arrives (Phase 5). The corner actions: Add to pack (its       #}
+{# its type colour, because it shows the asset's type. The title opens the entry's     #}
+{# drawer (HTMX into library.html's #library-drawer); as a plain link it's the entry's #}
+{# full page. With oob, it replaces the card in the grid after a status or rating      #}
+{# change in the drawer. The corner actions: Add to pack (its                          #}
 {# picker is the interface only until Phase 7), Details and Remove.                    #}
 {# The details panel works as on Discover, with the asset's tags from its provider.    #}
+{# Under the status and stars: the community rating, once any member has rated it.     #}
 {% with asset=entry.asset %}{% with tile=asset.tile %}
-<li class="result-card library-card" id="entry-{{ entry.pk }}" data-kind="{{ asset.kind }}">
+<li class="result-card library-card" id="entry-{{ entry.pk }}" data-kind="{{ asset.kind }}"{% if oob %} hx-swap-oob="true"{% endif %}>
   <div class="result-thumb">
     <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=28 %}</span>
     {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
   </div>
   <div class="result-body">
     <p class="library-type"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=12 %}</span><span class="micro">{{ asset.get_kind_display }}</span></p>
-    <h3 class="result-title"><a href="{{ asset.source_url }}" target="_blank" rel="noopener noreferrer" class="result-link">{{ asset.title }}</a></h3>
+    {% url 'catalog:entry' entry.pk as entry_url %}<h3 class="result-title"><a href="{{ entry_url }}" hx-get="{{ entry_url }}" hx-target="#library-drawer" hx-swap="innerHTML transition:false" aria-haspopup="dialog" class="result-link">{{ asset.title }}</a></h3>
     <div class="library-meta">
       <span class="status-chip micro" data-status="{{ entry.status }}">{{ entry.get_status_display }}</span>
       {% if entry.rating %}
@@ -22,6 +25,7 @@
         <span class="rating-none">Not rated</span>
       {% endif %}
     </div>
+    {% if entry.community %}<p class="library-community"><span class="micro">Community</span>{% include "catalog/partials/community_rating.html" with community=entry.community %}</p>{% endif %}
   </div>
   <div class="card-actions">{% include "catalog/partials/pack_button.html" with title=asset.title %}{% include "catalog/partials/details_button.html" with title=asset.title %}{% include "catalog/partials/remove_button.html" %}</div>
   <div class="result-details" aria-hidden="true">

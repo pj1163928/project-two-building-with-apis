@@ -51,6 +51,7 @@
   <script src="{% static 'js/password-toggle.js' %}" defer></script>
   <script src="{% static 'js/sound-preview.js' %}" defer></script>
   <script src="{% static 'js/card-actions.js' %}" defer></script>
+  <script src="{% static 'js/entry-drawer.js' %}" defer></script>
 </head>
 <body class="bg-app text-fg" hx-boost="true">
 {# The CSRF header lives on #app, not <body>: a boosted swap replaces #app but keeps <body>, #}
@@ -106,55 +107,45 @@
 
   <div class="flex flex-1 min-h-0">
 
-    {# ---------- Activity bar ---------- #}
-    {# Its top slot holds the panel toggle and is as tall as the panel's   #}
-    {# header (h-14); entries then match the panel's rows (h-11, gap-1,   #}
-    {# pt-1). Each icon shows a .tip tooltip on hover; z-20 lifts the      #}
-    {# tooltips over the side panel.                                       #}
-    <nav id="activity-bar" aria-label="Main" class="relative z-20 w-14 shrink-0 flex flex-col bg-app border-r border-line">
-      <div class="h-14 shrink-0 grid place-items-center border-b border-line">
-        <button type="button" id="panel-toggle" class="act panel-toggle w-10 h-10 grid place-items-center"
-                aria-controls="side-panel" aria-expanded="true">
-          <span class="when-open">{% include "partials/icon.html" with name="panel-close" size=20 %}</span>
-          <span class="when-collapsed">{% include "partials/icon.html" with name="panel-open" size=20 %}</span>
-          <span class="sr-only">Toggle side panel</span>
-          <span class="tip" aria-hidden="true">Collapse panel</span>
-        </button>
-      </div>
-      <div class="flex flex-col gap-1 pt-1">
-        <a href="{% url 'catalog:discover' %}" aria-label="Discover" class="act w-14 h-11 grid place-items-center"
-           {% if active_nav == "discover" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="search" size=20 %}<span class="tip" aria-hidden="true">Discover</span></a>
-        <a href="{% url 'catalog:library' %}" aria-label="Library" class="act w-14 h-11 grid place-items-center"
-           {% if active_nav == "library" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="library" size=20 %}<span class="tip" aria-hidden="true">Library</span></a>
-        <a href="{% url 'packs:list' %}" aria-label="Packs" class="act w-14 h-11 grid place-items-center"
-           {% if active_nav == "packs" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="pack" size=20 %}<span class="tip" aria-hidden="true">Packs</span></a>
-      </div>
-      <div class="flex-1"></div>
-      <div class="flex flex-col gap-1 pb-2">
-        <a href="{% if user.is_authenticated %}{% url 'accounts:profile' %}{% else %}{% url 'accounts:login' %}{% endif %}"
-           aria-label="Account" class="act w-14 h-11 grid place-items-center"
-           {% if active_nav == "account" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="user" size=20 %}<span class="tip" aria-hidden="true">Account</span></a>
-        <a href="{% url 'accounts:settings' %}" aria-label="Settings" class="act w-14 h-11 grid place-items-center"
-           {% if active_nav == "settings" %}aria-current="page"{% endif %}>{% include "partials/icon.html" with name="gear" size=20 %}<span class="tip" aria-hidden="true">Settings</span></a>
-      </div>
-    </nav>
-
-    {# ---------- Side panel (collapsible, slides open and shut) ---------- #}
-    <aside id="side-panel" aria-label="Side panel" class="shrink-0 bg-panel border-r border-line">
-      <div class="side-panel-inner w-64 h-full overflow-y-auto">
-        <div class="h-14 flex items-center px-5 border-b border-line">
-          <span class="micro text-fg-secondary">{% block panel_title %}Explorer{% endblock %}</span>
+    {# ---------- Sidebar: one column (the activity bar and the side panel merged) ---------- #}
+    {# Collapsed, it's the icon strip (w-14), and each icon shows a .tip tooltip on hover.  #}
+    {# Expanded (w-64), each icon sits beside its label, and the page's own panel (Library  #}
+    {# filters, Account rows) follows under its title. Every row is h-11 with gap-1 and    #}
+    {# pt-1, and the icon keeps the same 3.5rem cell in both states, so nothing jumps.     #}
+    {# relative z-20 lifts the tooltips over the content. User request, 2026-11-05.        #}
+    <aside id="side-panel" aria-label="Sidebar" class="sidebar relative z-20 shrink-0 flex flex-col bg-app border-r border-line">
+      <nav id="activity-bar" aria-label="Main" class="shrink-0">
+        <div class="h-14 shrink-0 flex items-center border-b border-line">
+          <span class="act-icon"><button type="button" id="panel-toggle" class="act panel-toggle w-10 h-10 grid place-items-center"
+                  aria-controls="side-panel" aria-expanded="true">
+            <span class="when-open">{% include "partials/icon.html" with name="panel-close" size=20 %}</span>
+            <span class="when-collapsed">{% include "partials/icon.html" with name="panel-open" size=20 %}</span>
+            <span class="sr-only">Toggle side panel</span>
+            <span class="tip" aria-hidden="true">Collapse panel</span>
+          </button></span>
+          <span class="sidebar-title micro text-fg-secondary">{% block panel_title %}Explorer{% endblock %}</span>
         </div>
-        {% block side_panel %}
-          <ul class="flex flex-col gap-1 pt-1">
-            <li><a class="panel-row" href="{% url 'catalog:discover' %}" {% if active_nav == "discover" %}aria-current="page"{% endif %}>Discover</a></li>
-            <li><a class="panel-row" href="{% url 'catalog:library' %}" {% if active_nav == "library" %}aria-current="page"{% endif %}>Library</a></li>
-            <li><a class="panel-row" href="{% url 'packs:list' %}" {% if active_nav == "packs" %}aria-current="page"{% endif %}>Packs</a></li>
-          </ul>
-        {% endblock %}
+        <div class="flex flex-col gap-1 pt-1">
+          <a href="{% url 'catalog:discover' %}" aria-label="Discover" class="act act-row"
+             {% if active_nav == "discover" %}aria-current="page"{% endif %}><span class="act-icon">{% include "partials/icon.html" with name="search" size=20 %}</span><span class="act-label" aria-hidden="true">Discover</span><span class="tip" aria-hidden="true">Discover</span></a>
+          <a href="{% url 'catalog:library' %}" aria-label="Library" class="act act-row"
+             {% if active_nav == "library" %}aria-current="page"{% endif %}><span class="act-icon">{% include "partials/icon.html" with name="library" size=20 %}</span><span class="act-label" aria-hidden="true">Library</span><span class="tip" aria-hidden="true">Library</span></a>
+          <a href="{% url 'packs:list' %}" aria-label="Packs" class="act act-row"
+             {% if active_nav == "packs" %}aria-current="page"{% endif %}><span class="act-icon">{% include "partials/icon.html" with name="pack" size=20 %}</span><span class="act-label" aria-hidden="true">Packs</span><span class="tip" aria-hidden="true">Packs</span></a>
+        </div>
+      </nav>
+      {# The page's own panel, only while expanded. It scrolls on its own. #}
+      <div class="side-panel-inner flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div class="w-64">{% block side_panel %}{% endblock %}</div>
       </div>
+      <nav aria-label="Account" class="shrink-0 flex flex-col gap-1 pt-1 pb-2 border-t border-line">
+        <a href="{% if user.is_authenticated %}{% url 'accounts:profile' %}{% else %}{% url 'accounts:login' %}{% endif %}"
+           aria-label="Account" class="act act-row"
+           {% if active_nav == "account" %}aria-current="page"{% endif %}><span class="act-icon">{% include "partials/icon.html" with name="user" size=20 %}</span><span class="act-label" aria-hidden="true">Account</span><span class="tip" aria-hidden="true">Account</span></a>
+        <a href="{% url 'accounts:settings' %}" aria-label="Settings" class="act act-row"
+           {% if active_nav == "settings" %}aria-current="page"{% endif %}><span class="act-icon">{% include "partials/icon.html" with name="gear" size=20 %}</span><span class="act-label" aria-hidden="true">Settings</span><span class="tip" aria-hidden="true">Settings</span></a>
+      </nav>
     </aside>
-
     {# ---------- Content ---------- #}
     {# data-drop picks this page's glow colours, shared by the hero glow and the footer glow. #}
     {# data-surface sets the mood: "showcase" pages (Home, Discover) get the expressive       #}

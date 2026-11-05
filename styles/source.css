@@ -348,6 +348,18 @@
   .star-rating .is-on { color: var(--color-fg-strong); }
   .star-rating .is-on svg { fill: currentColor; }
   .rating-none { font-size: 11.5px; color: var(--color-fg-muted); }
+  /* The community rating: every member's average for the asset, and how many
+     rated it. A filled star in grey, so it never reads as the member's own stars. */
+  .community-rating { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 11.5px; color: var(--color-fg-secondary); }
+  .community-rating svg { fill: currentColor; color: var(--color-fg-weak); }
+  .community-average { font-weight: 600; color: var(--color-fg-strong); }
+  .community-count { color: var(--color-fg-muted); }
+  .library-community { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.35rem;
+    color: var(--color-fg-muted); }
+  .result-community { margin-top: 0.2rem; }
+  .entry-community { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; font-size: 12.5px; }
+  .entry-community .community-rating { font-size: 12.5px; }
+  .entry-community-note { color: var(--color-fg-muted); }
 
   /* Hover or keyboard focus shows the card's full details, rising over the lower
      part of the thumbnail and stopping under the corner actions. It ignores the
@@ -435,10 +447,92 @@
   .picker-list { display: grid; gap: 0.25rem; }
   .picker-empty { padding: 1rem; text-align: center; font-size: 13px; color: var(--color-fg-weak);
     background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); }
-    background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); outline: none; }
   .picker-note { display: flex; gap: 0.5rem; font-size: 12px; line-height: 1.45; color: var(--color-fg-weak); }
   .picker-note > svg { flex: none; margin-top: 1px; }
   .picker-foot { display: flex; justify-content: flex-end; padding: 0 1.25rem 1.1rem; }
+
+  /* The library drawer: a native <dialog> sliding in from the right over a dimmed
+     page, filled by a card's title (catalog/partials/entry_drawer.html). */
+  .drawer-dialog { position: fixed; inset: 0 0 0 auto; width: min(34rem, 100vw); height: 100dvh; max-width: none;
+    max-height: none; margin: 0; padding: 0; color: var(--color-fg); background: var(--color-panel);
+    border-left: 1px solid var(--color-line-strong);
+    box-shadow: -24px 0 60px color-mix(in srgb, var(--color-shade) 45%, transparent); }
+  .drawer-dialog[open] { animation: drawer-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .drawer-dialog::backdrop { background: color-mix(in srgb, var(--color-shade) 55%, transparent); }
+  @keyframes drawer-in { from { transform: translateX(100%); } }
+  .drawer-panel { display: flex; flex-direction: column; min-height: 100%; }
+  .drawer-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; height: 3.5rem; padding: 0 0.75rem 0 1.25rem; background: var(--color-panel);
+    border-bottom: 1px solid var(--color-line); }
+  .drawer-body { padding: 1.25rem; }
+  /* The full page gives the same entry a bordered surface of its own. */
+  .entry-page { max-width: 46rem; padding: 1.5rem; background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line); }
+
+  /* One entry: the thumbnail, the heading, then sections under mono labels. */
+  .entry { display: grid; gap: 1.25rem; }
+  .entry-thumb { position: relative; display: grid; place-items: center; aspect-ratio: 4 / 3; overflow: hidden;
+    background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); }
+  .entry-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .entry[data-kind="texture"] .entry-thumb { aspect-ratio: 1 / 1; max-width: 22rem; }
+  .entry[data-kind="texture"] .entry-thumb img { object-fit: contain; }
+  .entry-head { display: grid; gap: 0.35rem; }
+  .entry-title { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; line-height: 1.2;
+    letter-spacing: -0.02em; color: var(--color-fg-strong); overflow-wrap: anywhere; }
+  .entry-byline { font-size: 13px; color: var(--color-fg-weak); }
+  .entry-section { display: grid; gap: 0.85rem; padding-top: 1.1rem; border-top: 1px solid var(--color-line); }
+  .entry-field { display: grid; gap: 0.5rem; }
+  .entry-notes { width: 100%; min-height: 7rem; padding: 0.6rem 0.75rem; font-size: 14px; line-height: 1.5; resize: vertical;
+    color: var(--color-fg-strong); background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line-strong);
+    outline: none; transition: box-shadow 0.15s; }
+  .entry-notes:focus { box-shadow: inset 0 0 0 1px var(--color-ink); }
+  .entry-notes::placeholder { color: var(--color-fg-muted); }
+  /* The status line under the review: "Saved", or an error with Try again. */
+  .entry-save-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; min-height: 1.5rem;
+    font-size: 12.5px; color: var(--color-fg-muted); }
+  .entry-save-status[data-save-status="saved"] { color: var(--color-fg-secondary); }
+  .entry-save-status[data-save-status="error"] { color: var(--color-fg-strong); }
+  .entry-save-status[data-save-status="error"] > svg { color: var(--color-error); }
+  .entry-save-link { text-decoration: underline; text-underline-offset: 2px; color: var(--color-fg-strong); }
+  html[data-pointer] .entry-save-link:hover, .entry-save-link:focus-visible { color: var(--color-on-ink);
+    background: var(--color-ink); text-decoration: none; outline: none; }
+
+  /* The rating: five star radios, filled up to the chosen one (a star is on when
+     it, or a later star, is checked), with a hover preview, and a clear choice. */
+  .rate-stars { display: flex; gap: 0.15rem; }
+  .rate-star { display: grid; place-items: center; width: 1.9rem; height: 1.9rem; cursor: pointer; color: var(--color-fg-muted);
+    transition: color 0.12s; }
+  .rate-star:has(input:checked), .rate-star:has(~ .rate-star input:checked) { color: var(--color-fg-strong); }
+  .rate-star:has(input:checked) svg, .rate-star:has(~ .rate-star input:checked) svg { fill: currentColor; }
+  html[data-pointer] .rate-stars:hover .rate-star { color: var(--color-fg-muted); }
+  html[data-pointer] .rate-stars:hover .rate-star svg { fill: none; }
+  html[data-pointer] .rate-stars .rate-star:hover, html[data-pointer] .rate-stars .rate-star:has(~ .rate-star:hover) { color: var(--color-fg-strong); }
+  html[data-pointer] .rate-stars .rate-star:hover svg, html[data-pointer] .rate-stars .rate-star:has(~ .rate-star:hover) svg { fill: currentColor; }
+  .rate-star:has(:focus-visible), .rate-clear:has(:focus-visible) { outline: 2px solid var(--color-ink); outline-offset: 1px; }
+  .rate-clear { font-size: 12.5px; color: var(--color-fg-weak); cursor: pointer; }
+  html[data-pointer] .rate-clear:hover { color: var(--color-fg-strong); }
+  .rate-clear .when-unrated, .rate-clear:has(input:checked) .when-rated { display: none; }
+  .rate-clear:has(input:checked) .when-unrated { display: inline; }
+  .rate-clear:has(input:checked) { color: var(--color-fg-muted); cursor: default; }
+
+  /* License, credit and files. */
+  .entry-facts { display: grid; gap: 0.5rem; font-size: 13px; color: var(--color-fg-secondary); }
+  .entry-facts > div { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.75rem; }
+  .entry-facts dt { color: var(--color-fg-muted); padding-top: 2px; }
+  .entry-facts dd { overflow-wrap: anywhere; }
+  .entry-attribution { white-space: pre-line; }
+  .entry-link { color: var(--color-fg-strong); text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: var(--color-line-strong); transition: text-decoration-color 0.15s; }
+  html[data-pointer] .entry-link:hover, .entry-link:focus-visible { text-decoration-color: currentColor; }
+  .entry-variants { display: grid; gap: 0.25rem; }
+  .entry-variant { background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); }
+  .entry-variant summary { display: flex; justify-content: space-between; gap: 1rem; padding: 0.55rem 0.75rem; cursor: pointer;
+    font-size: 13px; color: var(--color-fg-strong); }
+  .entry-variant-meta { font-family: var(--font-mono); font-size: 11px; color: var(--color-fg-muted); white-space: nowrap; }
+  .entry-files { display: grid; gap: 0.3rem; padding: 0.25rem 0.75rem 0.7rem; font-size: 12.5px; }
+  .entry-files li { display: flex; justify-content: space-between; gap: 1rem; min-width: 0; }
+  .entry-files a { min-width: 0; overflow-wrap: anywhere; }
+  .entry-files span { flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--color-fg-muted); }
+  .entry-foot { display: flex; justify-content: flex-end; padding-top: 1.1rem; border-top: 1px solid var(--color-line); }
 
   /* Sign-in and sign-up: one bordered container holding a plain form column
      and the branding panel, which sits on a soft monochrome radial glow. */
@@ -481,27 +575,42 @@
    without their text. The wordmark and the Sign-up button stay put. */
 html[data-fonts="loading"] #title-bar :is(.bar-item, .crumb, .crumb-sep) { visibility: hidden; }
 
-/* ---------- Side panel: slides shut to zero width and back ----------
+/* ---------- Sidebar: one column, the icon strip collapsed and icon + label expanded ----------
+   The activity bar and the side panel are one <aside id="side-panel"> (user
+   request, 2026-11-05). Collapsed, it's the 3.5rem icon strip, with tooltips.
+   Expanded, it's 16rem: each row's label appears beside its icon, and the
+   page's own panel (.side-panel-inner) shows below. The icon cell is 3.5rem in
+   both states, so the icons never move. Nothing on the <aside> clips (the
+   tooltips sit outside it); each label clips itself as the width changes.
    The state is set on <html data-panel> before first paint. shell.js adds
    data-panel-ready after the first frame, so a page load never animates. */
-#side-panel { width: 16rem; overflow: hidden; visibility: visible; }
-html[data-panel="collapsed"] #side-panel { width: 0; border-right-width: 0; visibility: hidden; }
-html[data-panel="collapsed"] .side-panel-inner { opacity: 0; transform: translateX(-1.5rem); }
-/* Expanding: the width eases out over 0.5 s, then the contents fade in a
-   beat later and each row slides in on a short stagger. Collapsing is
-   quicker and all at once. */
-html[data-panel-ready] #side-panel { transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s; }
-html[data-panel-ready][data-panel="collapsed"] #side-panel {
-  transition: width 0.42s cubic-bezier(0.22, 0.8, 0.24, 1), border-right-width 0s linear 0.42s, visibility 0s linear 0.42s; }
-html[data-panel-ready] .side-panel-inner { transition: opacity 0.35s ease 0.08s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
-html[data-panel-ready][data-panel="collapsed"] .side-panel-inner { transition: opacity 0.2s ease, transform 0.42s cubic-bezier(0.22, 0.8, 0.24, 1); }
-html[data-panel="collapsed"] .panel-row { opacity: 0; transform: translateX(-0.75rem); }
-html[data-panel-ready] .panel-row { transition: color 0.15s, background-color 0.15s,
-  opacity 0.3s ease var(--row-delay, 0s), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1) var(--row-delay, 0s); }
-html[data-panel-ready]:not([data-panel="collapsed"]) li:nth-child(1) > .panel-row { --row-delay: 0.1s; }
-html[data-panel-ready]:not([data-panel="collapsed"]) li:nth-child(2) > .panel-row { --row-delay: 0.15s; }
-html[data-panel-ready]:not([data-panel="collapsed"]) li:nth-child(3) > .panel-row { --row-delay: 0.2s; }
-html[data-panel-ready]:not([data-panel="collapsed"]) li:nth-child(n+4) > .panel-row { --row-delay: 0.25s; }
+#side-panel { width: 16rem; }
+html[data-panel="collapsed"] #side-panel { width: 3.5rem; }
+.act-row { display: flex; align-items: center; height: 2.75rem; }
+.act-icon { flex: none; display: grid; place-items: center; width: 3.5rem; }
+.act-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; padding-right: 1rem;
+  font-size: 15px; font-weight: 500; }
+.act[aria-current="page"] .act-label { font-weight: 600; }
+.sidebar-title { min-width: 0; overflow: hidden; white-space: nowrap; }
+/* The tooltips name the icons only while their labels are hidden. */
+html:not([data-panel="collapsed"]) .act-row > .tip { display: none; }
+html[data-panel="collapsed"] :is(.act-label, .sidebar-title) { opacity: 0; transform: translateX(-0.75rem); }
+html[data-panel="collapsed"] .side-panel-inner { opacity: 0; visibility: hidden; transform: translateX(-1.5rem); }
+/* Expanding: the width eases out over 0.5 s, then the labels slide in on a
+   short stagger and the page's panel fades in. Collapsing is quicker and all
+   at once; the page's panel leaves the tab order once it has faded. */
+html[data-panel-ready] #side-panel { transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+html[data-panel-ready][data-panel="collapsed"] #side-panel { transition: width 0.42s cubic-bezier(0.22, 0.8, 0.24, 1); }
+html[data-panel-ready] :is(.act-label, .sidebar-title) {
+  transition: opacity 0.3s ease var(--row-delay, 0s), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1) var(--row-delay, 0s); }
+html[data-panel-ready][data-panel="collapsed"] :is(.act-label, .sidebar-title) { transition: opacity 0.12s ease, transform 0.3s ease; }
+html[data-panel-ready]:not([data-panel="collapsed"]) .sidebar-title { --row-delay: 0.05s; }
+html[data-panel-ready]:not([data-panel="collapsed"]) .act-row:nth-child(1) { --row-delay: 0.1s; }
+html[data-panel-ready]:not([data-panel="collapsed"]) .act-row:nth-child(2) { --row-delay: 0.15s; }
+html[data-panel-ready]:not([data-panel="collapsed"]) .act-row:nth-child(n+3) { --row-delay: 0.2s; }
+html[data-panel-ready] .side-panel-inner { transition: opacity 0.35s ease 0.15s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s, visibility 0s; }
+html[data-panel-ready][data-panel="collapsed"] .side-panel-inner {
+  transition: opacity 0.2s ease, transform 0.42s cubic-bezier(0.22, 0.8, 0.24, 1), visibility 0s linear 0.2s; }
 .when-collapsed { display: none; }
 html[data-panel="collapsed"] .when-open { display: none; }
 html[data-panel="collapsed"] .when-collapsed { display: grid; }
@@ -615,10 +724,9 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
 .brand-signature { filter: drop-shadow(0 1px 8px color-mix(in srgb, var(--color-shade) 80%, transparent)); }
 
 @media (prefers-reduced-motion: reduce) {
-  #side-panel, .side-panel-inner { transition: none !important; }
+  #side-panel, .side-panel-inner, .act-label, .sidebar-title { transition: none !important; }
   .chip-swap > span { transition: none; }
   .drop-blob, .drop-glow::after { animation: none; }
-  .panel-row { transition: color 0.15s, background-color 0.15s !important; }
   .tip { transition: none; }
   .result-skeleton { animation: none; }
   .type-tile-bar { transition: none; }
@@ -626,6 +734,8 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .result-card[data-sound="loading"] .sound-play { animation: none; }
   .card-action, .card-tip, .picker-close { transition: none; }
   .card-actions .htmx-request .card-action, .card-actions .htmx-request.card-action { animation: none; }
+  .drawer-dialog[open] { animation: none; }
+  .rate-star, .entry-notes, .entry-link { transition: none; }
 }
 
 /* ---------- Light mode ----------

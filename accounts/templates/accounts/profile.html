@@ -3,7 +3,7 @@
 {% block breadcrumb %}{% url 'accounts:profile' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="account" icon="user" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'accounts:profile' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label=user.username icon="user" current=True %}{% endblock %}
 {% block panel_title %}Account{% endblock %}
 {% block side_panel %}
-  <ul class="flex flex-col gap-1">
+  <ul class="flex flex-col gap-1 mt-3 pt-1 border-t border-line" aria-label="Account pages">
     <li><a class="panel-row" href="{% url 'accounts:profile' %}" aria-current="page">Profile</a></li>
     <li><a class="panel-row" href="{% url 'accounts:settings' %}">Settings</a></li>
   </ul>

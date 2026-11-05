@@ -35,9 +35,10 @@
     if (event.target.matches && event.target.matches("dialog.picker-dialog")) event.target.close();
   });
 
-  // Escape lets go of every kept-open details panel, unless it's closing a picker.
+  // Escape lets go of every kept-open details panel, unless it's closing a dialog
+  // (a picker, or the library drawer).
   document.addEventListener("keydown", function (event) {
-    if (event.key !== "Escape" || document.querySelector("dialog.picker-dialog[open]")) return;
+    if (event.key !== "Escape" || document.querySelector("dialog[open]")) return;
     document.querySelectorAll('.result-card[data-details="open"]').forEach(function (card) {
       setDetails(card, false);
     });

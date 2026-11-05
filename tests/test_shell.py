@@ -64,9 +64,10 @@ def test_panel_toggle_sits_on_the_sidebar_in_place_of_the_logo_tile(client):
     assert "brand/icon-256.png" not in html
 
 
-def test_side_panel_slides_rather_than_disappearing():
+def test_side_panel_slides_to_the_icon_strip_rather_than_disappearing():
     source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
-    assert 'html[data-panel="collapsed"] #side-panel { width: 0;' in source
+    assert "#side-panel { width: 16rem; }" in source
+    assert 'html[data-panel="collapsed"] #side-panel { width: 3.5rem; }' in source
     assert "html[data-panel-ready] #side-panel { transition: width" in source
     assert "@media (prefers-reduced-motion: reduce)" in source
     shell_js = (settings.BASE_DIR / "static" / "js" / "shell.js").read_text(encoding="utf-8")
@@ -115,17 +116,28 @@ def test_title_bar_sign_in_and_sign_up_carry_icons(client):
     assert "<svg" in sign_up.group(0) and "Sign up" in sign_up.group(0)
 
 
-def test_side_panel_rows_line_up_with_activity_bar(client):
+def test_each_sidebar_icon_sits_beside_its_label_in_one_column(client):
+    """The activity bar and side panel are one column (user request, 2026-11-05)."""
     html = client.get(reverse("catalog:discover")).content.decode()
-    panel = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
-    nav = html.split('id="activity-bar"', 1)[1].split("</nav>", 1)[0]
-    # The activity bar's toggle slot and the panel header are both h-14;
-    # rows then match the activity bar's h-11 entries with the same gap-1.
-    assert '<div class="h-14 ' in panel
-    assert '<div class="h-14 ' in nav
-    rows = re.findall(r'<a class="panel-row"[^>]*>([^<]+)</a>', panel)
-    assert rows == ["Discover", "Library", "Packs"]
-    assert re.search(r'class="panel-row"[^>]*aria-current="page">Discover<', panel)
+    sidebar = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
+    # One column: the activity bar is inside the side panel, not beside it.
+    assert 'id="activity-bar"' in sidebar
+    assert 'class="panel-row"' not in sidebar  # no second list of the same pages
+    rows = re.findall(
+        r'<a [^>]*class="act act-row"[^>]*>\s*<span class="act-icon">\s*<svg.*?</svg>\s*</span>'
+        r'<span class="act-label" aria-hidden="true">([^<]+)</span>',
+        sidebar,
+        re.S,
+    )
+    assert rows == ICON_LABELS
+    assert re.search(r'aria-label="Discover" class="act act-row"\s*aria-current="page"', sidebar)
+    # The toggle's slot is h-14, and its title shows beside it while expanded.
+    assert '<div class="h-14 ' in sidebar and 'class="sidebar-title' in sidebar
+    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    assert ".act-icon { flex: none; display: grid; place-items: center; width: 3.5rem; }" in source
+    # Labels hide when collapsed, and tooltips name the icons only then.
+    assert 'html[data-panel="collapsed"] :is(.act-label, .sidebar-title) { opacity: 0;' in source
+    assert 'html:not([data-panel="collapsed"]) .act-row > .tip { display: none; }' in source
 
 
 def test_footer_text_sits_below_the_watermark(client):
@@ -316,9 +328,11 @@ def test_auth_pages_show_the_logo_to_the_right_of_the_form(client, name):
 
 def test_activity_bar_entries_in_order(client):
     html = client.get(reverse("packs:home")).content.decode()
-    nav = html.split('id="activity-bar"', 1)[1].split(">", 1)[1].split("</nav>", 1)[0]
-    labels = re.findall(r'aria-label="([^"]+)"', nav)
+    sidebar = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
+    labels = re.findall(r'<a [^>]*aria-label="([^"]+)"', sidebar)
     assert labels == ["Discover", "Library", "Packs", "Account", "Settings"]
+    # Account and Settings sit at the foot, after the page's own panel.
+    assert sidebar.index("side-panel-inner") < sidebar.index('aria-label="Account"')
 
 
 @pytest.mark.parametrize(
@@ -528,10 +542,10 @@ ICON_LABELS = ["Discover", "Library", "Packs", "Account", "Settings"]
 
 def test_activity_bar_icons_show_tooltips(client):
     html = client.get(reverse("catalog:discover")).content.decode()
-    nav = html.split('id="activity-bar"', 1)[1].split("</nav>", 1)[0]
-    tips = re.findall(r'<span class="tip" aria-hidden="true">([^<]+)</span>', nav)
+    sidebar = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
+    tips = re.findall(r'<span class="tip" aria-hidden="true">([^<]+)</span>', sidebar)
     assert tips == ["Collapse panel", *ICON_LABELS]
-    assert "title=" not in nav  # no doubled-up native tooltip
+    assert "title=" not in sidebar  # no doubled-up native tooltip
     shell_js = (settings.BASE_DIR / "static" / "js" / "shell.js").read_text(encoding="utf-8")
     assert '"Collapse panel" : "Expand panel"' in shell_js
     source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
@@ -541,22 +555,22 @@ def test_activity_bar_icons_show_tooltips(client):
 def test_icons_share_one_size_per_bar(member_client):
     html = member_client.get(reverse("catalog:discover")).content.decode()
     title_bar = html.split('id="title-bar"', 1)[1].split("</header>", 1)[0]
-    nav = html.split('id="activity-bar"', 1)[1].split("</nav>", 1)[0]
+    sidebar = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
     assert set(re.findall(r'<svg width="(\d+)"', title_bar)) == {"16"}
-    assert set(re.findall(r'<svg width="(\d+)"', nav)) == {"20"}
-    # Entry groups start the same 4px below their borders, in both columns.
-    panel = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
-    assert '<div class="flex flex-col gap-1 pt-1">' in nav
-    assert '<ul class="flex flex-col gap-1 pt-1">' in panel
+    assert set(re.findall(r'<svg width="(\d+)"', sidebar)) == {"20"}
+    # Each group of entries starts 4px below its border.
+    assert '<div class="flex flex-col gap-1 pt-1">' in sidebar
+    assert '<nav aria-label="Account" class="shrink-0 flex flex-col gap-1 pt-1 ' in sidebar
 
 
-def test_current_page_is_marked_in_all_three_places(member_client):
+def test_current_page_is_marked_in_the_sidebar_and_the_title_bar(member_client):
     html = member_client.get(reverse("catalog:library")).content.decode()
     nav = html.split('id="activity-bar"', 1)[1].split("</nav>", 1)[0]
-    panel = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
     title_bar = html.split('id="title-bar"', 1)[1].split("</header>", 1)[0]
     assert re.search(r'aria-label="Library"[^>]*aria-current="page"', nav)
-    assert re.search(r'class="panel-row"[^>]*aria-current="page">Library<', panel)
+    # The account pages' own rows still mark theirs (Profile, Settings).
+    profile = member_client.get(reverse("accounts:profile")).content.decode()
+    assert re.search(r'class="panel-row"[^>]*aria-current="page">Profile<', profile)
     assert re.search(
         r'class="crumb chip-swap"[^>]*aria-current="page"><span class="chip-label">library<',
         title_bar,
@@ -571,19 +585,24 @@ def test_current_page_is_marked_in_all_three_places(member_client):
     assert "box-shadow: inset 0 -2px 0 var(--color-ink);" in source
 
 
-def test_side_panel_expands_smoothly_with_staggered_rows():
+def test_side_panel_expands_smoothly_with_staggered_labels():
     source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
     assert (
         "html[data-panel-ready] #side-panel { transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
         in source
     )
     assert (
-        "html[data-panel-ready] .side-panel-inner { transition: opacity 0.35s ease 0.08s" in source
+        "html[data-panel-ready] .side-panel-inner { transition: opacity 0.35s ease 0.15s" in source
     )
-    assert 'html[data-panel="collapsed"] .panel-row { opacity: 0;' in source
-    assert "li:nth-child(2) > .panel-row { --row-delay: 0.15s; }" in source
+    assert (
+        'html[data-panel="collapsed"] .side-panel-inner { opacity: 0; visibility: hidden;' in source
+    )
+    assert ".act-row:nth-child(2) { --row-delay: 0.15s; }" in source
     reduced = source.split("@media (prefers-reduced-motion: reduce) {", 1)[1].split("\n}", 1)[0]
-    assert ".panel-row { transition: color 0.15s, background-color 0.15s !important; }" in reduced
+    assert (
+        "#side-panel, .side-panel-inner, .act-label, .sidebar-title { transition: none !important; }"
+        in reduced
+    )
 
 
 SHOWCASE = ["packs:home", "catalog:discover"]

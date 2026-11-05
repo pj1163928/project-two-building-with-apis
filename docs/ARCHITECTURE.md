@@ -28,6 +28,8 @@ phases add.
 | `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>&page=<n>` | Everyone (an HTMX fragment; `page` is optional, 1 to 20) |
 | `catalog:library` | `/library/?q=&type=&provider=&status=&tag=&min_rating=&sort=&page=` | Members (the controls' HTMX requests get the results fragment) |
 | `catalog:save` | `/library/save/` | Members; POST only, with CSRF (an HTMX fragment) |
+| `catalog:entry` | `/library/<id>/` | Members, own entries only (anything else is **404**). The library's HTMX request gets the drawer; any other request gets the full page |
+| `catalog:update` | `/library/<id>/update/` | Members, own entries only (**404** otherwise); POST only, with CSRF. Saves whichever of `status`, `rating`, `notes` is posted |
 | `catalog:remove` | `/library/<id>/remove/` | Members, own entries only (anything else is **404**); POST only, with CSRF (HTMX gets the results fragment) |
 | `packs:list` | `/packs/` | Members |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
@@ -36,7 +38,7 @@ phases add.
 | `accounts:profile` | `/accounts/profile/` | Members |
 | `accounts:settings` | `/accounts/settings/` | Members |
 
-Planned additions: `/library/<id>/`, `/packs/<slug>/` (slugs are unique
+Planned additions: `/packs/<slug>/` (slugs are unique
 site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
 
 ## Discover
@@ -139,7 +141,7 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
     with `request.query_params`; it takes a QueryDict or a plain dict.
   - **Parameters:** `q`, `type`, `provider`, `status` and `tag` (each may
     repeat), `min_rating` (1 to 5), `sort` (`newest`, the default, `oldest`,
-    `title`, `rating`) and `page`.
+    `title`, `rating`, `community`) and `page`.
   - **Tags** *(Phase 4 polish, 2026-11-05, at the user's request)*: `tag`
     keeps entries whose asset has **every** chosen tag
     (`SavedAssetQuerySet.tagged()`, one subquery per tag, so no entry is
@@ -183,6 +185,59 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
   library. A signed-out visitor goes to sign-in and back to the library.
   Phase 7 adds the list of packs the entry leaves, and Phase 6 the API's
   DELETE.
+- **The drawer** *(Phase 5)*: `/library/<id>/` (`EntryView`) shows one of
+  the member's entries: the stored Asset's details, license and
+  attribution, source link, tags and file variants, then the member's
+  review. Every entry view and update looks the entry up through
+  `_own_entry()` (`for_user()` then `get_object_or_404`), so another
+  member's entry, or one that doesn't exist, is a 404. A card's title
+  `hx-get`s it into the library's drawer (`_wants_fragment()`: HTMX, not
+  boosted, not a history restore). A direct visit, a boosted link or a
+  history restore gets the full page (`catalog/entry.html`), which is
+  what makes the link bookmarkable. Opening the drawer doesn't change the
+  address bar; the title is still a real link to the entry, and the
+  drawer has "Open as page". A signed-out drawer request gets
+  `HX-Redirect` to sign-in and back to the entry.
+- **Saving the review** (`UpdateEntryView`, `catalog/forms.py`):
+  `ReviewForm` binds only the fields that were posted (the rest at their
+  stored values, so they still validate) and saves only those
+  (`update_fields`). A notes autosave and a status click therefore never
+  overwrite each other. Rating is 1 to 5 or empty (cleared); status is one
+  of the four; notes are up to `NOTES_MAX_LENGTH` (10,000) characters,
+  kept as typed, with line breaks stored as LF. Bad values, or none of the
+  three fields, are a **400** with one plain sentence, and nothing is
+  saved. The reply is the status line (`entry_save_status.html`). A status
+  or rating change made from the library page (`_from_library()`, read
+  from `HX-Current-URL`) also sends the card out of band; notes don't
+  show on the card, and the full page has no card. A plain POST redirects
+  to the entry's page. A signed-out HTMX save gets a **401** status line
+  with a sign-in link that opens in a new tab, instead of `HX-Redirect`,
+  so the notes being typed aren't lost (user request, 2026-11-05). A
+  plain POST is still sent to sign-in. The API (Phase 6) gets its own
+  serializer, with the same rules.
+- **Remove from the drawer or the full page:** the drawer's Delete posts to
+  `catalog:remove` from the library page, so it gets the results for the
+  same view. On the full page it's a boosted form, and a boosted request
+  is redirected to the library like a plain one.
+- **Community rating** *(user request, 2026-11-05)*: each member's own
+  rating stays private, but every page that shows an asset can show the
+  average of all members' ratings for it and how many rated it. It never
+  shows who rated, or anyone's notes or status.
+  - `SavedAssetQuerySet.with_community_rating()` annotates entries with
+    `community_rating` (the average, None when no one has rated) and
+    `community_count`. Both are subqueries over every member's entries, so
+    each entry stays one row. `SavedAsset.community` wraps them as a
+    `CommunityRating(average, count)`, or None.
+  - `filter_library()` and `_own_entry()` always annotate. The library's
+    `community` sort orders by the average (assets no one has rated last),
+    then by the count, then newest saved.
+  - `SavedAsset.objects.community_ratings(provider, external_ids)` gives
+    Discover's shelves the same figures, keyed by external ID. Like
+    "In library", they're looked up on every shelf request, not cached.
+  - A count of 1 shows that one member's rating, but never whose. The user
+    chose to show it from the first rating, not from 3. Phase 8's sentinel
+    test (no rating ever shows through a pack) should keep community
+    ratings off the public pack pages, or allow for them.
 - **Saved count:** `config.context_processors.shell` adds `saved_count`
   (the member's own entries) for signed-in members only.
 

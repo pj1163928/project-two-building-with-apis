@@ -49,7 +49,8 @@ def test_toolbar_holds_search_and_sort_disabled_while_empty(library_html):
     assert re.search(
         r'<input type="search" id="library-search" name="q" value=""[^>]* disabled>', toolbar
     )
-    # The PRD's four sorts, newest saved first (the default).
+    # The PRD's four sorts, newest saved first (the default), then the community
+    # rating (added 2026-11-05 at the user's request).
     sort = re.search(
         r'<select name="sort" class="library-control" disabled>(.*?)</select>', toolbar, re.S
     )
@@ -58,6 +59,7 @@ def test_toolbar_holds_search_and_sort_disabled_while_empty(library_html):
         ("oldest", "Oldest"),
         ("title", "Title A–Z"),
         ("rating", "Rating, high to low"),
+        ("community", "Community rating"),
     ]
     # The grid/list toggle is gone: the PRD describes only a card grid.
     assert "Grid view" not in library_html and "List view" not in library_html
@@ -86,13 +88,10 @@ def _chips(html):
 
 def test_filters_live_in_the_side_panel_disabled_while_empty(library_html):
     panel = library_html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
-    # The usual navigation rows stay on top.
-    assert re.findall(r'<a class="panel-row"[^>]*>([^<]+)</a>', panel) == [
-        "Discover",
-        "Library",
-        "Packs",
-    ]
-    assert '<fieldset disabled class="' in panel.split('id="library-filters"', 1)[1]
+    # The filters are the page's own panel, under the sidebar's navigation rows.
+    inner = panel.split('class="side-panel-inner', 1)[1]
+    assert panel.index('aria-label="Packs"') < panel.index('class="side-panel-inner')
+    assert '<fieldset disabled class="' in inner.split('id="library-filters"', 1)[1]
     chips = _chips(library_html)
     assert {title: [chip[0] for chip in group] for title, group in chips.items()} == {
         "Type": ["Textures", "HDRIs", "Models", "Sounds"],
@@ -201,8 +200,13 @@ def test_each_card_shows_thumbnail_type_title_status_and_rating(entries, member_
     assert 'role="img" aria-label="Rated 3 out of 5"' in sunset
     assert sunset.count('class="star is-on"') == 3
     assert sunset.count('class="star"') == 2
-    # The title opens the provider's page.
-    assert 'href="https://freesound.org/s/345560/" target="_blank"' in footsteps
+    # The title opens the entry's drawer; as a plain link, its full page.
+    entry_url = reverse("catalog:entry", args=[entries[2].pk])
+    assert (
+        f'<a href="{entry_url}" hx-get="{entry_url}" hx-target="#library-drawer" '
+        'hx-swap="innerHTML transition:false" aria-haspopup="dialog" class="result-link">Footsteps</a>'
+    ) in footsteps
+    assert "freesound.org/s/345560" not in footsteps
 
 
 def test_thumbnails_are_the_providers_urls_never_a_local_copy(entries, member_client):

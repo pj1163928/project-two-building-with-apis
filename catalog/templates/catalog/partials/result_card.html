@@ -7,8 +7,9 @@
 {# The corner actions (.card-actions), top right over the thumbnail: Save, Add to   #}
 {# pack, and Details, which keeps .result-details open. Hovering the card, or        #}
 {# keyboard focus inside it, shows .result-details too: the full title, author,      #}
-{# license, source and tags that the card itself cuts short.                         #}
-<li class="result-card" data-kind="{{ record.kind }}">
+{# license, source and tags that the card itself cuts short. Once any member has    #}
+{# rated the asset, its community rating shows under the author.                     #}
+{% load catalog_extras %}<li class="result-card" data-kind="{{ record.kind }}">
   <div class="result-thumb">
     <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=28 %}</span>
     {% if record.thumbnail_url %}<img src="{{ record.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
@@ -23,6 +24,7 @@
   <div class="result-body">
     <h3 class="result-title"><a href="{{ record.source_url }}" target="_blank" rel="noopener noreferrer" class="result-link">{{ record.title }}</a></h3>
     <p class="result-meta"><span class="result-author">{{ record.author }}</span><span class="micro text-fg-muted shrink-0">{{ record.license }}</span></p>
+    {% with community=community_ratings|lookup:record.external_id %}{% if community %}<p class="result-community">{% include "catalog/partials/community_rating.html" %}</p>{% endif %}{% endwith %}
   </div>
   <div class="card-actions">{% include "catalog/partials/save_button.html" %}{% include "catalog/partials/pack_button.html" with title=record.title next=shelf.page_url %}{% include "catalog/partials/details_button.html" with title=record.title %}</div>
   <div class="result-details" aria-hidden="true">

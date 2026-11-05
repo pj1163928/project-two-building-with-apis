@@ -57,10 +57,11 @@ It's a throwaway prototype, so take its look, not its code.
 - **Type colours** are `texture`, `hdri`, `model` and `sound` (for example
   `text-texture`). Use them only to show an asset's type. Tailwind emits
   only the tokens that are used. Each has a dark and a light value. So far
-  they appear in three places:
+  they appear in four places:
   - Discover's type tiles (the icon and the bar under the current tile)
   - a result's fallback type icon, inside the shelf fragments
   - a library card's type icon (`.library-type-icon`) and fallback icon
+  - the same two icons in the library drawer and on an entry's page
 
   `test_shell.py` keeps them out of the chrome on every page, out of every
   other page's own content, and on library cards to those two icons only.
@@ -134,8 +135,7 @@ this only matters on a full load or refresh.
 | Part | id | Notes |
 |---|---|---|
 | Title bar | `title-bar` | `h-12`. From the left: the wordmark (`h-8`, links home), a divider, **Home** (`#home-button`, the only Home chip), "TOOLBOX", the breadcrumb, then the account chips on the right. Every item is a square `h-8` chip (`.bar-item`, `.crumb`) with 16 px icons. The breadcrumb sits in `{% block breadcrumb_nav %}`. Home empties that block, because its Home chip already marks the page. Sign-out is a POST form |
-| Activity bar | `activity-bar` | A top slot (`h-14`) holding the panel toggle, then Discover, Library, Packs (`pt-1`, `gap-1`), then Account and Settings. Every icon is 20 px and has a `.tip` tooltip instead of a `title`. The bar is `relative z-20` so tooltips sit over the side panel. A view sets `extra_context = {"active_nav": "<key>"}` to mark its entry with `aria-current="page"` |
-| Side panel | `side-panel` | `{% block panel_title %}` and `{% block side_panel %}`. It slides shut (see below). The header is `h-14`, the same as the toggle slot, and rows use `.panel-row` (`h-11` with `gap-1` and `pt-1`, like the activity bar), so each row lines up with its icon. Keep these heights in step if either bar changes |
+| Sidebar | `side-panel` (with `activity-bar` inside) | One column: the activity bar and the side panel merged (user request, 2026-11-05). From the top: an `h-14` slot with the panel toggle and `{% block panel_title %}` (`.sidebar-title`, "Explorer" by default); `nav#activity-bar` with Discover, Library and Packs (`pt-1`, `gap-1`); the page's own panel (`.side-panel-inner`, `{% block side_panel %}`: the Library filters, the Account pages' Profile and Settings rows); and an Account nav at the foot with Account and Settings. Each entry is an `.act.act-row` (`h-11`): a 3.5 rem `.act-icon` cell holding its 20 px icon, its `.act-label`, and a `.tip` tooltip for the collapsed strip, instead of a `title`. The sidebar is `relative z-20` so tooltips sit over the content. A view sets `extra_context = {"active_nav": "<key>"}` to mark its entry with `aria-current="page"` |
 | Content | `content` | `data-drop` = the page's `active_nav`. The hero glow (`.page-glow`), then `{% block content %}` in a `px-8 lg:px-12 pt-14 pb-12 space-y-8` wrapper, then the footer (`page-footer`): the drop glow, the faint giant watermark, and the `.brand-signature` row ("Built for Axcenity Engine", a small wordmark, "Axcenity Studios · 2026") |
 | Status bar | `status-bar` | Monochrome. Each provider's last known status (`partials/provider_status.html`, from `config.context_processors.shell`): a solid ink dot for OK, an alert icon for an error, a muted dot for unknown, with the words in `title` and screen-reader text. The saved count (`partials/saved_count.html`, `#saved-count`) appears only when signed in, counts only that member's entries, and is sent again out of band after each save |
 
@@ -146,14 +146,27 @@ this only matters on a full load or refresh.
 `aria-expanded` in step. The toggle holds two icons (`.when-open` and
 `.when-collapsed`), and CSS shows whichever fits the state.
 
-**Side panel animation:** collapsing animates the panel's width to 0 over
-0.42 s on a smooth ease-out curve. The contents fade and drift left at the
-same time, and the panel becomes `visibility: hidden` at the end, so its
-links leave the tab order. Expanding is gentler: the width eases out over
-0.5 s, the contents fade in 0.08 s later, and the `.panel-row`s slide in on
-a 0.1 to 0.25 s stagger (`--row-delay`). `shell.js` sets `data-panel-ready` after the
-first frame, so the transition never plays on page load. Reduced motion
-turns it off.
+**Side panel animation:** the sidebar is 16 rem open and the 3.5 rem icon
+strip collapsed. The icon cell is 3.5 rem in both states, so the icons
+never move.
+- **Collapsing** animates the width over 0.42 s on a smooth ease-out curve.
+  The labels and the title fade at once, and the page's panel fades and
+  drifts left, then becomes `visibility: hidden`, so its links leave the
+  tab order.
+- **Expanding** is gentler. The width eases out over 0.5 s, the labels
+  slide in on a 0.1 to 0.2 s stagger (`--row-delay`), and the page's panel
+  fades in 0.15 s later.
+- **Clipping:** nothing on the `<aside>` clips, because the tooltips sit
+  outside it. Each label clips itself (`overflow: hidden`) as the width
+  changes.
+- **Tooltips** show only while collapsed, since the labels name the icons
+  when it's open.
+
+`shell.js` sets `data-panel-ready` after the first frame, so the transition
+never plays on page load. Reduced motion turns it off. The first version
+had two columns: the icon bar, plus a panel that repeated Discover, Library
+and Packs as text rows. The user asked for one column with each icon
+beside its label (2026-11-05).
 
 **Hover is an inversion:** dark chrome (activity bar entries, the panel
 toggle, side-panel rows, title-bar chips) turns white with black content.
@@ -176,15 +189,16 @@ Keyboard `:focus-visible` isn't gated. Put any new chrome hover rule behind
 the gate too. With boosted navigation, the gate is re-armed after every
 swap (`htmx:afterSwap` in `shell.js`).
 
-**Current page:** marked the same way in three places. The activity-bar
-entry and the side-panel row get white text, a slightly lighter fill and a
-2 px white bar on the left edge, and the row also turns semibold. The
-title-bar chip (the crumb, or Home on the home page) gets white text, a
-fill and a 2 px white underline (`inset` box shadow).
+**Current page:** marked the same way in the sidebar and the title bar.
+The sidebar entry gets white text, a slightly lighter fill, a 2 px white
+bar on the left edge and a semibold label. So does a page's own
+`.panel-row` (the Account pages' Profile and Settings). The title-bar chip
+(the crumb, or Home on the home page) gets white text, a fill and a 2 px
+white underline (`inset` box shadow).
 
-**Tooltips:** each activity-bar icon holds a `<span class="tip"
+**Tooltips:** each sidebar entry holds a `<span class="tip"
 aria-hidden="true">`, a white mono label that slides out to the right after
-0.2 s. The link's `aria-label` stays the accessible name. `shell.js` swaps
+0.2 s, while the sidebar is collapsed. The link's `aria-label` stays the accessible name. `shell.js` swaps
 the toggle's tip between "Collapse panel" and "Expand panel".
 
 **Square corners:** title-bar chips, the Sign-up button (`rounded-none`),
@@ -288,7 +302,8 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
   every page. A swap doesn't run a new page's `<head>`, so there's no
   per-page scripts block. Scripts listen on the `document` (delegation)
   rather than binding to elements a swap replaces, as `shell.js`,
-  `password-toggle.js`, `sound-preview.js` and `card-actions.js` do.
+  `password-toggle.js`, `sound-preview.js`, `card-actions.js` and
+  `entry-drawer.js` do.
 - **Preserved:** the title-bar logo link (`#brand-link`) is
   `hx-preserve`, so it isn't rebuilt on each swap. A rebuilt image left a
   blank frame with the chips sliding left. Its `<img>` also has
@@ -303,7 +318,7 @@ in the htmx config.
   out over 0.16 s, then the new page rises in over 0.34 s.
 - **Rest of the page:** a short 0.18 s crossfade.
 - **Current-page marks:** each bar's current item has a shared name:
-  `current-act` in the activity bar, `current-row` in the side panel, and
+  `current-act` in the sidebar, `current-row` for a page's own panel row, and
   `current-chip` for the title-bar crumb or Home. The mark glides from
   the old item to the new one over 0.32 s.
 - **One name per page:** a name used twice on a page cancels the whole
@@ -373,8 +388,9 @@ library is empty.
   search (`#library-search`, `q`) and the sort select (the PRD's four
   sorts). The grid/list toggle from the Phase 1 polish was removed in
   Phase 4, because the PRD describes only a card grid.
-- `#library-filters` sits in the side panel, below the usual rows,
-  because the PRD puts the filters there. It has `.filter-group`s of
+- `#library-filters` is the library's own panel in the sidebar, under its
+  navigation rows, because the PRD puts the filters there. It shows while
+  the sidebar is open. It has `.filter-group`s of
   square `.filter-chip`s: Type, Provider and Status are checkboxes (any
   number on), and Minimum rating is a radio group (Any, 1+ … 5). Tags
   (Phase 4 polish) are checkboxes too, one per tag on the member's saved
@@ -418,7 +434,8 @@ textures), stretched title link, corner actions and details panel (see
 - the provider's thumbnail over the type icon, as on Discover
 - the type: its icon in the type colour, then the singular label in mono
   ("Texture", "HDRI")
-- the title, which opens the provider's page until Phase 5's drawer
+- the title, which opens the entry's drawer (below). As a plain link it's
+  the entry's full page, so Ctrl-click and Copy link work
 - a `.library-meta` row: a monochrome `.status-chip` (`data-status`;
   Approved is inverted, Rejected struck through) and five star icons
   (`.star-rating`, filled with `.is-on`, `role="img"` with "Rated N out of 5"),
@@ -433,6 +450,13 @@ textures), stretched title link, corner actions and details panel (see
     same view, and the saved count follows out of band. Phase 7 replaces
     the confirm with a dialog listing the packs the entry leaves.
 - **Details:** the provider's name and the asset's stored tags.
+- **Community rating** (`.library-community`, user request, 2026-11-05):
+  once any member has rated the asset, a "Community" line under the status
+  and stars shows `catalog/partials/community_rating.html`: a grey filled
+  star, the average to one decimal and "· N ratings". It's monochrome and
+  grey, so it never reads as the member's own stars. It never names who
+  rated. The same partial shows under a Discover result's author
+  (`.result-community`) and in the drawer.
 
 **Pack picker** (`catalog/partials/pack_picker.html`): one native
 `<dialog id="pack-picker" class="picker-dialog">` on the library and on a
@@ -448,6 +472,77 @@ member's Discover page.
   note that packs are on the way. Phase 7 fills the list. Collections were
   tried the same day and dropped at the user's request: everything
   centres on packs.
+
+## Library drawer
+
+*(Phase 5.)* A card's title `hx-get`s `/library/<id>/` into
+`<dialog id="library-drawer" class="drawer-dialog">` (`innerHTML`), once on
+`catalog/library.html`. `static/js/entry-drawer.js` calls `showModal()`
+after the swap.
+
+- **The panel** (`catalog/partials/entry_drawer.html`): a native dialog,
+  full height, `min(34rem, 100vw)` wide, against the right edge. It slides
+  in over 0.28 s over a `shade` backdrop. Its sticky head has "Library
+  entry", **Open as page** (the entry's URL) and Close. Close, a backdrop
+  click or Escape shuts it. Reduced motion turns off the slide. The address
+  bar doesn't change.
+- **The full page** (`catalog/entry.html`): the same body in a bordered
+  `.entry-page` surface, under "Back to your library". The crumbs are
+  library / entry, and Library stays current in the bars.
+- **The body** (`catalog/partials/entry_detail.html`, `.entry`): the
+  thumbnail (provider URL over the type icon, square and whole for
+  textures), the type and provider, the title (`h2` in the drawer, `h1` on
+  the page) and author. Then sections under mono labels:
+  - **Your review:** status chips (`.filter-chip` radios), five star radios
+    (`.rate-star`, each filled when it or a later star is checked, with a
+    hover preview) plus "Clear rating" / "Not rated" (`.rate-clear`), and
+    the notes box. Below them is the status line, `#entry-save-status`.
+    Under the stars, `#entry-community` gives the community rating ("from
+    every member who rated it, you included", or "No one has rated this
+    yet."). A rating change sends it again out of band.
+  - **License and credit:** the linked license, the attribution, "View on
+    <provider>", tags and the saved date.
+  - **Files:** one `<details>` per variant ("2K JPG · 2 files · 5.2 MB"),
+    opening to each file's link and size.
+  - **Remove from library** (`entry_remove.html`), with the browser's
+    confirm.
+- **Type colour:** only the type icon beside the label and the fallback
+  icon, as on the cards.
+
+**Saving:** status, rating and notes are three separate forms, each
+posting only its own field to `catalog:update`. Status and rating post
+on `change`. Notes post 0.7 s after typing stops and again on leaving the
+box (`input changed delay:700ms, change`), queued (`hx-sync="this:queue
+last"`) with a 15 s timeout. There's no Save button. Every reply replaces
+only `#entry-save-status`: "Changes save as you make them.", "Saving…",
+"Saved", or an error with **Try again**. A status or rating change from
+the library also swaps the card behind the drawer out of band.
+
+**No page transition:** the drawer's swaps (opening it, every save, and
+its Remove) say `transition:false` in `hx-swap`. Under the global View
+Transitions, the whole `#content` faded out and back in behind the drawer
+as it opened, so the drawer seemed to appear, vanish and reappear. The user
+reported this on 2026-11-05.
+
+**Notes are never lost** (user request, 2026-11-05). `entry-drawer.js`:
+
+- keeps the text in `localStorage` (`data-draft-key`, `ax-notes-<id>`)
+  from the first keystroke until a save of that exact text succeeds. If a
+  draft is still there when the entry opens again, the script puts it back
+  and saves it.
+- on a 400 or 401, lets the Toolbox's own status line swap in. On any
+  other error response (a CSRF page, a server error page), a dropped
+  connection or a timeout, it writes "Couldn't reach the Toolbox…" or
+  "Something went wrong…" there itself, with Try again. A lost connection
+  also retries on `online`.
+- sends the CSRF token from the `csrftoken` cookie, so a save still works
+  after signing in again in another tab, which rotates the token.
+- asks before closing the drawer, opening another entry, navigating
+  (boosted) or unloading the page while the notes differ from the last
+  text the server confirmed and no save is on its way.
+
+Escape in `card-actions.js` ignores every open dialog, the drawer
+included.
 
 ## Home hero
 

@@ -1,0 +1,4 @@
+{# A community rating: the average of every member's rating for an asset, and how many #}
+{# rated it. Never who rated, or anyone's own rating, notes or status. Renders nothing  #}
+{# until someone has rated the asset. Given `community` (catalog.models.CommunityRating). #}
+{% if community %}<span class="community-rating"><span class="sr-only">Community rating </span>{% include "partials/icon.html" with name="star" size=12 %}<span class="community-average">{{ community.average|floatformat:1 }}</span><span class="community-count">· {{ community.count }} rating{{ community.count|pluralize }}</span></span>{% endif %}

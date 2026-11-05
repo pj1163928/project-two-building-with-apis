@@ -1,0 +1,9 @@
+{# The drawer's community rating, under the member's own stars. A rating change sends it #}
+{# again out of band, so the average includes the new rating straight away.               #}
+<p id="entry-community" class="entry-community"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <span class="micro text-fg-muted">Community</span>
+  {% with community=entry.community %}
+    {% if community %}{% include "catalog/partials/community_rating.html" %}<span class="entry-community-note">from every member who rated it{% if entry.rating %}, you included{% endif %}</span>
+    {% else %}<span class="entry-community-note">No one has rated this yet.</span>{% endif %}
+  {% endwith %}
+</p>

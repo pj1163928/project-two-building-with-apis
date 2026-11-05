@@ -185,3 +185,12 @@ def test_light_mode_inverts_the_logo_and_tints_the_glow(light_block):
     assert "--logo-filter-hover: none;" in light_block
     # Screen blending would wash the glow out on white.
     assert ".drop-blob { mix-blend-mode: multiply;" in light_block
+
+
+def test_every_block_in_the_stylesheet_is_closed_once(css):
+    """A stray line once closed @layer components early, and Tailwind refused the file."""
+    depth = 0
+    for number, line in enumerate(re.sub(r"/\*.*?\*/", "", css, flags=re.S).splitlines(), 1):
+        depth += line.count("{") - line.count("}")
+        assert depth >= 0, f"source.css closes a block that isn't open near line {number}"
+    assert depth == 0

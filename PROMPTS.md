@@ -28,6 +28,194 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-05 — Axcenity Toolbox: Phase 5/13, Library drawer (plus polish)
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 5`.
+2. Looks good one thing to look into is to make the notes autosave
+   resilient to failed requsts. Keep the user's unsaved text aand display
+   an error rather than losing their changes.
+3. Looks good move to next (approving TDD 1's test).
+4. Looks good move on (after TDD 1 went green).
+5. Looks good move to next test (approving TDD 2's test).
+6. Looks good move to 3 (after TDD 2 went green).
+7. Looks good move to next (approving TDD 3's test).
+8. Looks good move on (after TDD 3 went green, to build the rest).
+9. At the commit question: Don't commit.
+10. Ok so an issue that I notice when loading the sidebar menu is that it
+    brefily pops up goes away then it reappears and stays essentially it
+    does not transition very smoothly. For the reviews I want to make sure
+    they are for all users meaning it will average all the reviews accross
+    all accounts. Also for the sidebar menu I noticed that it seperates the
+    icos and the text I would like those to be together when expanded.
+11. Answers to the follow-up questions:
+    - the flicker is in the library drawer
+    - add a community average beside each member's own private rating
+    - show it in the drawer, on library cards and on Discover results, and
+      add a library sort
+    - merge the sidebar into one column, each icon beside its label
+
+### Summary
+
+- **Outcome:** Clicking a library card's title opens a slide-over drawer at
+  `/library/<id>/`, and a direct visit shows the same entry as a full
+  page. The drawer shows:
+  - the asset's details, license and attribution, source link, tags,
+    saved date and file variants
+  - the review: status chips and star radios that save on change (the
+    rating can be cleared), and notes that save after a 0.7 s pause and
+    on blur
+  - Remove from library
+
+  A status or rating change from the library updates the card behind the
+  drawer out of band. Notes autosave survives failures (the user's
+  addition). 562 tests pass (524 before). `ruff check` and
+  `ruff format --check` are clean.
+- **Changes:**
+  - `catalog/forms.py` (new): `ReviewForm` binds only the posted fields
+    (the rest at their stored values) and saves only those
+    (`update_fields`). It gives one-sentence errors for a bad rating,
+    status or over-long notes, keeps notes as typed and stores line
+    breaks as LF.
+  - `catalog/views.py`:
+    - `EntryView` returns the drawer fragment or the full page, and sends
+      a signed-out drawer request to sign-in with `HX-Redirect`.
+    - `UpdateEntryView` replies with the status line: "Saved", or a 400
+      that saves nothing. The card goes out of band only for a status or
+      rating change from the library. A plain POST redirects to the
+      entry. A signed-out HTMX save gets a 401 with a sign-in link.
+    - `_own_entry()` scopes every lookup to the member, and
+      `_from_library()` reads `HX-Current-URL`.
+    - `_wants_results_only` is renamed `_wants_fragment`.
+    - `RemoveFromLibraryView` now treats a boosted POST like a plain one.
+  - `catalog/urls.py`: adds `catalog:entry` and `catalog:update`.
+  - Templates:
+    - new: `catalog/entry.html`, plus the partials `entry_detail.html`,
+      `entry_drawer.html`, `entry_save_status.html` and
+      `entry_remove.html`
+    - `library_card.html`: the title opens the drawer, and the card can
+      be sent out of band
+    - `library.html`: holds the `<dialog id="library-drawer">`
+    - `icon.html`: adds an `expand` icon
+  - `static/js/entry-drawer.js` (new): opens and closes the drawer. For
+    notes, it:
+    - keeps a localStorage draft until a save of that exact text succeeds
+    - restores a leftover draft and saves it when the entry reopens
+    - shows its own message for errors the server doesn't explain, and
+      for a dropped connection or a timeout
+    - offers Try again, and retries on its own when the browser is back
+      online
+    - sends the newest CSRF token from the cookie
+    - asks before closing, switching entries, navigating or unloading
+      with unsaved notes
+  - `static/js/card-actions.js`: Escape ignores any open dialog.
+  - `templates/base.html`: loads the new script.
+  - `styles/source.css`: the drawer, the entry layout, the star input
+    (with a `:has()` fill and hover preview) and the status line, with
+    reduced-motion overrides. Also removed one stray line (see Sideways).
+  - Tests:
+    - `tests/test_library_drawer.py` (new, 22 tests, 32 cases)
+    - `tests/test_access_control.py`: the Phase 5 rules
+    - `tests/test_library_page.py`: the title now opens the drawer
+    - `tests/test_theme.py`: a brace-balance check on `source.css`
+  - Docs:
+    - `docs/ARCHITECTURE.md`: the URLs, the drawer and saving
+    - `docs/FRONTEND.md`: the "Library drawer" section and the
+      type-colour list
+    - `docs/TESTING.md`: the new test file and the access rules
+  - `plans/axcenity-toolbox.md`: ticked Phase 5, added the autosave
+    criterion and a note for Phase 7.
+  - `prd/axcenity-toolbox.md`: recorded the autosave addition under the
+    drawer.
+- **Polish (prompts 10–11):**
+  - **Drawer flicker:** htmx ran the drawer's swaps through the global
+    View Transitions, so `#content` faded out and back in behind the
+    drawer as it opened. The drawer's own swaps (opening it, every save,
+    its Remove) now use `transition:false`.
+  - **Community rating:**
+    - `SavedAssetQuerySet.with_community_rating()` adds the average and
+      count, as subqueries so each entry stays one row.
+      `SavedAsset.community` wraps them.
+    - `community_ratings()` serves Discover.
+    - There's a new `community` library sort, with assets no one has
+      rated last.
+    - `community_rating.html` shows it on library cards and Discover
+      results. `entry_community.html` shows it in the drawer and is sent
+      again out of band after a rating change.
+    - There's a `lookup` template filter (`catalog/templatetags/`).
+    - `tests/test_community_rating.py` has 9 tests.
+  - **One-column sidebar:**
+    - `base.html` merges the activity bar and the side panel into one
+      `<aside id="side-panel">`: the toggle with the panel title, the main
+      nav, the page's own panel, then Account and Settings.
+    - Each entry is an icon cell with its label beside it, plus a tooltip
+      shown only while collapsed. The duplicate Discover, Library and Packs
+      text rows are gone.
+    - The CSS animates 16 rem ↔ 3.5 rem, with the labels staggered.
+    - 8 shell and library tests were rewritten for the new layout.
+  - Docs, the plan (a "Phase 5 polish" section) and the PRD (stories 93
+    and 94) record all three. The suite is at 571 tests, and ruff is
+    clean.
+- **TDD:** three behaviours, each RED on an assertion before any code:
+  1. An update changes only the field it posts.
+  2. A rating of 1 to 5 saves and an empty one clears it. Anything else is
+     a 400 with "Choose a rating from 1 to 5." and nothing saved, not even
+     the notes posted alongside it.
+  3. Another member's entry is a 404 to view (drawer and page) and to
+     every update, and nothing changes.
+- **Decisions:**
+  - one update URL that saves only what's posted, so concurrent saves
+    don't overwrite each other
+  - opening the drawer doesn't change the address bar; the title stays a
+    real link, and the drawer has "Open as page"
+  - the card goes out of band only when the change came from the library
+    page
+  - a changed card stays in the grid even if the filter no longer matches
+    it
+  - notes are capped at 10,000 characters in the form only, so no
+    migration
+  - the pack list in the drawer is left for Phase 7
+- **Deviations:**
+  - Ratings were private per member under the PRD. At the user's request,
+    every page now also shows an anonymous community average with its
+    count, from the first rating (the user chose this over hiding it until
+    3 ratings). Each member's own rating stays private. Noted for Phase 8:
+    keep community ratings off public pack pages, or allow for them in
+    the sentinel test.
+  - The sidebar's two-column design from Phase 1 was replaced at the
+    user's request.
+  - The user added the notes autosave resilience to the
+  approved brief. To keep the text when the session has ended, a
+  signed-out HTMX save gets a 401 status line with a sign-in link in a new
+  tab. Remove instead redirects the whole window (`HX-Redirect`). A plain
+  POST is still sent to sign-in.
+- **Sideways:**
+  - The first TDD 2 run failed with a `ValueError` (saving an invalid
+    form), not an assertion. The scaffolding got an `is_valid()` guard,
+    and the re-run failed on `200 == 400`.
+  - `tailwind build` failed on a stray line in `styles/source.css` (line
+    438, left after `.picker-empty` by the Phase 4 polish). It closed
+    `@layer components` early, so the committed stylesheet didn't build.
+    The line was removed, and `test_theme.py` now checks the brace
+    balance.
+  - The signed-out test first missed its message because the apostrophe
+    is HTML-escaped. The test now unescapes the body.
+  - The test's `" ".join(split())` turned non-breaking spaces into
+    ordinary ones, so the expected file sizes were corrected.
+  - There's no Node, so the scripts were parse-checked with a throwaway
+    `esprima` (`uv run --no-project --with esprima`). The JavaScript
+    behaviour hasn't been run in a browser; the manual guide covers it.
+  - "Sidebar menu" could have meant the drawer or the left side panel, so
+    the agent asked before changing either. The flicker was the drawer,
+    and the icons-and-labels request was the side panel.
+  - The rewritten sidebar test's regex first failed: there's a newline
+    between the icon cell and its `<svg>`, and a doubled backslash crept
+    in through `sed`. Both were fixed in the test.
+  - On review, browsers send textarea line breaks as CRLF, which the
+    10,000 limit would count twice. The form now stores LF, and a test
+    covers it.
+
 ## 2026-11-05 — Axcenity Toolbox: Phase 4 polish, card actions, tag filter and Remove
 
 ### Prompts

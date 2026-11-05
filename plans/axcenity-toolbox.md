@@ -495,20 +495,51 @@ behind the drawer in step with any change.
 
 ### Acceptance criteria
 
-- [ ] An HTMX request for `/library/<id>/` returns the drawer fragment,
+- [x] An HTMX request for `/library/<id>/` returns the drawer fragment,
   and a direct visit returns a full page.
-- [ ] Changing the status saves at once and updates the card behind the
+- [x] Changing the status saves at once and updates the card behind the
   drawer through an out-of-band swap.
-- [ ] Setting or clearing the rating saves at once and updates the card.
+- [x] Setting or clearing the rating saves at once and updates the card.
   Values outside 1–5 are rejected.
-- [ ] Notes save after the debounce with no Save button, and the saved
+- [x] Notes save after the debounce with no Save button, and the saved
   text survives a reload.
-- [ ] The drawer renders from local data while every provider function is
+- [x] The drawer renders from local data while every provider function is
   patched to raise.
+- [x] *(Added 2026-11-05 at the user's request.)* A failed notes save
+  never loses the text. The reply replaces only the status line, which
+  shows the error and Try again. The text is kept in the browser until a
+  save succeeds and comes back when the entry reopens. Leaving with
+  unsaved notes asks first. A signed-out save gets a 401 with a sign-in
+  link (new tab) instead of a redirect.
+
+### Phase 5 polish (2026-11-05, at the user's request)
+
+Added after the phase. The PRD records it as stories 93 and 94.
+
+- [x] **No drawer flicker:** the drawer's swaps (opening it, saves and its
+  Remove) leave the page transition out (`transition:false`). Before, the
+  content behind faded out and in, so the drawer appeared, vanished and
+  reappeared.
+- [x] **Community rating:** each member's rating stays private, but library
+  cards, the drawer and Discover results show the average of every
+  member's rating with how many rated (never who). The library sorts by it
+  ("Community rating", unrated assets last). For the API (Phase 6): add
+  the same `community` sort to the list; for Phase 8, keep community
+  ratings off public pack pages or allow for them in the sentinel test.
+- [x] **One-column sidebar:** the activity bar and the side panel are one
+  column. Expanded, each icon sits beside its label, with the page's own
+  panel below; collapsed, it's the icon strip with tooltips.
+- [x] Standard gate (see top). Access rules: the community rating never
+  shows another member's name, notes or status, on the library, the
+  drawer or Discover.
+
+> **For Phase 7:** the drawer's Remove (`entry_remove.html`) still uses
+> `hx-confirm`; give it the same packs dialog as the card. The drawer's
+> pack list goes in `entry_detail.html`, after "License and credit".
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules:
+- [x] Standard gate (see top). Access rules:
   - Another member's `/library/<id>/` returns 404, for viewing and for
     every update URL.
   - Signed-out visitors are sent to sign in.

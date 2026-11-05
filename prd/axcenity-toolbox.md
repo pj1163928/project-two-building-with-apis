@@ -181,6 +181,11 @@ asset catalog and pack creator for the engine.
 91. As a member, I want to remove an item from my library straight from its card, so that my library holds only what I still want. **[T1]**
 92. As a member, I want an Add to pack button on Discover results as well as library cards, saving the asset to my library first if needed, so that I can put an asset into a pack the moment I find it. **[T1]**
 
+### Added 2026-11-05 (at the user's request, after Phase 5)
+
+93. As a member, I want to see the average rating every member has given an asset, and how many rated it, on my library cards, in the drawer and on Discover results, and to sort my library by it, so that I can lean on what others found. My own rating stays private: the average never shows who rated. **[T1]**
+94. As a member, I want the side panel to be one column, each icon beside its label when it's open and the icon strip when it's closed, so that I can read where each icon goes. **[T1]**
+
 ### Requirement traceability
 
 | Graded requirement | User stories |
@@ -320,6 +325,12 @@ asset catalog and pack creator for the engine.
     bookmarkable.
   - **Drawer:** a slide-over at `/library/<id>/`.
     - Status and stars save immediately; notes save after a debounce.
+      *(Added 2026-11-05.)* The community rating (every member's average,
+      with a count) shows under the member's own stars.
+      *(Added 2026-11-05 at the user's request.)* A failed notes save
+      keeps the text on the page with an error and Try again, keeps a
+      draft in the browser until it saves, and asks before the member
+      leaves with unsaved notes.
     - It lists the packs the asset is in, and has Delete.
     - When the request isn't from HTMX (checked through `request.htmx`),
       the same view returns a full page.
@@ -429,7 +440,9 @@ These rules apply to the website **and** the API, and each one has a test.
 | Create or edit packs through the API | Not available | Not available | Not available |
 
 - No public view, public serializer or export ever includes a
-  SavedAsset's notes, rating or status.
+  SavedAsset's notes, rating or status. *(Added 2026-11-05.)* The
+  community rating (story 93) is an average over every member, with a
+  count, and never names who rated.
 - A member can only add their own SavedAssets to their own packs.
 
 ### Acceptance criteria: export manifest
@@ -469,7 +482,9 @@ so any change to the shape fails the tests.
   - a title bar with the wordmark and "TOOLBOX"
   - an activity bar with the app icon tile (Home) at the top, then
     Discover, Library, Packs, Account and Settings
-  - a collapsible side panel
+  - a collapsible side panel *(changed 2026-11-05: one column with the
+    activity bar, each icon beside its label when open, the icon strip
+    when closed)*
   - a monochrome status bar showing provider status and the saved count
 - **Colour:** the chrome is monochrome, and primary buttons are white with
   dark text. Colour only ever means asset type: textures `#F2A15A`, HDRIs

@@ -74,6 +74,7 @@ SORT_LABELS = {
     "oldest": "Oldest",
     "title": "Title A–Z",
     "rating": "Rating, high to low",
+    "community": "Community rating",
 }
 
 
@@ -247,14 +248,18 @@ def filter_library(user, params: Mapping[str, Any]) -> LibraryPage:
     The page and the API both use it. It searches the title, tags and notes
     (q), filters by type, provider, status, tag (every chosen tag, whichever
     provider it came from) and min_rating, sorts by one of LIBRARY_SORTS and
-    pages by PAGE_SIZE. Bad values fall back to the
+    pages by PAGE_SIZE. Each entry carries its asset's community rating
+    (SavedAsset.community). Bad values fall back to the
     defaults (see clean_library_params), and a page past the end is the last
     page. Only `user`'s own entries are ever returned, and none for a
     signed-out visitor.
     """
     cleaned = clean_library_params(params)
     entries = (
-        SavedAsset.objects.for_user(user).select_related("asset").prefetch_related("asset__tags")
+        SavedAsset.objects.for_user(user)
+        .with_community_rating()
+        .select_related("asset")
+        .prefetch_related("asset__tags")
     )
     if cleaned.q:
         entries = entries.search(cleaned.q)

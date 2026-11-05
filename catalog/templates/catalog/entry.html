@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.asset.title }} · Library{% endblock %}
+{% block breadcrumb %}{% url 'catalog:library' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="library" icon="library" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'catalog:entry' entry.pk as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="entry" icon="info" current=True %}{% endblock %}
+
+{# One library entry as a full page: what a direct visit, a bookmark or "Open as page" gets. #}
+{# The same body as the drawer (catalog/partials/entry_detail.html).                         #}
+{% block content %}
+  <section class="space-y-5">
+    {% url 'catalog:library' as library_url %}
+    <a href="{{ library_url }}" class="btn btn-quiet btn-sm">Back to your library</a>
+    <div class="entry-page">{% include "catalog/partials/entry_detail.html" with as_page=True %}</div>
+  </section>
+{% endblock %}

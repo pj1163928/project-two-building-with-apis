@@ -7,12 +7,13 @@ status.
 """
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
-from django.db.models import Count, F, Q
-from django.db.models.functions import Lower
+from django.db.models import Avg, Count, F, IntegerField, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
 
 from providers import KINDS, PROVIDERS, AssetRecord
@@ -138,13 +139,32 @@ class Asset(models.Model):
 
 
 # The library's sorts, by their URL value; "newest" is the default. Each ends
-# on a unique column, so the order never shifts between pages.
+# on a unique column, so the order never shifts between pages. "community"
+# needs SavedAssetQuerySet.with_community_rating().
 LIBRARY_SORTS = {
     "newest": ("-saved_at", "-id"),
     "oldest": ("saved_at", "id"),
     "title": (Lower("asset__title"), "-saved_at", "-id"),
     "rating": (F("rating").desc(nulls_last=True), "-saved_at", "-id"),
+    "community": (
+        F("community_rating").desc(nulls_last=True),
+        F("community_count").desc(),
+        "-saved_at",
+        "-id",
+    ),
 }
+
+
+@dataclass(frozen=True)
+class CommunityRating:
+    """The average of every member's rating for one asset, and how many rated it.
+
+    Only the average and the count: never who rated, or anyone's own rating,
+    notes or status.
+    """
+
+    average: float
+    count: int
 
 
 class SavedAssetQuerySet(models.QuerySet):
@@ -159,6 +179,47 @@ class SavedAssetQuerySet(models.QuerySet):
             .filter(asset__provider=provider_key, asset__external_id__in=list(external_ids))
             .values_list("asset__external_id", flat=True)
         )
+
+    def with_community_rating(self) -> "SavedAssetQuerySet":
+        """Entries annotated with their asset's community rating.
+
+        `community_rating` is the average of every member's rating for the
+        entry's asset (None when no one has rated it) and `community_count`
+        how many members rated it. Unrated entries don't count. Each is a
+        subquery over all members' entries, so the entries themselves stay
+        one row each.
+        """
+        rated = SavedAsset.objects.filter(asset=OuterRef("asset"), rating__isnull=False)
+        per_asset = rated.order_by().values("asset")
+        return self.annotate(
+            community_rating=Subquery(per_asset.annotate(average=Avg("rating")).values("average")),
+            community_count=Coalesce(
+                Subquery(per_asset.annotate(count=Count("id")).values("count")),
+                0,
+                output_field=IntegerField(),
+            ),
+        )
+
+    def community_ratings(
+        self, provider_key: str, external_ids: Iterable[str]
+    ) -> dict[str, CommunityRating]:
+        """The community rating of each of one provider's assets that anyone has rated.
+
+        Keyed by external ID. Assets no member has rated are left out.
+        """
+        rows = (
+            self.filter(
+                asset__provider=provider_key,
+                asset__external_id__in=list(external_ids),
+                rating__isnull=False,
+            )
+            .order_by()
+            .values("asset__external_id")
+            .annotate(average=Avg("rating"), count=Count("id"))
+        )
+        return {
+            row["asset__external_id"]: CommunityRating(row["average"], row["count"]) for row in rows
+        }
 
     def search(self, text: str) -> "SavedAssetQuerySet":
         """Entries matching every word of `text` in the title, a tag or the notes.
@@ -185,7 +246,9 @@ class SavedAssetQuerySet(models.QuerySet):
         return entries
 
     def sorted_by(self, sort: str) -> "SavedAssetQuerySet":
-        """Entries in one of LIBRARY_SORTS' orders. Unrated entries sort last by rating."""
+        """Entries in one of LIBRARY_SORTS' orders. Unrated entries sort last by
+        rating, and assets no one has rated sort last by community rating (which
+        needs with_community_rating())."""
         return self.order_by(*LIBRARY_SORTS[sort])
 
 
@@ -225,6 +288,13 @@ class SavedAsset(models.Model):
 
     def __str__(self):
         return f"{self.user} · {self.asset.title}"
+
+    @property
+    def community(self) -> CommunityRating | None:
+        """This entry's community rating, when with_community_rating() annotated it
+        and at least one member has rated the asset."""
+        count = getattr(self, "community_count", 0)
+        return CommunityRating(self.community_rating, count) if count else None
 
     @property
     def stars(self) -> list[bool]:

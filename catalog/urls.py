@@ -15,6 +15,10 @@ urlpatterns = [
     path("library/", views.LibraryView.as_view(), name="library"),
     # POST only: saves one provider asset (provider, external_id) to the member's library.
     path("library/save/", views.SaveAssetView.as_view(), name="save"),
+    # One of the member's entries: the drawer for HTMX, a full page otherwise.
+    path("library/<int:pk>/", views.EntryView.as_view(), name="entry"),
+    # POST only: saves whichever of status, rating and notes is posted.
+    path("library/<int:pk>/update/", views.UpdateEntryView.as_view(), name="update"),
     # POST only: removes one of the member's own entries (the shared Asset stays).
     path("library/<int:pk>/remove/", views.RemoveFromLibraryView.as_view(), name="remove"),
 ]

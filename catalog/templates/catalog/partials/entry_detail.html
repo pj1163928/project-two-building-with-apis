@@ -1,0 +1,83 @@
+{# One library entry in full: the drawer's body, and the full page at /library/<id>/       #}
+{# (as_page=True makes the title the page's h1). Drawn only from the stored Asset, so it  #}
+{# renders with every provider down. The thumbnail is the provider's URL over the type   #}
+{# icon, as on the cards.                                                                 #}
+{#                                                                                        #}
+{# The community rating (every member's average) sits under the member's own stars.     #}
+{# Your review: three separate forms, so each posts only its own field to catalog:update #}
+{# and two quick changes never overwrite each other. Status and stars save on change;    #}
+{# notes save 0.7 s after typing stops, and on leaving the box. Each reply replaces      #}
+{# #entry-save-status only, never the notes, so a failed save keeps the text (and        #}
+{# static/js/entry-drawer.js keeps a draft in this browser until it saves).              #}
+{% with asset=entry.asset %}{% with tile=asset.tile %}{% url 'catalog:update' entry.pk as update_url %}
+<article class="entry" data-kind="{{ asset.kind }}" aria-labelledby="entry-title">
+  <div class="entry-thumb">
+    <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=36 %}</span>
+    {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+  </div>
+
+  <header class="entry-head">
+    <p class="library-type"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=12 %}</span><span class="micro">{{ asset.get_kind_display }} · {{ asset.get_provider_display }}</span></p>
+    {% if as_page %}<h1 id="entry-title" class="entry-title">{{ asset.title }}</h1>{% else %}<h2 id="entry-title" class="entry-title">{{ asset.title }}</h2>{% endif %}
+    {% if asset.author %}<p class="entry-byline">By {{ asset.author }}</p>{% endif %}
+  </header>
+
+  <section class="entry-section" aria-labelledby="entry-review-title">
+    <h3 id="entry-review-title" class="micro text-fg-secondary">Your review</h3>
+    <form class="entry-form" method="post" action="{{ update_url }}" hx-post="{{ update_url }}" hx-trigger="change" hx-target="#entry-save-status" hx-swap="outerHTML transition:false" data-autosave="status">{% csrf_token %}
+      <fieldset class="entry-field"><legend class="micro text-fg-muted">Status</legend>
+        <div class="flex flex-wrap gap-1.5">{% for value, label in status_choices %}<label class="filter-chip"><input type="radio" class="sr-only" name="status" value="{{ value }}"{% if value == entry.status %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div>
+      </fieldset>
+    </form>
+    <form class="entry-form" method="post" action="{{ update_url }}" hx-post="{{ update_url }}" hx-trigger="change" hx-target="#entry-save-status" hx-swap="outerHTML transition:false" data-autosave="rating">{% csrf_token %}
+      <fieldset class="entry-field"><legend class="micro text-fg-muted">Rating</legend>
+        <div class="flex items-center gap-3">
+          <div class="rate-stars">{% for value in star_values %}<label class="rate-star"><input type="radio" class="sr-only" name="rating" value="{{ value }}"{% if value == entry.rating %} checked{% endif %}><span class="sr-only">{{ value }} star{{ value|pluralize }}</span>{% include "partials/icon.html" with name="star" size=20 %}</label>{% endfor %}</div>
+          <label class="rate-clear"><input type="radio" class="sr-only" name="rating" value=""{% if not entry.rating %} checked{% endif %}><span class="when-rated">Clear rating</span><span class="when-unrated">Not rated</span></label>
+        </div>
+      </fieldset>
+    </form>
+    {% include "catalog/partials/entry_community.html" %}
+    <form class="entry-form" method="post" action="{{ update_url }}" hx-post="{{ update_url }}" hx-trigger="input changed delay:700ms, change" hx-sync="this:queue last" hx-request='{"timeout": 15000}' hx-target="#entry-save-status" hx-swap="outerHTML transition:false" data-autosave="notes" data-draft-key="ax-notes-{{ entry.pk }}">{% csrf_token %}
+      <div class="entry-field">
+        <label for="entry-notes" class="micro text-fg-muted">Notes</label>
+        <textarea id="entry-notes" name="notes" class="entry-notes" rows="5" maxlength="{{ notes_max_length }}" placeholder="What did you test? Which project is it for?">{{ entry.notes }}</textarea>
+      </div>
+    </form>
+    {% include "catalog/partials/entry_save_status.html" with state="idle" %}
+  </section>
+
+  <section class="entry-section" aria-labelledby="entry-license-title">
+    <h3 id="entry-license-title" class="micro text-fg-secondary">License and credit</h3>
+    <dl class="entry-facts">
+      <div><dt class="micro">License</dt><dd>{% if asset.license_url %}<a href="{{ asset.license_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ asset.license }}</a>{% else %}{{ asset.license }}{% endif %}</dd></div>
+      {% if asset.attribution %}<div><dt class="micro">Attribution</dt><dd class="entry-attribution">{{ asset.attribution }}</dd></div>{% endif %}
+      <div><dt class="micro">Source</dt><dd>{% if asset.source_url %}<a href="{{ asset.source_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">View on {{ asset.get_provider_display }}</a>{% else %}{{ asset.get_provider_display }}{% endif %}</dd></div>
+      {% with tags=asset.tags.all %}{% if tags %}<div><dt class="micro">Tags</dt><dd>{{ tags|join:", " }}</dd></div>{% endif %}{% endwith %}
+      <div><dt class="micro">Saved</dt><dd><time datetime="{{ entry.saved_at|date:'c' }}">{{ entry.saved_at|date:"j M Y" }}</time></dd></div>
+    </dl>
+  </section>
+
+  <section class="entry-section" aria-labelledby="entry-files-title">
+    <h3 id="entry-files-title" class="micro text-fg-secondary">Files</h3>
+    {% if asset.variants %}
+      <ul class="entry-variants">
+        {% for variant in asset.variants %}
+          <li>
+            <details class="entry-variant">
+              <summary><span class="entry-variant-label">{{ variant.label }}</span><span class="entry-variant-meta">{{ variant.files|length }} file{{ variant.files|length|pluralize }}{% if variant.total_size is not None %} · {{ variant.total_size|filesizeformat }}{% endif %}</span></summary>
+              <ul class="entry-files">
+                {% for file in variant.files %}<li><a href="{{ file.url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ file.filename }}</a>{% if file.size is not None %}<span>{{ file.size|filesizeformat }}</span>{% endif %}</li>{% endfor %}
+              </ul>
+            </details>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-fg-weak">{{ asset.get_provider_display }} listed no downloadable files for this asset.</p>
+    {% endif %}
+  </section>
+
+  <footer class="entry-foot">{% include "catalog/partials/entry_remove.html" %}</footer>
+</article>
+{% endwith %}{% endwith %}

@@ -43,9 +43,20 @@ Phase 4 polish rules (Remove, tags):
 - Removing needs a valid CSRF token; the header base.html sends is enough.
 - The tag filter and the side panel's tag chips never show another
   member's entries or tags.
+
+Phase 5 rules (the drawer):
+- Another member's entry, or one that doesn't exist, is a 404 for viewing
+  (the drawer and the full page) and for every update, and nothing changes.
+- A signed-out visitor opening an entry is sent to sign-in and back to it
+  (the drawer's request redirects the whole window). A signed-out update
+  saves nothing: a plain POST goes to sign-in, and an HTMX save gets a 401
+  status line with a sign-in link, so the notes being typed stay on the page.
+- Every update needs a valid CSRF token; the header base.html sends is
+  enough.
 """
 
 import re
+from html import unescape
 from urllib.parse import quote
 
 import pytest
@@ -484,3 +495,93 @@ def test_tags_never_show_another_members_entries_or_tags(
         html = member_client.get(reverse("catalog:library") + query).content.decode()
         assert "Their Secret Brick" not in html, query
         assert 'value="classified"' not in html.split('id="library-filters"', 1)[1], query
+
+
+# ---------------------------------------------------------------- the drawer (Phase 5)
+
+
+@pytest.fixture
+def theirs(make_asset, django_user_model, password):
+    """Another member's entry, with private notes, a rating and a status."""
+    from catalog.models import SavedAsset
+
+    other = django_user_model.objects.create_user("other_member", password=password)
+    return SavedAsset.objects.create(
+        user=other,
+        asset=make_asset(external_id="theirs", title="Their Secret Brick"),
+        notes="their secret note",
+        rating=2,
+        status=SavedAsset.Status.REJECTED,
+    )
+
+
+def test_another_members_entry_is_a_404_to_view_and_to_update(member_client, theirs):
+    from catalog.models import SavedAsset
+
+    view = reverse("catalog:entry", args=[theirs.pk])
+    update = reverse("catalog:update", args=[theirs.pk])
+    for headers in ({}, {"HX-Request": "true"}):
+        response = member_client.get(view, headers=headers)
+        assert response.status_code == 404
+        assert "their secret note" not in response.content.decode()
+        for data in ({"notes": "mine now"}, {"rating": "5"}, {"status": "approved"}):
+            assert member_client.post(update, data, headers=headers).status_code == 404
+    theirs.refresh_from_db()
+    assert (theirs.notes, theirs.rating, theirs.status) == (
+        "their secret note",
+        2,
+        SavedAsset.Status.REJECTED,
+    )
+    # An entry that doesn't exist is the same 404.
+    assert member_client.get(reverse("catalog:entry", args=[99999])).status_code == 404
+    assert member_client.post(reverse("catalog:update", args=[99999])).status_code == 404
+
+
+def test_a_visitor_opening_an_entry_is_sent_to_sign_in_and_back(client, member, password, mine):
+    url = reverse("catalog:entry", args=[mine.pk])
+    response = client.get(url)
+    assert response.status_code == 302 and response.url == login_url_for(url)
+    # The drawer's request redirects the whole window, not into the drawer.
+    htmx = client.get(url, headers={"HX-Request": "true"})
+    assert htmx["HX-Redirect"] == login_url_for(url)
+    signed_in = client.post(response.url, {"username": member.username, "password": password})
+    assert signed_in.url == url
+
+
+def test_a_visitors_update_saves_nothing_and_keeps_the_text_on_the_page(client, mine):
+    url = reverse("catalog:update", args=[mine.pk])
+    entry_url = reverse("catalog:entry", args=[mine.pk])
+    plain = client.post(url, {"notes": "typed while signed out"})
+    assert plain.status_code == 302 and plain.url == login_url_for(entry_url)
+    # An HTMX save gets a 401 status line, not a redirect that would lose the notes.
+    htmx = client.post(url, {"notes": "typed while signed out"}, headers={"HX-Request": "true"})
+    html = unescape(htmx.content.decode())
+    assert htmx.status_code == 401 and "HX-Redirect" not in htmx
+    assert "You're signed out, so this didn't save. Your text is still here." in html
+    assert f'href="{login_url_for(entry_url)}" target="_blank" rel="noopener"' in html
+    assert "data-save-retry" in html
+    mine.refresh_from_db()
+    assert mine.notes == ""
+
+
+def test_updating_rejects_a_post_without_a_csrf_token(csrf_client, member, mine):
+    csrf_client.force_login(member)
+    url = reverse("catalog:update", args=[mine.pk])
+    for data in ({"notes": "no token"}, {"rating": "5"}, {"status": "approved"}):
+        assert csrf_client.post(url, data, headers={"HX-Request": "true"}).status_code == 403
+    mine.refresh_from_db()
+    assert (mine.notes, mine.rating, mine.status) == ("", None, "to_review")
+
+
+def test_updating_succeeds_with_the_pages_csrf_header(csrf_client, member, mine):
+    csrf_client.force_login(member)
+    page = csrf_client.get(reverse("catalog:entry", args=[mine.pk])).content.decode()
+    token = re.search(r"hx-headers='\{\"X-CSRFToken\": \"([^\"]+)\"\}'", page).group(1)
+    response = csrf_client.post(
+        reverse("catalog:update", args=[mine.pk]),
+        {"rating": "5"},
+        headers={"HX-Request": "true", "X-CSRFToken": token},
+    )
+    assert response.status_code == 200
+    mine.refresh_from_db()
+    assert mine.rating == 5
