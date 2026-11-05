@@ -3,9 +3,21 @@
 Used anonymously, which Openverse caps at 20 requests/minute and 200/day.
 """
 
+import re
+from dataclasses import replace
+
 from .formatting import duration
-from .http import get_json
-from .records import AssetRecord, items_in, tag_names, text
+from .http import ProviderError, get_json
+from .records import (
+    AssetRecord,
+    Variant,
+    VariantFile,
+    byte_size,
+    file_name,
+    items_in,
+    tag_names,
+    text,
+)
 
 NAME = "Openverse Audio"
 API_URL = "https://api.openverse.org/v1/audio/"
@@ -119,3 +131,47 @@ def search_records(query: str, kind: str, limit: int = 12, page: int = 1) -> lis
     data = get_json(API_URL, params, provider=NAME)
     records = (_record(item) for item in items_in(data, "results", NAME))
     return [record for record in records if record][:limit]
+
+
+# An Openverse ID (a UUID): letters, digits and hyphens, so it's safe in a URL path.
+_ID = re.compile(r"^[\w-]+$")
+
+
+def _variant(entry, external_id):
+    """One audio file as a variant labelled by its type. A URL with no file name
+    (Freesound's download links) gets "<id>.<type>"."""
+    url = text(entry.get("url"))
+    if not url:
+        return None
+    filetype = text(entry.get("filetype")).lower()
+    fallback = f"{external_id}.{filetype or 'audio'}"
+    return Variant(
+        filetype.upper() or "Audio",
+        (VariantFile(url, file_name(url, fallback), byte_size(entry.get("filesize"))),),
+    )
+
+
+def _variants(item, external_id):
+    """The main audio file, then each alternative file, one variant per file type."""
+    alternatives = item.get("alt_files")
+    entries = [item, *(alternatives if isinstance(alternatives, list) else [])]
+    variants = {}
+    for entry in entries:
+        if isinstance(entry, dict) and (variant := _variant(entry, external_id)):
+            variants.setdefault(variant.label, variant)
+    return tuple(variants.values())
+
+
+def fetch_record(external_id: str) -> AssetRecord:
+    """Return the full AssetRecord for one Openverse audio ID, with its variants.
+
+    Any failure raises ProviderError, including an unknown ID (HTTP 404).
+    """
+    audio_id = external_id.strip()
+    if not _ID.match(audio_id):
+        raise ProviderError(f"{NAME} has no sound with that ID.")
+    item = get_json(f"{API_URL}{audio_id}/", provider=NAME)
+    record = _record(item) if isinstance(item, dict) else None
+    if record is None:
+        raise ProviderError(f"{NAME} sent back results the Toolbox couldn't read.")
+    return replace(record, variants=_variants(item, record.external_id))

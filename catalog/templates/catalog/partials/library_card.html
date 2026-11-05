@@ -1,0 +1,25 @@
+{# One library entry, drawn only from the Toolbox's stored Asset, so it renders with   #}
+{# every provider down. The thumbnail is the provider's URL (linked, never copied),    #}
+{# over the type icon that shows when it's missing or broken. The type's icon takes    #}
+{# its type colour, because it shows the asset's type. The title opens the provider's  #}
+{# page until the drawer arrives (Phase 5).                                             #}
+{% with asset=entry.asset %}{% with tile=asset.tile %}
+<li class="result-card library-card" id="entry-{{ entry.pk }}">
+  <div class="result-thumb">
+    <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=28 %}</span>
+    {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+  </div>
+  <div class="result-body">
+    <p class="library-type"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=12 %}</span><span class="micro">{{ asset.get_kind_display }}</span></p>
+    <h3 class="result-title"><a href="{{ asset.source_url }}" target="_blank" rel="noopener noreferrer" class="result-link">{{ asset.title }}</a></h3>
+    <div class="library-meta">
+      <span class="status-chip micro" data-status="{{ entry.status }}">{{ entry.get_status_display }}</span>
+      {% if entry.rating %}
+        <span class="rating" role="img" aria-label="Rated {{ entry.rating }} out of 5">{% for on in entry.stars %}<span class="star{% if on %} is-on{% endif %}">{% include "partials/icon.html" with name="star" size=12 %}</span>{% endfor %}</span>
+      {% else %}
+        <span class="rating-none">Not rated</span>
+      {% endif %}
+    </div>
+  </div>
+</li>
+{% endwith %}{% endwith %}

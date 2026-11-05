@@ -13,15 +13,18 @@ reads `DJANGO_SETTINGS_MODULE` from `pyproject.toml`. Name files by area:
 
 | File | Covers |
 |---|---|
-| `test_access_control.py` | The access rules, page by page: who gets 200, who is redirected to sign-in, POST-only sign-out, CSRF rejections, and a visitor's status bar holding provider status only |
+| `test_access_control.py` | The access rules, page by page: who gets 200, who is redirected to sign-in, POST-only sign-out, CSRF rejections, a visitor's status bar holding provider status only, saving (sign-in back to Discover, CSRF) and the saved count counting only the member's own entries |
 | `test_accounts.py` | Sign-up and sign-in flows and their validation errors |
 | `test_shell.py` | Every page renders in the shell; branding, fonts and static files; no type colour in the chrome, and in content only on Discover's tiles; showcase vs work surfaces; boosted navigation, the hover gate and the font gate |
-| `test_library_page.py` | The library's layout: the toolbar, the side-panel filters and the empty state |
+| `test_library_page.py` | The library's layout (the toolbar, the side-panel filters, the empty state) and its grid: newest first, each card's thumbnail, type, title, status and rating, provider URLs only, a member's own entries only, and rendering with every provider down |
+| `test_library_save.py` | Saving: the shared Asset reused across members, one entry per member, nothing saved on a `ProviderError`, new entries To review, the model constraints, the save view's replies and 400s, and "In library" on Discover's shelves |
+| `test_tags.py` | `normalize_tag()`, rule by rule |
 | `test_auth_pages.py` | Sign-in and sign-up: the layout, the top-bar actions, password toggles, the Forgot password link, focus and error styling |
 | `test_theme.py` | `styles/source.css` holds only `axcenity` palette colours |
 | `test_network_guard.py` | The guard blocks every kind of unmocked request |
 | `test_console_regression.py` | The console script and each provider's `search()` / `get_details()` |
 | `test_provider_records.py` | `search_records()` and `AssetRecord`: the PRD mapping and filters, every field filled, the 12 limit, Poly Haven's `/info` calls and their 12 h cache, paging for Load more, malformed answers, and safe messages with their details logged |
+| `test_provider_fetch.py` | `fetch_record()` for each provider (`responses`): every field and variant, every file URL kept, Poly Haven's cached `/info`, and a safe message for an unknown ID, a malformed answer or an ID that isn't a slug |
 | `test_provider_failures.py` | Story 83 at the HTTP level: a timeout, a connection error, a 429, Openverse's 500 with HTML, Poly Haven's 404 and `keywordMatches == 0`, each with its exact friendly message and no leaked text |
 | `test_discover.py` | Discover: shelf URL validation, mixed shelves for every failure, the page's pending shelves, tiles, command bar and `/` shortcut, each shelf state, the search cache, credits, fallback icons, provider status, the random pick and Shuffle, Load more, sound previews and the hover details |
 
@@ -50,6 +53,7 @@ UI that appears only once a URL exists.
 | `member` | A user named `demo_member` |
 | `provider_calls` (in `test_discover.py`) | Replaces every provider's `search_records` and records each call, to prove a request never reached a provider |
 | `member_client` | The default `client`, signed in as `member`. It's the same object as `client`, so use `django.test.Client()` when you need a second, signed-out client in the same test |
+| `make_asset` | A factory for stored `Asset`s with sensible defaults (`make_asset(external_id=..., kind=..., **fields)`) |
 
 ## Which mocking tool
 

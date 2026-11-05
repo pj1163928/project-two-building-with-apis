@@ -31,7 +31,7 @@
   <section class="space-y-5">
     {% include "partials/page_header.html" with label="Library" heading="Your library." lead="Everything you save from Discover lands here, with your notes, ratings and statuses." compact=True %}
 
-    {# Search, sort and view. Disabled until there is something to search. #}
+    {# Search, sort and view. Disabled until Phase 4 wires them up (and, after that, while the library is empty). #}
     <div id="library-toolbar" class="work-toolbar" role="toolbar" aria-label="Library controls" aria-disabled="true">
       <label class="toolbar-search">
         <span class="sr-only">Search your library</span>
@@ -54,8 +54,15 @@
       </div>
     </div>
 
+    {# The member's own entries, newest saved first. #}
     <div id="library-results">
-      {% include "partials/empty_state.html" with title="Your library is empty." body="Save assets from Discover to start collecting. Search, sorting and filters switch on once you have." link_url=discover_url link_text="Go to Discover" %}
+      {% if entries %}
+        <ul class="result-grid" aria-label="Your saved assets">
+          {% for entry in entries %}{% include "catalog/partials/library_card.html" %}{% endfor %}
+        </ul>
+      {% else %}
+        {% include "partials/empty_state.html" with title="Your library is empty." body="Save assets from Discover to start collecting. Search, sorting and filters switch on once you have." link_url=discover_url link_text="Go to Discover" %}
+      {% endif %}
     </div>
   </section>
 {% endblock %}

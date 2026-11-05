@@ -57,10 +57,13 @@ It's a throwaway prototype, so take its look, not its code.
 - **Type colours** are `texture`, `hdri`, `model` and `sound` (for example
   `text-texture`). Use them only to show an asset's type. Tailwind emits
   only the tokens that are used. Each has a dark and a light value. So far
-  they appear only on Discover: its type tiles (the icon and the bar under
-  the current tile) and a result's fallback type icon, inside the shelf
-  fragments. `test_shell.py` keeps them out of the chrome on every page,
-  and out of every other page's content.
+  they appear in three places:
+  - Discover's type tiles (the icon and the bar under the current tile)
+  - a result's fallback type icon, inside the shelf fragments
+  - a library card's type icon (`.library-type-icon`) and fallback icon
+
+  `test_shell.py` keeps them out of the chrome on every page, out of every
+  other page's own content, and on library cards to those two icons only.
 - **Page drop colours (the one exception):** each page's content area has
   a "water drop" glow in three vivid colours, behind the hero and in the
   footer. The colours are chosen by `#content[data-drop="<active_nav>"]` in
@@ -119,6 +122,8 @@ this only matters on a full load or refresh.
   image URLs come from `{% static %}` through `--mark-url` and `--word-url`
   on `<html>`.
 - The ghost mark is the empty state in `partials/empty_state.html`.
+- The "In library" badge carries a small `.mark`. It sits in the card's
+  Save row, never on the thumbnail.
 - **Never** put the logo on a provider thumbnail.
 
 ## The shell (`templates/base.html`)
@@ -129,7 +134,7 @@ this only matters on a full load or refresh.
 | Activity bar | `activity-bar` | A top slot (`h-14`) holding the panel toggle, then Discover, Library, Packs (`pt-1`, `gap-1`), then Account and Settings. Every icon is 20 px and has a `.tip` tooltip instead of a `title`. The bar is `relative z-20` so tooltips sit over the side panel. A view sets `extra_context = {"active_nav": "<key>"}` to mark its entry with `aria-current="page"` |
 | Side panel | `side-panel` | `{% block panel_title %}` and `{% block side_panel %}`. It slides shut (see below). The header is `h-14`, the same as the toggle slot, and rows use `.panel-row` (`h-11` with `gap-1` and `pt-1`, like the activity bar), so each row lines up with its icon. Keep these heights in step if either bar changes |
 | Content | `content` | `data-drop` = the page's `active_nav`. The hero glow (`.page-glow`), then `{% block content %}` in a `px-8 lg:px-12 pt-14 pb-12 space-y-8` wrapper, then the footer (`page-footer`): the drop glow, the faint giant watermark, and the `.brand-signature` row ("Built for Axcenity Engine", a small wordmark, "Axcenity Studios · 2026") |
-| Status bar | `status-bar` | Monochrome. Each provider's last known status (`partials/provider_status.html`, from `config.context_processors.shell`): a solid ink dot for OK, an alert icon for an error, a muted dot for unknown, with the words in `title` and screen-reader text. Member-only data (the saved count) appears only when signed in |
+| Status bar | `status-bar` | Monochrome. Each provider's last known status (`partials/provider_status.html`, from `config.context_processors.shell`): a solid ink dot for OK, an alert icon for an error, a muted dot for unknown, with the words in `title` and screen-reader text. The saved count (`partials/saved_count.html`, `#saved-count`) appears only when signed in, counts only that member's entries, and is sent again out of band after each save |
 
 **Side panel collapse:** an inline script in `<head>` sets
 `<html data-panel="open|collapsed">` before first paint, from
@@ -355,8 +360,8 @@ Both extend `templates/registration/auth_base.html`, which fills the blocks
 ## Library layout
 
 `catalog/library.html` shows its controls even when the library is empty,
-so the layout is set before any assets arrive. They're disabled until
-Phase 4 wires them up, and while the library is empty.
+so the layout is set before any assets arrive. They stay disabled until
+Phase 4 wires them up, and after that while the library is empty.
 
 - `#library-toolbar` (`.work-toolbar`, square and bordered) sits directly
   under the header. It holds the search (`.toolbar-search`, `q`), the sort
@@ -366,7 +371,20 @@ Phase 4 wires them up, and while the library is empty.
   because the PRD puts the filters there. It has `.filter-group`s of
   square `.filter-chip`s: Type, Provider, Status and Minimum rating,
   inside a `<fieldset disabled>`.
-- `#library-results` holds the empty state now, and the grid later.
+- `#library-results` holds the empty state, or the grid: a `.result-grid`
+  of `catalog/partials/library_card.html` cards, newest saved first.
+
+**Library cards** (`<li class="result-card library-card" id="entry-<pk>">`)
+reuse the result card's frame, thumbnail and stretched title link:
+
+- the provider's thumbnail over the type icon, as on Discover
+- the type: its icon in the type colour, then the singular label in mono
+  ("Texture", "HDRI")
+- the title, which opens the provider's page until Phase 5's drawer
+- a `.library-meta` row: a monochrome `.status-chip` (`data-status`;
+  Approved is inverted, Rejected struck through) and five star icons
+  (`.rating`, filled with `.is-on`, `role="img"` with "Rated N out of 5"),
+  or "Not rated"
 
 ## Home hero
 
@@ -459,6 +477,21 @@ class="result-card">`s:
   (behind the hover gate) or `:focus-within`. It shows the full title,
   author, license, source and the first six tags. It has
   `pointer-events: none`, so a click still opens the source.
+- **Save to library:** every card ends with a `.result-actions` row
+  (`catalog/partials/save_button.html`), above the stretched link
+  (`z-index: 3`). The card is a flex column, so the row sits at its foot,
+  and `.result-details` stops 2.5 rem short so hovering never hides it.
+  - A member gets a `<form class="save-slot">` that `hx-post`s the
+    provider and ID to `catalog:save` and swaps itself (`outerHTML`) for
+    the reply. "Saving…" shows while it runs.
+  - The reply is the "In library" badge (`in_library.html`: a filled chip
+    with the mark, linking to the library) plus the saved count out of
+    band. On a `ProviderError` it's `save_error.html`: the message
+    (`role="alert"`, the error colour on its icon only) and Try again,
+    which posts the same save. That also hides the hover details.
+  - A result the member already has renders the badge straight away.
+  - A visitor gets a link to sign in, with `next` set to this Discover
+    search.
 - **Sound preview:** a card with a `preview_url` gets a square ink
   `.sound-play` button at the thumbnail's top left, and a 2 px
   `.sound-progress` line along its foot. `static/js/sound-preview.js`

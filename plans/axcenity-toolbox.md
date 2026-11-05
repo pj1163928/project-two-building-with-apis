@@ -339,31 +339,31 @@ title, status and rating. The status bar shows the member's saved count.
 
 ### Acceptance criteria
 
-- [ ] The first save of an asset calls `fetch_record()` and creates one
+- [x] The first save of an asset calls `fetch_record()` and creates one
   Asset with its tags normalized. A second user saving the same asset
   reuses the Asset and doesn't call `fetch_record()`.
-- [ ] Saving an asset the member already has creates no second
+- [x] Saving an asset the member already has creates no second
   SavedAsset, and the result shows "In library".
-- [ ] If `fetch_record()` raises `ProviderError`, the friendly message
+- [x] If `fetch_record()` raises `ProviderError`, the friendly message
   replaces the button and nothing is saved.
-- [ ] A new SavedAsset starts as To review with no rating.
-- [ ] `normalize_tag()` unit tests cover each rule:
+- [x] A new SavedAsset starts as To review with no rating.
+- [x] `normalize_tag()` unit tests cover each rule:
   - case and surrounding whitespace
   - collapsed inner whitespace
   - number-only tags dropped
   - a simple plural "s" removed
   - words ending in "ss" kept
-- [ ] Deleting a SavedAsset leaves the shared Asset in place (model-level
+- [x] Deleting a SavedAsset leaves the shared Asset in place (model-level
   test).
-- [ ] The library grid renders from local data while every provider
+- [x] The library grid renders from local data while every provider
   function is patched to raise.
-- [ ] Thumbnails link to the provider URL and are never downloaded.
-- [ ] `responses` tests cover each provider's `fetch_record()`, including
+- [x] Thumbnails link to the provider URL and are never downloaded.
+- [x] `responses` tests cover each provider's `fetch_record()`, including
   the variants and the Poly Haven file URLs.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules:
+- [x] Standard gate (see top). Access rules:
   - `/library/` sends signed-out visitors to sign in.
   - A member sees only their own entries.
   - Saving needs sign-in and a valid CSRF token.

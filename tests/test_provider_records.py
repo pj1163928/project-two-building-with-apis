@@ -99,12 +99,19 @@ OV_ITEM = {
 CC0_URL = "https://creativecommons.org/publicdomain/zero/1.0/"
 
 
-def assert_every_field_filled(record):
-    """Every field is filled. Only sounds have a preview to play, so only they need one."""
+def assert_every_field_filled(record, with_variants=False):
+    """Every field is filled. Only sounds have a preview to play, so only they need one.
+
+    Search results carry no variants (only fetch_record() fetches files), so
+    `variants` must be filled only when `with_variants` is set.
+    """
     assert isinstance(record, AssetRecord)
     for field in dataclasses.fields(AssetRecord):
         if field.name == "preview_url" and record.kind != "sound":
             assert record.preview_url == "", "only sounds have a preview"
+            continue
+        if field.name == "variants" and not with_variants:
+            assert record.variants == (), "search results carry no variants"
             continue
         assert getattr(record, field.name), f"{field.name} is empty"
 

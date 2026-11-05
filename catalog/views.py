@@ -1,8 +1,13 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import redirect_to_login
 from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView
+from django_htmx.http import HttpResponseClientRedirect
+
+from providers import PROVIDERS_BY_KEY, ProviderError
 
 from .discover import (
     KIND_TILES,
@@ -17,6 +22,8 @@ from .discover import (
     shelf_provider,
     shuffle_url,
 )
+from .library import save_to_library
+from .models import SavedAsset
 
 
 class DiscoverView(TemplateView):
@@ -74,9 +81,62 @@ class DiscoverShelfView(View):
         template = (
             "catalog/partials/shelf.html" if page == 1 else "catalog/partials/shelf_more.html"
         )
-        return render(request, template, {"shelf": shelf})
+        # Results the member already has render as "In library". Shelves are
+        # cached for everyone, so this is looked up fresh on every request.
+        saved_ids = SavedAsset.objects.saved_external_ids(
+            request.user, shelf.key, (record.external_id for record in shelf.records)
+        )
+        return render(request, template, {"shelf": shelf, "saved_ids": saved_ids})
+
+
+class SaveAssetView(LoginRequiredMixin, View):
+    """Save to library: the POST behind a Discover result's Save button.
+
+    Members only, with CSRF (base.html sends the token on every HTMX
+    request). The reply is a fragment that replaces the button: the "In
+    library" badge (with the status bar's saved count out of band), or the
+    ProviderError message with Try again. A bad provider or ID is a 400
+    before any provider is called.
+    """
+
+    http_method_names = ["post"]
+
+    def handle_no_permission(self):
+        # Back to the Discover page the button was on, not to this POST-only URL.
+        htmx = self.request.htmx
+        back = (htmx and htmx.current_url_abs_path) or reverse("catalog:discover")
+        login = redirect_to_login(back)
+        return HttpResponseClientRedirect(login.url) if htmx else login
+
+    def post(self, request):
+        provider = request.POST.get("provider", "")
+        external_id = request.POST.get("external_id", "").strip()
+        if provider not in PROVIDERS_BY_KEY or not external_id or len(external_id) > 200:
+            return HttpResponseBadRequest("Saving needs a known provider and an asset ID.")
+        slot = {"provider": provider, "external_id": external_id}
+        try:
+            save_to_library(request.user, provider, external_id)
+        except ProviderError as error:
+            return render(
+                request, "catalog/partials/save_error.html", {**slot, "error": str(error)}
+            )
+        return render(request, "catalog/partials/in_library.html", {**slot, "count_oob": True})
 
 
 class LibraryView(LoginRequiredMixin, TemplateView):
+    """The member's private library: a card grid of their own entries, newest first.
+
+    Every card renders from the Toolbox's stored Asset, so the library works
+    with every provider down. Search, filters, sorts and pages arrive in
+    Phase 4.
+    """
+
     template_name = "catalog/library.html"
     extra_context = {"active_nav": "library"}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["entries"] = list(
+            SavedAsset.objects.for_user(self.request.user).select_related("asset")
+        )
+        return context

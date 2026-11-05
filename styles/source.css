@@ -257,8 +257,8 @@
   @media (min-width: 96rem) { .result-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
   /* A result card. Its title link is stretched over the card (::after), so the
      whole card opens the provider's page; a sound's play button sits above it. */
-  .result-card { position: relative; height: 100%; background: var(--color-surface);
-    box-shadow: inset 0 0 0 1px var(--color-line); transition: box-shadow 0.15s; }
+  .result-card { position: relative; display: flex; flex-direction: column; height: 100%;
+    background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line); transition: box-shadow 0.15s; }
   html[data-pointer] .result-card:hover, .result-card:focus-within { box-shadow: inset 0 0 0 1px var(--color-fg-secondary); }
   .result-link::after { content: ""; position: absolute; inset: 0; z-index: 1; }
   .result-link:focus-visible { outline: none; }
@@ -284,6 +284,47 @@
   .result-meta { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 11.5px; color: var(--color-fg-weak); }
   /* A long author list is cut with an ellipsis; the details panel shows it whole. */
   .result-author { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Save to library: its own row at the card's foot (2.5rem: the button plus its
+     padding), above the stretched link. The details panel stops above the row,
+     so hovering a card never hides its button; a save error's longer message
+     hides the panel instead. Monochrome, inverting on hover like the chrome. */
+  .result-actions { position: relative; z-index: 3; margin-top: auto; padding: 0 0.75rem 0.75rem; }
+  .result-card:has(.result-actions) .result-details { bottom: 2.5rem; }
+  .result-card:has(.save-error) .result-details { display: none; }
+  .save-slot { display: grid; gap: 0.5rem; }
+  .save-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; width: 100%;
+    height: 1.75rem; font-size: 12px; color: var(--color-fg); box-shadow: inset 0 0 0 1px var(--color-line-strong);
+    transition: color 0.15s, background-color 0.15s; }
+  html[data-pointer] .save-button:hover, .save-button:focus-visible { color: var(--color-on-ink);
+    background: var(--color-ink); outline: none; }
+  .save-button:disabled { opacity: 0.6; cursor: progress; }
+  .save-busy { display: none; }
+  .save-slot.htmx-request .save-label { display: none; }
+  .save-slot.htmx-request .save-busy { display: inline; }
+  /* "In library": a filled chip with the logo mark, linking to the library. */
+  .in-library { display: flex; align-items: center; justify-content: center; gap: 0.4rem; height: 1.75rem;
+    font-size: 12px; font-weight: 500; color: var(--color-fg-strong); background: var(--color-control);
+    transition: background-color 0.15s; }
+  html[data-pointer] .in-library:hover, .in-library:focus-visible { background: var(--color-control-hover); outline: none; }
+  .save-error-text { display: flex; gap: 0.4rem; font-size: 11.5px; line-height: 1.35; color: var(--color-fg-secondary); }
+  .save-error-text > svg { flex: none; margin-top: 1px; color: var(--color-error); }
+
+  /* Library cards: the result card's frame, with the type (its icon in the type
+     colour), the title, and a row holding the status chip and the rating. */
+  .library-type { display: flex; align-items: center; gap: 0.4rem; color: var(--color-fg-secondary); }
+  .library-type-icon { display: grid; }
+  .library-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.4rem; }
+  .status-chip { display: inline-flex; align-items: center; height: 1.25rem; padding: 0 0.4rem;
+    color: var(--color-fg-secondary); box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+  .status-chip[data-status="testing"] { color: var(--color-fg-strong); box-shadow: inset 0 0 0 1px var(--color-fg-secondary); }
+  .status-chip[data-status="approved"] { color: var(--color-on-ink); background: var(--color-ink); box-shadow: none; }
+  .status-chip[data-status="rejected"] { color: var(--color-fg-muted); text-decoration: line-through; }
+  .rating { display: flex; gap: 1px; color: var(--color-fg-muted); }
+  .rating .star { display: grid; }
+  .rating .is-on { color: var(--color-fg-strong); }
+  .rating .is-on svg { fill: currentColor; }
+  .rating-none { font-size: 11.5px; color: var(--color-fg-muted); }
 
   /* Hover or focus shows the card's full details, rising over the lower part of
      the thumbnail. It ignores the pointer, so a click still opens the source. */
@@ -522,6 +563,7 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .type-tile-bar { transition: none; }
   .result-details, .sound-play { transition: none; }
   .result-card[data-sound="loading"] .sound-play { animation: none; }
+  .save-button, .in-library { transition: none; }
 }
 
 /* ---------- Light mode ----------

@@ -28,6 +28,139 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-04 — Axcenity Toolbox: Phase 3/13, Save to library
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 3`.
+2. Looks good go ahead and continue
+3. Looks good move to next
+4. Looks good move to next
+5. Looks good move on
+6. Looks good move on
+7. Looks good move to next
+
+### Summary
+
+- **Outcome:** members can save Discover results to a private library.
+  - The first save of an asset by anyone fetches its full details,
+    including every download variant, into a shared Asset. Later saves
+    reuse it.
+  - The button swaps for an "In library" badge with the logo mark, and
+    results the member already has render that way.
+  - A provider failure shows its friendly message in the button's place,
+    with Try again.
+  - Signed-out visitors are sent to sign in and back to their search.
+  - `/library/` shows the member's own cards: thumbnail, type, title,
+    status and rating. The status bar shows their saved count, updated out
+    of band after each save.
+  - 451 tests pass (370 before the phase).
+    `ruff check` and `ruff format --check` are clean. A one-off
+    `tailwind build` emits every new class.
+- **Changes:**
+  - `providers/records.py`: `Variant` and `VariantFile` (with
+    `total_size` and `as_dict()`), `AssetRecord.variants`, and the
+    `byte_size()` and `file_name()` helpers.
+  - `providers/ambientcg.py`, `polyhaven.py`, `openverse.py`:
+    `fetch_record()` in each Toolbox section.
+    - ambientCG: one variant per download zip.
+    - Poly Haven: `_cached_info()` plus `/files`, keeping every file URL.
+      Loose maps are grouped by resolution and format; each bundle is its
+      own variant with its included files.
+    - Openverse: the main file, then one variant per other file type.
+    - An ID that isn't a plain slug is refused before any request. The
+      console's functions are untouched.
+  - `providers/__init__.py`: documents `fetch_record()`.
+  - `catalog/tags.py` (new): `normalize_tag()` and `MAX_TAG_LENGTH`.
+  - `catalog/models.py` and `catalog/migrations/0001_initial.py` (new):
+    - `Tag` and `Tag.objects.from_names()`.
+    - `Asset` and `Asset.objects.from_record()`, unique on (provider,
+      external_id).
+    - `SavedAsset`: the `Status` choices, a 1–5 rating check, unique on
+      (user, asset), and a `PROTECT` link to Asset. Its queryset has
+      `for_user()` and `saved_external_ids()`, and the model has `stars`.
+  - `catalog/library.py` (new service module): `get_or_fetch_asset()`,
+    `save_to_library()` and `UnknownProviderError`.
+  - `catalog/views.py`, `catalog/urls.py`:
+    - `SaveAssetView` at `catalog:save`: POST only, members only, a 400
+      before any provider call, and sign-in redirects back to Discover.
+    - The shelf view passes the member's saved IDs.
+    - `LibraryView` lists the member's entries.
+  - `catalog/discover.py`: `Shelf.page_url`.
+  - `config/context_processors.py`: `saved_count`, for members only.
+  - `catalog/admin.py`: admin for the three models.
+  - Templates:
+    - new `save_button.html`, `in_library.html`, `save_error.html`,
+      `library_card.html` and `templates/partials/saved_count.html`
+    - `result_card.html`: the Save row
+    - `library.html`: the grid
+    - `base.html`: the count
+    - `icon.html`: `plus` and `star`
+  - `styles/source.css`: the card as a flex column with a Save row, the
+    details panel stopping above it, the Save, badge and error styles, the
+    library card's type, status chip and stars, and reduced motion.
+  - Tests:
+    - new `test_tags.py`, `test_library_save.py` and
+      `test_provider_fetch.py`
+    - additions to `test_library_page.py`, `test_access_control.py` and
+      `test_shell.py` (type colour on library cards)
+    - the `make_asset` fixture in `conftest.py`
+    - `test_provider_records.py`'s field helper now expects search results
+      to carry no variants
+  - `docs/ARCHITECTURE.md`, `docs/FRONTEND.md`, `docs/TESTING.md`: saving,
+    the models, the Save slot, library cards and the new test files.
+  - `plans/axcenity-toolbox.md`: every Phase 3 box ticked.
+- **TDD:**
+  1. `normalize_tag()` follows each PRD rule (one parametrized test, 14
+     cases). Red on 11 cases against a pass-through stub, then green.
+  2. `save_to_library()`: the first save fetches once and stores one
+     Asset with normalized tags, a second member reuses it without
+     fetching, and a repeat save adds no second entry. Red (no fetch),
+     then green.
+  3. A `ProviderError` saves nothing and keeps its message. Green on its
+     first run, because behaviour 2's code fetches before it writes. A
+     temporary mutant that reserved the Asset row before fetching made it
+     fail on `assert not Asset.objects.exists()`, and the mutant was
+     reverted.
+- **Decisions:**
+  - Variant labels read "2K JPG", "1K glTF" or "MP3", so Phase 7's
+    default-variant rule can match one form. An unknown size is stored as
+    `null`.
+  - The plural "s" comes off the last word only. "Number-only" means
+    digits and spaces. `canvas` becomes `canva`, per the PRD's literal
+    rule.
+  - The save URL replies with fragments only, because its button lives in
+    HTMX-loaded shelves.
+  - A visitor's Save is a sign-in link, with `next` set to the shelf's
+    Discover search. A signed-out POST goes back to the page in
+    `HX-Current-URL`, never to the POST-only URL.
+  - The Save row sits at the card's foot, so the logo mark never lands on
+    a thumbnail and the hover details never cover the button.
+  - Library cards show type colour on the type icon and the fallback icon
+    only. `test_shell.py` was widened to allow exactly those.
+  - The kind labels are singular ("Texture"), unlike the plural tile
+    labels.
+  - `preview_url` isn't stored on Asset yet. It's noted for Phase 5's
+    drawer.
+- **Deviations:** none. The brief and the three behaviours were approved
+  as proposed.
+- **Sideways:**
+  - Twice, a long Git Bash heredoc failed to parse ("unexpected EOF"), so
+    nothing was written. The files were written with the Write tool and
+    small scratch scripts instead.
+  - A test caught `file_name()` naming ambientCG's `/get?x=1` download
+    "get". Now a path segment only counts when it has an extension.
+  - `KIND_CHOICES` first reused the plural tile labels. The labels were
+    made singular and the uncommitted migration was regenerated.
+  - The existing "every field filled" helper failed on the new `variants`
+    field, and was taught that search results carry none.
+  - A muddled shell-test assertion, which would have matched `x-texture`,
+    was replaced with a chrome check before it ran.
+  - A manual live check of `fetch_record()` against all three providers
+    (read-only GETs, outside the test suite) showed Openverse's
+    alternative WAV has no file name in its URL. Such files are now named
+    `<id>.<type>`, and the test fixture was made realistic.
+
 ## 2026-11-04 — Axcenity Toolbox: Phase 2b polish (sound previews, Load more, card details, random picks)
 
 ### Prompts

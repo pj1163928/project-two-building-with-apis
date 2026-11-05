@@ -2,10 +2,22 @@
 
 import re
 from collections import defaultdict
+from dataclasses import replace
 
 from .cache import remember
-from .http import get_json
-from .records import CC0_LICENSE, CC0_URL, AssetRecord, items_in, tag_names, text
+from .http import ProviderError, get_json
+from .records import (
+    CC0_LICENSE,
+    CC0_URL,
+    AssetRecord,
+    Variant,
+    VariantFile,
+    byte_size,
+    file_name,
+    items_in,
+    tag_names,
+    text,
+)
 
 NAME = "Poly Haven"
 API_URL = "https://api.polyhaven.com"
@@ -193,3 +205,65 @@ def search_records(query: str, kind: str, limit: int = 12, page: int = 1) -> lis
         if isinstance(info, dict):
             records.append(_record(slug, info, kind))
     return records
+
+
+# A Poly Haven slug: letters, digits, underscores and hyphens, so it's safe in a URL path.
+_SLUG = re.compile(r"^[\w-]+$")
+# How formats are written in variant labels; anything else is upper-cased.
+_FORMAT_LABELS = {"gltf": "glTF", "blend": "Blend", "mtlx": "MaterialX"}
+
+
+def _variant_label(resolution, fmt):
+    return f"{resolution.upper()} {_FORMAT_LABELS.get(fmt, fmt.upper())}"
+
+
+def _variants(slug, files):
+    """The /files tree as variants, keeping every download URL.
+
+    Loose maps are grouped by resolution and format, so "2K JPG" holds every
+    map's 2K JPG. A bundle (blend, gltf, fbx, usd, mtlx) is its own variant:
+    the bundle file plus each file it includes, under its relative path.
+    Variants run from the smallest resolution up, loose maps before bundles.
+    """
+    groups = defaultdict(list)
+    for map_name, by_resolution in files.items():
+        if not isinstance(by_resolution, dict):
+            continue
+        for resolution, by_format in by_resolution.items():
+            if not _RESOLUTION.match(resolution) or not isinstance(by_format, dict):
+                continue
+            for fmt, entry in by_format.items():
+                if not isinstance(entry, dict) or not (url := text(entry.get("url"))):
+                    continue
+                fallback = f"{slug}_{map_name}_{resolution}.{fmt}"
+                group = groups[(int(resolution[:-1]), "include" in entry, fmt, resolution)]
+                group.append(
+                    VariantFile(url, file_name(url, fallback), byte_size(entry.get("size")))
+                )
+                included = entry.get("include")
+                for path, part in included.items() if isinstance(included, dict) else ():
+                    if isinstance(part, dict) and (part_url := text(part.get("url"))):
+                        group.append(VariantFile(part_url, path, byte_size(part.get("size"))))
+    variants = []
+    for key in sorted(groups):
+        _, _, fmt, resolution = key
+        variants.append(Variant(label=_variant_label(resolution, fmt), files=tuple(groups[key])))
+    return tuple(variants)
+
+
+def fetch_record(external_id: str) -> AssetRecord:
+    """Return the full AssetRecord for one Poly Haven slug, with its variants.
+
+    /info comes through the 12-hour cache (_cached_info), and /files supplies
+    every download URL that the console's get_details() only totals. Any
+    failure raises ProviderError.
+    """
+    slug = external_id.strip()
+    if not _SLUG.match(slug):
+        raise ProviderError(f"{NAME} has no asset with that ID.")
+    info = _cached_info(slug)
+    kind = TYPE_NAMES.get(info.get("type")) if isinstance(info, dict) else None
+    files = get_json(f"{API_URL}/files/{slug}", provider=NAME)
+    if kind is None or not isinstance(files, dict):
+        raise ProviderError(f"{NAME} sent back results the Toolbox couldn't read.")
+    return replace(_record(slug, info, kind), variants=_variants(slug, files))

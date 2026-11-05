@@ -185,13 +185,11 @@
     </main>
   </div>
 
-  {# ---------- Status bar (monochrome; each provider's last known status) ---------- #}
+  {# ---------- Status bar (monochrome; each provider's last known status, and a member's saved count) ---------- #}
   <footer id="status-bar" class="h-6 shrink-0 flex items-center gap-4 px-3 text-[11.5px] bg-app border-t border-line text-fg-secondary">
     <span class="flex items-center gap-1.5 text-fg-strong"><i class="mark w-3" aria-hidden="true"></i>Toolbox</span>
     {% for status in status_providers %}{% include "partials/provider_status.html" %}{% endfor %}
-    {% if user.is_authenticated %}
-      <span class="ml-auto">Library · <b class="text-fg-strong">—</b> saved</span>
-    {% endif %}
+    {% if user.is_authenticated %}{% include "partials/saved_count.html" %}{% endif %}
   </footer>
 </div>
 </body>

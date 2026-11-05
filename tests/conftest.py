@@ -72,3 +72,24 @@ def member(django_user_model, password):
 def member_client(client, member):
     client.force_login(member)
     return client
+
+
+@pytest.fixture
+def make_asset(db):
+    """Build a stored Asset with sensible defaults; keyword arguments override them."""
+    from catalog.models import Asset
+
+    def make(provider="polyhaven", external_id="red_brick_03", kind="texture", **fields):
+        values = {
+            "title": "Red Brick 03",
+            "author": "Rob Tuytel",
+            "thumbnail_url": f"https://cdn.polyhaven.com/thumbs/{external_id}.png",
+            "license": "CC0",
+            "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+            "attribution": '"Red Brick 03" by Rob Tuytel, from Poly Haven, CC0 1.0',
+            "source_url": f"https://polyhaven.com/a/{external_id}",
+        }
+        values.update(fields)
+        return Asset.objects.create(provider=provider, external_id=external_id, kind=kind, **values)
+
+    return make

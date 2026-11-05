@@ -1,0 +1,2 @@
+{# The status bar's saved count: the signed-in member's own entries only. A save sends it again out of band. #}
+<span id="saved-count" class="ml-auto"{% if oob %} hx-swap-oob="true"{% endif %}>Library · <b class="text-fg-strong">{{ saved_count }}</b> saved</span>

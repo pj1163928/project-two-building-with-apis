@@ -13,7 +13,7 @@ phases add.
 | `config` | Settings, root URLs, the shell's context processor | — |
 | `providers` | API clients for ambientCG, Poly Haven and Openverse (plain Python, not a Django app) | — |
 | `accounts` | Sign-up, sign-in, sign-out, profile, settings, and the API token page *(planned)* | `accounts:` |
-| `catalog` | Discover and the library; Asset, Tag and SavedAsset *(planned)*; the library API *(planned)* | `catalog:` |
+| `catalog` | Discover and the library; Asset, Tag and SavedAsset; saving; the library API *(planned)* | `catalog:` |
 | `packs` | Home and the public gallery; Pack and PackItem, the builder, export and the pack API *(planned)* | `packs:` |
 
 `config/urls.py` mounts `accounts.urls` at `/accounts/`, and mounts
@@ -27,6 +27,7 @@ phases add.
 | `catalog:discover` | `/discover/?type=<kind>&q=<query>` | Everyone |
 | `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>&page=<n>` | Everyone (an HTMX fragment; `page` is optional, 1 to 20) |
 | `catalog:library` | `/library/` | Members |
+| `catalog:save` | `/library/save/` | Members; POST only, with CSRF (an HTMX fragment) |
 | `packs:list` | `/packs/` | Members |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
 | `accounts:login` | `/accounts/login/` | Everyone |
@@ -91,6 +92,47 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
 - **Credits:** each provider module has a `CREDIT` line and a `HOME_URL`,
   which every shelf shows.
 
+## Library and saving
+
+- **Models** (`catalog/models.py`):
+  - `Tag`: a unique, normalized name. `Tag.objects.from_names(names)`
+    normalizes, de-duplicates and creates as needed.
+  - `Asset`: the shared copy of one provider asset, unique on
+    (`provider`, `external_id`). It holds the PRD's fields, with `variants`
+    as JSON: `[{"label", "files": [{"url", "filename", "size"}],
+    "total_size"}]`. A size the provider doesn't give is `null`.
+    `Asset.objects.from_record(record)` stores a fetched `AssetRecord` (tags
+    normalized), or returns the row already stored, never overwriting it.
+  - `SavedAsset`: one member's entry: `notes`, `rating` (null or 1 to 5, a
+    database check), `status` (`SavedAsset.Status`, To review by default)
+    and `saved_at`. It's unique on (`user`, `asset`). Its FK to Asset is
+    `PROTECT`, so deleting an entry never touches the Asset, and an Asset
+    in anyone's library can't be deleted. `SavedAsset.objects.for_user(user)`
+    is the only way pages read entries, and it's empty for a visitor.
+- **Saving** (`catalog/library.py`, the service module):
+  - `get_or_fetch_asset(provider_key, external_id)` reuses a stored Asset
+    or calls the provider's `fetch_record()` once. An unknown provider is
+    `UnknownProviderError`. A `ProviderError` passes through, and nothing
+    is stored.
+  - `save_to_library(user, provider_key, external_id)` returns
+    `(entry, created)`. Saving an asset the member already has returns
+    their entry with `created=False`. The API (Phase 6) uses the same
+    functions.
+- **The save URL** (`SaveAssetView`) checks the provider and a non-blank ID
+  of at most 200 characters (**400** otherwise) before any provider call.
+  It replies with the "In library" badge, or with the `ProviderError`
+  message and Try again. A signed-out POST is sent to sign-in with `next`
+  set to the Discover page it came from (`HX-Current-URL`; an HTMX request
+  gets `HX-Redirect`), never to the POST-only URL itself.
+- **"In library" on Discover:** shelves are cached for everyone, so the
+  shelf view looks up the member's saved IDs among the shelf's records on
+  every request (`SavedAsset.objects.saved_external_ids()`).
+- **The library page** lists the member's entries, newest saved first,
+  from stored Assets only, so it works with every provider down. Search,
+  filters, sorts and pages arrive in Phase 4.
+- **Saved count:** `config.context_processors.shell` adds `saved_count`
+  (the member's own entries) for signed-in members only.
+
 ## Authentication
 
 - Django's `LoginView` and `LogoutView`. `LogoutView` accepts only POST,
@@ -119,17 +161,17 @@ Every rule has a test (see [TESTING.md](TESTING.md)).
 ## Shared functions
 
 Each of these has exactly one implementation, used by both the pages and
-the API. All but `search_records()` are *(planned)*:
+the API. `normalize_tag()`, `search_records()` and `fetch_record()` are built; the rest are *(planned)*:
 
 | Function | Purpose |
 |---|---|
-| `normalize_tag()` | The one way to tidy tag names |
+| `normalize_tag()` | Built (Phase 3), `catalog/tags.py`. The one way to tidy tag names: lowercase, trimmed, single spaces; number-only tags dropped; a plural "s" stripped from the last word unless it ends in "ss". Returns `None` for a dropped tag |
 | `filter_library(user, params)` | Library search, filters, sorts, pages of 12 |
 | `filter_public_packs(params)` | Gallery search, type filter, sorts, pages of 12 |
 | `add_to_pack(pack, saved_asset)` | Adds an item and enforces ownership |
 | Manifest builder | The Option A export shape, locked by a golden file |
 | `search_records()` | Built (Phase 2a). Returns `AssetRecord`s (`providers/records.py`), next to the console's `search()` |
-| `fetch_record()` | Provider details for saving (Phase 3), next to the console's `get_details()` |
+| `fetch_record()` | Built (Phase 3). One asset's full `AssetRecord` with its `variants`, next to the console's `get_details()`. ambientCG: one variant per download zip. Poly Haven: `_cached_info()` plus `/files`, keeping every URL; loose maps grouped by resolution and format ("2K JPG"), and each bundle (glTF, Blend…) its own variant with its included files. Openverse: the main file, then one per other file type. An ID that isn't a plain slug is refused before any request |
 
 ## Provider errors
 
@@ -162,8 +204,8 @@ Django's local-memory cache (`CACHES` in settings):
   `CatalogConfig.ready()` installs Django's cache. The console script
   installs none, so it caches nothing. Every Toolbox lookup goes through
   `polyhaven._cached_info()`, while the console's `search()` and
-  `get_details()` keep calling `_info()` directly. *(Phase 3's
-  `fetch_record()` must use `_cached_info()` too.)*
+  `get_details()` keep calling `_info()` directly. `fetch_record()` uses
+  `_cached_info()` too; its `/files` request isn't cached.
 - **Provider status** is kept for 1 h (see Discover).
 - **Failures are never cached:** a `ProviderError` returns before anything
   is stored, so Retry always reaches the provider again.

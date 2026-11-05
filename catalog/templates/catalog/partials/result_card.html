@@ -4,7 +4,8 @@
 {# button sits above it. The type icon sits under the image: it shows when there is  #}
 {# no thumbnail URL, and shell.js removes an image that fails to load. Hovering or   #}
 {# focusing the card shows .result-details: the full title, author, license, source  #}
-{# and tags that the card itself cuts short.                                          #}
+{# and tags that the card itself cuts short. The Save slot has its own row at the     #}
+{# foot (catalog/partials/save_button.html), above the stretched link.               #}
 <li class="result-card">
   <div class="result-thumb">
     <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=28 %}</span>
@@ -21,6 +22,7 @@
     <h3 class="result-title"><a href="{{ record.source_url }}" target="_blank" rel="noopener noreferrer" class="result-link">{{ record.title }}</a></h3>
     <p class="result-meta"><span class="result-author">{{ record.author }}</span><span class="micro text-fg-muted shrink-0">{{ record.license }}</span></p>
   </div>
+  <div class="result-actions">{% include "catalog/partials/save_button.html" %}</div>
   <div class="result-details" aria-hidden="true">
     <p class="result-details-title">{{ record.title }}</p>
     <dl class="result-details-list">

@@ -13,4 +13,6 @@ urlpatterns = [
         name="discover_shelf",
     ),
     path("library/", views.LibraryView.as_view(), name="library"),
+    # POST only: saves one provider asset (provider, external_id) to the member's library.
+    path("library/save/", views.SaveAssetView.as_view(), name="save"),
 ]

@@ -1,7 +1,20 @@
 """ambientCG: CC0 PBR materials, HDRIs and 3D models (https://docs.ambientcg.com/api/v3/)."""
 
+from dataclasses import replace
+
 from .http import ProviderError, get_json
-from .records import CC0_LICENSE, CC0_URL, AssetRecord, items_in, tag_names, text
+from .records import (
+    CC0_LICENSE,
+    CC0_URL,
+    AssetRecord,
+    Variant,
+    VariantFile,
+    byte_size,
+    file_name,
+    items_in,
+    tag_names,
+    text,
+)
 
 NAME = "ambientCG"
 API_URL = "https://ambientcg.com/api/v3/assets"
@@ -123,3 +136,50 @@ def search_records(query: str, kind: str, limit: int = 12, page: int = 1) -> lis
     data = get_json(API_URL, params, provider=NAME)
     records = (_record(asset, kind) for asset in items_in(data, "assets", NAME))
     return [record for record in records if record][:limit]
+
+
+# What fetch_record() asks for: the search fields plus every download.
+_DETAIL_INCLUDE = "title,url,tags,type,thumbnails,downloads"
+# ambientCG's `type` back to the Toolbox's kinds.
+_KINDS_BY_TYPE = {value: kind for kind, value in KIND_FILTERS.items()}
+
+
+def _variants(asset):
+    """One variant per download (each is a single zip), labelled e.g. "2K JPG"."""
+    downloads = asset.get("downloads")
+    variants = []
+    for download in downloads if isinstance(downloads, list) else []:
+        if not isinstance(download, dict) or not (url := text(download.get("url"))):
+            continue
+        attributes = text(download.get("attributes"))
+        extension = text(download.get("extension")) or "zip"
+        fallback = f"{text(asset.get('id'))}_{attributes or 'download'}.{extension}"
+        variants.append(
+            Variant(
+                label=attributes.replace("-", " ") or "Download",
+                files=(
+                    VariantFile(url, file_name(url, fallback), byte_size(download.get("size"))),
+                ),
+            )
+        )
+    return tuple(variants)
+
+
+def fetch_record(external_id: str) -> AssetRecord:
+    """Return the full AssetRecord for one ambientCG asset ID, with its variants.
+
+    Any failure raises ProviderError, including an unknown ID (ambientCG
+    answers that with an empty list) and an asset of a type the Toolbox
+    doesn't hold.
+    """
+    asset_id = external_id.strip()
+    data = get_json(API_URL, {"id": asset_id, "include": _DETAIL_INCLUDE}, provider=NAME)
+    assets = items_in(data, "assets", NAME)
+    if not assets:
+        raise ProviderError(f"{NAME} has no asset with that ID.")
+    asset = assets[0]
+    kind = _KINDS_BY_TYPE.get(text(asset.get("type")))
+    record = _record(asset, kind) if kind else None
+    if record is None:
+        raise ProviderError(f"{NAME} sent back an asset the Toolbox can't save.")
+    return replace(record, variants=_variants(asset))

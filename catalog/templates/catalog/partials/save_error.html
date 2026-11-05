@@ -1,0 +1,8 @@
+{# A save that failed: the ProviderError's friendly message in the button's place,      #}
+{# and Try again, which posts the same save and swaps the slot again. Nothing was saved. #}
+<form class="save-slot save-error" hx-post="{% url 'catalog:save' %}" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button">
+  <p class="save-error-text" role="alert">{% include "partials/icon.html" with name="alert" size=13 %}<span>{{ error }}</span></p>
+  <input type="hidden" name="provider" value="{{ provider }}">
+  <input type="hidden" name="external_id" value="{{ external_id }}">
+  <button type="submit" class="save-button"><span class="save-label">Try again</span><span class="save-busy">Saving…</span></button>
+</form>

@@ -442,7 +442,11 @@ def test_type_colour_never_appears_in_the_chrome(pages):
 
 
 def test_type_colour_means_type_only_on_the_discover_tiles(pages):
-    """Discover's type tiles are the only place type colour appears so far."""
+    """On a page's own HTML, Discover's type tiles are the only place type colour appears.
+
+    (Shelf fragments and library cards also use it, only for an asset's type:
+    see the test below and test_discover.py.)
+    """
     for name, response in pages:
         html = response.content.decode()
         content = html.split('id="content"', 1)[1].split('id="page-footer"', 1)[0]
@@ -454,6 +458,25 @@ def test_type_colour_means_type_only_on_the_discover_tiles(pages):
         assert not TYPE_TOKEN.search(_classes(outside)), "type colour outside the tiles"
         used = {match.group(0) for match in TYPE_TOKEN.finditer(_classes(tiles))}
         assert used == {f"{prefix}-{kind}" for prefix in ("text", "bg") for kind in KIND_KEYS}
+
+
+def test_library_cards_use_type_colour_only_for_the_assets_type(member_client, member, make_asset):
+    from catalog.models import SavedAsset
+
+    for kind in KIND_KEYS:
+        SavedAsset.objects.create(user=member, asset=make_asset(external_id=kind, kind=kind))
+    html = member_client.get(reverse("catalog:library")).content.decode()
+    content = html.split('id="content"', 1)[1].split('id="page-footer"', 1)[0]
+    coloured = re.findall(
+        r'class="([^"]*\b(?:text|bg)-(?:texture|hdri|model|sound)\b[^"]*)"', content
+    )
+    # Only the type icon beside the label and the fallback icon under the thumbnail.
+    assert {classes.split()[0] for classes in coloured} == {"library-type-icon", "result-fallback"}
+    for kind in KIND_KEYS:
+        assert f'class="library-type-icon text-{kind}"' in content
+    # And the chrome around a full library stays monochrome.
+    chrome = html.split('id="content"', 1)[0] + html.split('id="status-bar"', 1)[1]
+    assert not TYPE_TOKEN.search(_classes(chrome))
 
 
 @pytest.mark.parametrize("signed_in", [False, True])

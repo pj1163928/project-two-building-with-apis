@@ -111,6 +111,11 @@ class Shelf:
         return PAGE_SIZE
 
     @property
+    def page_url(self) -> str:
+        """The Discover page this shelf belongs on: where sign-in sends a visitor back to."""
+        return discover_url(self.kind, self.query)
+
+    @property
     def next_url(self) -> str:
         return shelf_url(self.kind, self.key, self.query, self.page + 1)
 

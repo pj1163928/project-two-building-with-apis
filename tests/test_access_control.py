@@ -16,6 +16,15 @@ Phase 2a rules:
 Phase 2b rules:
 - Discover and its shelves stay open to signed-out visitors, and the status
   bar shows them provider status only, never member data.
+
+Phase 3 rules:
+- Saving needs sign-in: a visitor's save is sent to sign-in and back to
+  Discover (an HTMX save redirects the whole page back to its search), and
+  nothing is saved or fetched.
+- Saving needs a valid CSRF token; the header base.html sends is enough.
+- The status bar's saved count only ever counts the current member's
+  entries. (/library/ itself is in MEMBERS_ONLY_PAGES; the grid's
+  own-entries rule is in test_library_page.py.)
 """
 
 import re
@@ -219,3 +228,114 @@ def test_the_status_bar_shows_visitors_provider_status_and_no_member_data(
         "Toolbox ambientCG : status unknown Poly Haven : OK Openverse Audio : status unknown"
     )
     assert member.username not in bar and "saved" not in bar
+
+
+# ---------------------------------------------------------------- saving (Phase 3)
+
+
+@pytest.fixture
+def saving_fetches(monkeypatch):
+    """Poly Haven's fetch_record, replaced; the list records each call."""
+    from providers import AssetRecord, polyhaven
+
+    calls = []
+
+    def fake(external_id):
+        calls.append(external_id)
+        return AssetRecord(
+            provider="polyhaven",
+            external_id=external_id,
+            kind="texture",
+            title="Red Brick 03",
+            author="Rob Tuytel",
+            thumbnail_url="https://cdn.polyhaven.com/thumbs/red_brick_03.png",
+            license="CC0",
+            license_url="https://creativecommons.org/publicdomain/zero/1.0/",
+            attribution="Red Brick 03 by Rob Tuytel",
+            source_url="https://polyhaven.com/a/red_brick_03",
+        )
+
+    monkeypatch.setattr(polyhaven, "fetch_record", fake)
+    return calls
+
+
+SAVE_BODY = {"provider": "polyhaven", "external_id": "red_brick_03"}
+
+
+def test_a_visitors_save_is_sent_to_sign_in_and_back_to_discover(client, saving_fetches):
+    from catalog.models import SavedAsset
+
+    response = client.post(reverse("catalog:save"), SAVE_BODY)
+    assert response.status_code == 302
+    # Back to Discover, never to the POST-only save URL.
+    assert response.url == login_url_for(reverse("catalog:discover"))
+    assert saving_fetches == [] and not SavedAsset.objects.exists()
+
+
+def test_a_visitors_htmx_save_redirects_the_whole_page_back_to_its_search(client, saving_fetches):
+    from catalog.models import SavedAsset
+
+    headers = {
+        "HX-Request": "true",
+        "HX-Current-URL": "http://testserver/discover/?type=texture&q=brick",
+    }
+    response = client.post(reverse("catalog:save"), SAVE_BODY, headers=headers)
+    assert response.status_code == 200
+    assert response["HX-Redirect"] == login_url_for("/discover/?type=texture&q=brick")
+    assert saving_fetches == [] and not SavedAsset.objects.exists()
+
+
+def test_signing_in_from_save_returns_to_the_discover_search(client, member, password):
+    back = "/discover/?type=texture&q=brick"
+    response = client.post(login_url_for(back), {"username": member.username, "password": password})
+    assert response.status_code == 302
+    assert response.url == back
+
+
+def test_saving_rejects_a_post_without_a_csrf_token(csrf_client, member, saving_fetches):
+    from catalog.models import SavedAsset
+
+    csrf_client.force_login(member)
+    response = csrf_client.post(reverse("catalog:save"), SAVE_BODY, headers={"HX-Request": "true"})
+    assert response.status_code == 403
+    assert saving_fetches == [] and not SavedAsset.objects.exists()
+
+
+def test_saving_succeeds_with_the_pages_csrf_header(csrf_client, member, saving_fetches):
+    """The header base.html sends on every HTMX request is enough."""
+    from catalog.models import SavedAsset
+
+    csrf_client.force_login(member)
+    page = csrf_client.get(reverse("catalog:discover")).content.decode()
+    token = re.search(r"hx-headers='\{\"X-CSRFToken\": \"([^\"]+)\"\}'", page).group(1)
+    response = csrf_client.post(
+        reverse("catalog:save"), SAVE_BODY, headers={"HX-Request": "true", "X-CSRFToken": token}
+    )
+    assert response.status_code == 200
+    assert SavedAsset.objects.filter(user=member).count() == 1
+
+
+def test_the_saved_count_counts_only_the_current_members_entries(
+    member_client, member, make_asset, django_user_model, password
+):
+    from catalog.models import SavedAsset
+
+    other = django_user_model.objects.create_user("other_member", password=password)
+    assets = [make_asset(external_id=f"asset_{n}") for n in range(5)]
+    for asset in assets[:2]:
+        SavedAsset.objects.create(user=member, asset=asset)
+    for asset in assets:
+        SavedAsset.objects.create(user=other, asset=asset)
+
+    def count(client):
+        bar = (
+            client.get(reverse("catalog:discover")).content.decode().split('id="status-bar"', 1)[1]
+        )
+        return re.search(r'id="saved-count"[^>]*>Library · <b[^>]*>(\d+)</b> saved', bar).group(1)
+
+    assert count(member_client) == "2"
+    theirs = Client()
+    theirs.force_login(other)
+    assert count(theirs) == "5"
+    # A visitor's bar holds no count at all.
+    assert 'id="saved-count"' not in Client().get(reverse("catalog:discover")).content.decode()
