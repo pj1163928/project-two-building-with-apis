@@ -15,7 +15,7 @@ from django.urls import reverse
 pytestmark = pytest.mark.django_db
 
 PUBLIC_PAGES = ["packs:home", "catalog:discover", "accounts:login", "accounts:signup"]
-MEMBER_PAGES = ["packs:home", "catalog:discover", "catalog:library", "packs:list"]
+MEMBER_PAGES = ["packs:home", "catalog:discover", "catalog:library", "packs:list", "packs:create"]
 MEMBER_PAGES += ["accounts:profile", "accounts:settings", "accounts:token"]
 
 TYPE_HEXES = ["#F2A15A", "#6C8CFF", "#4CC38A", "#A48AFF"]
@@ -474,6 +474,28 @@ def test_type_colour_means_type_only_on_the_discover_tiles(pages):
         assert used == {f"{prefix}-{kind}" for prefix in ("text", "bg") for kind in KIND_KEYS}
 
 
+def test_pack_items_use_type_colour_only_for_the_assets_type(member_client, member, make_asset):
+    from catalog.models import SavedAsset
+    from packs.models import Pack
+    from packs.services import add_to_pack
+
+    pack = Pack.objects.create_pack(member, "Every Kind")
+    for kind in KIND_KEYS:
+        add_to_pack(
+            pack,
+            SavedAsset.objects.create(user=member, asset=make_asset(external_id=kind, kind=kind)),
+        )
+    html = member_client.get(reverse("packs:builder", args=[pack.pk])).content.decode()
+    content = html.split('id="content"', 1)[1].split('id="page-footer"', 1)[0]
+    coloured = re.findall(
+        r'class="([^"]*\b(?:text|bg)-(?:texture|hdri|model|sound)\b[^"]*)"', content
+    )
+    assert {classes.split()[0] for classes in coloured} == {"library-type-icon", "result-fallback"}
+    # The side panel's list of packs is chrome, and stays monochrome.
+    chrome = html.split('id="content"', 1)[0] + html.split('id="status-bar"', 1)[1]
+    assert not TYPE_TOKEN.search(_classes(chrome))
+
+
 def test_library_cards_use_type_colour_only_for_the_assets_type(member_client, member, make_asset):
     from catalog.models import SavedAsset
 
@@ -606,7 +628,7 @@ def test_side_panel_expands_smoothly_with_staggered_labels():
 
 
 SHOWCASE = ["packs:home", "catalog:discover"]
-WORK = ["catalog:library", "packs:list", "accounts:profile", "accounts:settings"]
+WORK = ["catalog:library", "packs:list", "packs:create", "accounts:profile", "accounts:settings"]
 
 
 @pytest.mark.parametrize("name", SHOWCASE + WORK)

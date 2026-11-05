@@ -656,41 +656,61 @@ from.
 
 ### Acceptance criteria
 
-- [ ] Typing tags "Rocks, rock, 2048,  Mossy  Stones" stores the tags
+- [x] Typing tags "Rocks, rock, 2048,  Mossy  Stones" stores the tags
   `rock`, `mossy stone`.
-- [ ] A new pack is private. The public/private switch saves at once.
-- [ ] `add_to_pack()`:
+- [x] A new pack is private. The public/private switch saves at once.
+- [x] `add_to_pack()`:
   - adds an item at the end with the default variant
   - adding the same SavedAsset twice to one pack leaves a single item
   - refuses a SavedAsset that the pack's owner doesn't own
-- [ ] The default variant rule is tested for a 2K JPG, an MP3, and the
+- [x] The default variant rule is tested for a 2K JPG, an MP3, and the
   fallback to the first variant.
-- [ ] One SavedAsset can sit in two packs with a different variant and
+- [x] One SavedAsset can sit in two packs with a different variant and
   import path in each.
-- [ ] Changing a variant, an import path or the order saves through HTMX
+- [x] Changing a variant, an import path or the order saves through HTMX
   with no Save button.
-- [ ] Remove deletes only the PackItem. The SavedAsset and the Asset
+- [x] Remove deletes only the PackItem. The SavedAsset and the Asset
   stay.
-- [ ] Deleting a SavedAsset first shows the packs it's in. Confirming
+- [x] Deleting a SavedAsset first shows the packs it's in. Confirming
   removes its PackItems from those packs and leaves the shared Asset and
   the packs' other items alone.
-- [ ] Deleting a pack removes its PackItems but none of the owner's
+- [x] Deleting a pack removes its PackItems but none of the owner's
   SavedAssets.
-- [ ] The library card's "Add to pack" dropdown lists only the member's
+- [x] The library card's "Add to pack" dropdown lists only the member's
   own packs.
-- [ ] Adding a Discover result to a pack saves it to the library first
+- [x] Adding a Discover result to a pack saves it to the library first
   when needed (To review) and reuses an existing entry untouched. A
   `ProviderError` saves and adds nothing.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules:
+- [x] Standard gate (see top). Access rules:
   - The builder and every pack edit URL return **404** to another member
     and send signed-out visitors to sign in.
   - Adding another member's SavedAsset to your pack is refused, through
     `add_to_pack()` and through the HTMX URLs.
   - Adding your SavedAsset to another member's pack returns **404**.
   - Every pack write needs a valid CSRF token.
+
+> **Built as (2026-11-05):** the owner's pages use the pk
+> (`/packs/<id>/edit/`), leaving `/packs/<slug>/` for Phase 8's public page.
+> The slug is set once at creation and survives a rename. The order is
+> changed with Move up and Move down, not drag and drop. Pack creation,
+> adding an item, Discover's save-then-add and reordering each run in one
+> transaction (user request).
+>
+> **For Phase 8:**
+>
+> - `PackItem.preferred_variant` is the variant's label exactly as the
+>   provider wrote it, so the export can find it in `Asset.variants`. It's
+>   blank for an asset with no variants.
+> - `PackItem.default_import_path` already gives `<kind>s/<external_id>/`.
+> - `Pack.ordered_items()` gives items in position order with their Assets.
+> - The builder needs a link to the public page once it exists, and the
+>   pack list's cards could link there too.
+> - Found while building: after Add to pack on Discover saves a result, the
+>   card's Save corner still says Save until the next search; the saved
+>   count does update.
 
 ---
 

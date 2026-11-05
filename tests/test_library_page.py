@@ -490,22 +490,28 @@ def test_each_library_card_has_its_corner_actions_and_full_details(entries, memb
     actions = re.search(r'<div class="card-actions">(.*?)</div>\n', card, re.S).group(1)
     tips = re.findall(r'<span class="card-tip" aria-hidden="true">([^<]+)</span>', actions)
     assert tips == ["Add to pack", "Details", "Remove"]
-    assert 'data-picker="pack-picker" data-picker-asset="Red Brick 03"' in actions
+    picker = reverse("packs:picker")
+    assert (
+        'data-picker="pack-picker" data-picker-asset="Red Brick 03" '
+        f'data-picker-url="{picker}?entry={brick.pk}"'
+    ) in actions
+    # Remove opens the Remove dialog (which lists the packs); as a link it's the same confirm.
     remove = reverse("catalog:remove", args=[brick.pk])
     assert (
-        f'<form class="card-action-form" method="post" action="{remove}" hx-post="{remove}" '
-        'hx-target="#library-results" hx-swap="outerHTML" '
-        'hx-confirm="Remove “Red Brick 03” from your library?"'
+        f'<a class="card-action" href="{remove}" hx-get="{remove}" '
+        'hx-target="#remove-dialog" hx-swap="innerHTML transition:false"'
     ) in actions
-    assert 'name="csrfmiddlewaretoken"' in actions
+    assert "hx-confirm" not in content
     assert "mark" not in actions
     # The details panel: as on Discover, with the asset's stored tags.
     details = re.search(r'<div class="result-details" aria-hidden="true">(.*?)</dl>', card, re.S)
     text = " ".join(re.sub(r"<[^>]+>", " ", details.group(1)).split())
     assert text == "Red Brick 03 By Rob Tuytel License CC0 From Poly Haven Tags brick, red"
-    # The pack picker the button opens, once. The interface only until Phase 7.
+    # The pack picker the button opens, and the Remove dialog, once each. The picker
+    # loads the member's packs when it opens.
     assert content.count('<dialog id="pack-picker" class="picker-dialog"') == 1
-    assert "You don't have any packs yet." in content
+    assert content.count('<dialog id="remove-dialog" class="picker-dialog"') == 1
+    assert '<div id="pack-picker-list"' in content
     assert "collection" not in content.lower()
 
 
@@ -575,11 +581,11 @@ def test_remove_without_htmx_returns_to_the_library(entries, member_client):
     assert SavedAsset.objects.count() == 2
 
 
-def test_remove_is_post_only(entries, member_client):
+def test_a_get_on_remove_only_confirms(entries, member_client):
     from catalog.models import SavedAsset
 
     response = member_client.get(reverse("catalog:remove", args=[entries[0].pk]))
-    assert response.status_code == 405
+    assert response.status_code == 200 and b"Remove from library" in response.content
     assert SavedAsset.objects.count() == 3
 
 

@@ -62,9 +62,11 @@ It's a throwaway prototype, so take its look, not its code.
   - a result's fallback type icon, inside the shelf fragments
   - a library card's type icon (`.library-type-icon`) and fallback icon
   - the same two icons in the library drawer and on an entry's page
+  - the same two icons on each item in the pack builder (Phase 7)
 
   `test_shell.py` keeps them out of the chrome on every page, out of every
-  other page's own content, and on library cards to those two icons only.
+  other page's own content, and on library cards and pack items to those
+  two icons only.
 - **Page drop colours (the one exception):** each page's content area has
   a "water drop" glow in three vivid colours, behind the hero and in the
   footer. The colours are chosen by `#content[data-drop="<active_nav>"]` in
@@ -443,12 +445,12 @@ textures), stretched title link, corner actions and details panel (see
   component, whose `.rating *` rule painted each star as a grey 24 px block
   (fixed 2026-11-05).
 - **Corner actions:** Add to pack, Details and Remove.
-  - Add to pack opens the page's pack picker. It's the interface only
-    until Phase 7 builds packs.
-  - Remove (`catalog/partials/remove_button.html`) is a POST form with the
-    browser's confirm (`hx-confirm`). It swaps `#library-results` for the
-    same view, and the saved count follows out of band. Phase 7 replaces
-    the confirm with a dialog listing the packs the entry leaves.
+  - Add to pack opens the page's pack picker (below) for this entry.
+  - Remove (`catalog/partials/remove_button.html`, Phase 7) is a link to
+    `catalog:remove` that `hx-get`s the confirm into `<dialog
+    id="remove-dialog" class="picker-dialog">`, once on the library page
+    (see "Remove dialog"). Opened without HTMX it's the same confirm as a
+    page. It replaced the browser's `hx-confirm`.
 - **Details:** the provider's name and the asset's stored tags.
 - **Community rating** (`.library-community`, user request, 2026-11-05):
   once any member has rated the asset, a "Community" line under the status
@@ -462,16 +464,36 @@ textures), stretched title link, corner actions and details panel (see
 `<dialog id="pack-picker" class="picker-dialog">` on the library and on a
 member's Discover page.
 - A card's Add to pack button (`catalog/partials/pack_button.html`)
-  carries `data-picker="pack-picker"` and `data-picker-asset="<title>"`.
-  `static/js/card-actions.js` writes the title into the dialog and calls
-  `showModal()`.
+  carries `data-picker="pack-picker"`, `data-picker-asset="<title>"` and
+  `data-picker-url`: `packs:picker` with `?entry=<id>` on a library card,
+  or `?provider=…&external_id=…` on a Discover result.
+  `static/js/card-actions.js` writes the title into the dialog, loads the
+  URL into `#pack-picker-list` (`htmx.ajax`, "Loading your packs…" first)
+  and calls `showModal()`, so the list is always current.
+- The list (`packs/partials/picker_list.html`): each of the member's packs
+  is a full-width `.picker-pack` button showing its item count, which posts
+  to `packs:picker_add` and swaps the list for the reply ("Added to …", or
+  the provider's message in a `.picker-alert`). A pack the asset is already
+  in shows "In pack" and no button. Then New pack. With no packs: "You
+  don't have any packs yet."
 - It's square, on the panel colour, over a `shade` backdrop. A backdrop
-  click, Close, the × button or Escape shuts it. The × and Close submit a
-  `method="dialog"` form, which htmx's boost leaves alone.
-- For now it shows "You don't have any packs yet.", Go to Packs, and a
-  note that packs are on the way. Phase 7 fills the list. Collections were
-  tried the same day and dropped at the user's request: everything
-  centres on packs.
+  click, Close, the × button or Escape shuts it. The × and Close sit in
+  their own `method="dialog"` forms (the list's forms can't nest in one),
+  which htmx's boost leaves alone. Its swaps say `transition:false`, like
+  the drawer's.
+
+**Remove dialog** (Phase 7): `<dialog id="remove-dialog"
+class="picker-dialog">`, once on the library page. A card's Remove or the
+drawer's Delete `hx-get`s `catalog:remove` into it
+(`catalog/partials/remove_dialog.html`), and `card-actions.js` opens any
+`.picker-dialog` that HTMX has just filled. It shows the entry's title,
+"It will also leave these N packs:" with each pack (`#remove-packs`), or
+"It isn't in any of your packs.", and a note that the notes, rating and
+status go too. Its Remove form posts to `catalog:remove` into
+`#library-results`, carries `data-drawer-remove` (so an open drawer closes)
+and `data-dialog-done` (so the dialog closes once the request succeeds).
+The same partial, with `as_page`, is the confirm page
+(`catalog/remove_confirm.html`).
 
 ## Library drawer
 
@@ -504,8 +526,11 @@ after the swap.
     <provider>", tags and the saved date.
   - **Files:** one `<details>` per variant ("2K JPG · 2 files · 5.2 MB"),
     opening to each file's link and size.
-  - **Remove from library** (`entry_remove.html`), with the browser's
-    confirm.
+  - **Packs** *(Phase 7)*: the packs the entry is in (`#entry-packs`),
+    each linking to its builder with the item's variant, or "It isn't in
+    any of your packs yet."
+  - **Remove from library** (`entry_remove.html`): in the drawer it opens
+    the Remove dialog; on the full page it links to the confirm page.
 - **Type colour:** only the type icon beside the label and the fallback
   icon, as on the cards.
 
@@ -543,6 +568,50 @@ reported this on 2026-11-05.
 
 Escape in `card-actions.js` ignores every open dialog, the drawer
 included.
+
+## Packs
+
+*(Phase 7.)* Work surfaces. Every packs page's side panel is
+`packs/partials/pack_nav.html`: "Your packs" with a small **New** action
+(`.panel-action`), then one `.panel-row` per pack (`#pack-nav-<id>`), the
+open pack current. With none: "The packs you create are listed here."
+
+- **Your packs** (`packs/pack_list.html`): the header, a `.work-toolbar`
+  with the count and **New pack** (`btn-primary`), then `#pack-list`, a
+  `.pack-grid` of `.pack-card`s: Private or Public (a `.status-chip`,
+  Public inverted), the item count, the title (its link stretched over the
+  card), the intended use (two lines), the tags and the date it changed.
+  Empty: "You have no packs yet." with New pack.
+- **New pack** (`packs/pack_new.html`): a `novalidate` form through
+  `partials/form_fields.html` (title, intended use, tags with their tidying
+  rule as help), **Create pack** and Cancel.
+- **The builder** (`packs/builder.html`): "Pack builder" over the title
+  (`#pack-title`), then a toolbar with the **public/private switch**
+  (`#pack-visibility`: two `.filter-chip` radios that post on change and
+  swap the form, saying "Only you can see it." or "Anyone can view and
+  export it.") and **Delete pack**, which opens `#pack-delete-dialog`
+  (`data-dialog-open`; its form is a plain boosted POST). Below, a
+  `.builder-grid`: the details and items on the left, **Add from my
+  library** on the right (sticky on wide screens).
+  - **Details:** title, intended use and tags, three forms each posting
+    only its own field on `change` to `packs:details`. The reply replaces
+    `#pack-save-status`; a rename also swaps `#pack-title` and the side
+    panel's row out of band.
+  - **Items** (`#pack-items`, `packs/partials/items.html`): the count, then
+    one `.pack-item` per item: the thumbnail over the type icon, the type
+    and provider, the title, a **Variant** select and an **Import path**
+    input (its placeholder is the default, `<kind>s/<external_id>/`), each
+    its own form posting on `change` into the item's status line
+    (`#item-<id>-status`). Then Move up, Move down (disabled at the ends)
+    and Remove, `.card-action` squares that swap the whole list. There's no
+    Save button anywhere.
+  - **Add from my library:** a search that `hx-get`s `packs:library_search`
+    on load, 300 ms after typing, and on `packItemsChanged` (sent by every
+    add, move and remove), into `#pack-library-results`: up to 12 entries,
+    each with Add (posting to `packs:add_item`, swapping `#pack-items`) or
+    "In pack".
+- All the builder's swaps say `transition:false`, so the page doesn't fade
+  behind each save.
 
 ## Home hero
 

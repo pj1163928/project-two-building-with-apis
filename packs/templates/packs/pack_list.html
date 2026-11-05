@@ -1,9 +1,32 @@
 {% extends "base.html" %}
 {% block title %}Packs{% endblock %}
 {% block breadcrumb %}{% url 'packs:list' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="packs" icon="pack" current=True %}{% endblock %}
+{% block side_panel %}{% include "packs/partials/pack_nav.html" %}{% endblock %}
 {% block content %}
+  {% url 'packs:create' as new_pack_url %}
   <section class="space-y-5">
     {% include "partials/page_header.html" with label="Packs" heading="Your packs." lead="Group saved assets into kits for a project, then export them for the engine." compact=True %}
-    {% include "partials/empty_state.html" with title="You have no packs yet." body="Packs you create will be listed here." %}
+    <div class="work-toolbar justify-between">
+      <p class="micro text-fg-muted px-2">{{ packs|length }} pack{{ packs|length|pluralize }}</p>
+      <a href="{{ new_pack_url }}" class="btn btn-primary btn-sm gap-1.5">{% include "partials/icon.html" with name="plus" size=15 %}<span>New pack</span></a>
+    </div>
+    {% if packs %}
+      <ul id="pack-list" class="pack-grid" aria-label="Your packs">
+        {% for pack in packs %}
+          <li class="pack-card">
+            <div class="flex items-center justify-between gap-3">
+              <span class="status-chip micro" data-visibility="{% if pack.is_public %}public{% else %}private{% endif %}">{% if pack.is_public %}Public{% else %}Private{% endif %}</span>
+              <span class="micro text-fg-muted">{{ pack.item_count }} item{{ pack.item_count|pluralize }}</span>
+            </div>
+            <h2 class="pack-card-title"><a href="{% url 'packs:builder' pack.pk %}" class="pack-card-link">{{ pack.title }}</a></h2>
+            {% if pack.description %}<p class="pack-card-description">{{ pack.description }}</p>{% endif %}
+            {% with tags=pack.tags.all %}{% if tags %}<p class="pack-card-tags">{% for tag in tags %}<span>{{ tag.name }}</span>{% endfor %}</p>{% endif %}{% endwith %}
+            <p class="micro text-fg-muted mt-auto">Changed <time datetime="{{ pack.updated_at|date:'c' }}">{{ pack.updated_at|date:"j M Y" }}</time></p>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {% include "partials/empty_state.html" with title="You have no packs yet." body="Make a pack for a project, then fill it from your library or straight from Discover." link_url=new_pack_url link_text="New pack" %}
+    {% endif %}
   </section>
 {% endblock %}

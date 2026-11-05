@@ -1,0 +1,9 @@
+{# The public/private switch: two chips that post on change and swap this form for the reply. #}
+{% url 'packs:visibility' pack.pk as visibility_url %}
+<form id="pack-visibility" class="visibility-switch" method="post" action="{{ visibility_url }}" hx-post="{{ visibility_url }}" hx-trigger="change" hx-target="this" hx-swap="outerHTML transition:false">{% csrf_token %}
+  <fieldset class="flex items-center gap-1.5"><legend class="sr-only">Who can see this pack</legend>
+    <label class="filter-chip"><input type="radio" class="sr-only" name="visibility" value="private"{% if not pack.is_public %} checked{% endif %}><span>Private</span></label>
+    <label class="filter-chip"><input type="radio" class="sr-only" name="visibility" value="public"{% if pack.is_public %} checked{% endif %}><span>Public</span></label>
+  </fieldset>
+  <span class="text-xs text-fg-weak" role="status">{% if saved %}{% include "partials/icon.html" with name="check" size=13 %} {% endif %}{% if pack.is_public %}Anyone can view and export it.{% else %}Only you can see it.{% endif %}</span>
+</form>

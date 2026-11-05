@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ pack.title }} · Packs{% endblock %}
+{% block breadcrumb %}{% url 'packs:list' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="packs" icon="pack" %}{% url 'packs:builder' pack.pk as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="builder" icon="pack-add" current=True %}{% endblock %}
+{% block side_panel %}{% include "packs/partials/pack_nav.html" %}{% endblock %}
+
+{# The pack builder, for the owner only. Every control saves on its own through HTMX:    #}
+{# the details on leaving each field, the public/private switch at once, and each item's #}
+{# variant and import path on change. There's no Save button. Moving, removing and       #}
+{# adding items swap the item list (#pack-items), and Add from my library refreshes      #}
+{# itself after each (the packItemsChanged event).                                       #}
+{% block content %}
+  {% url 'packs:details' pack.pk as details_url %}{% url 'packs:library_search' pack.pk as search_url %}
+  <section class="space-y-5">
+    <div class="page-hero space-y-3 max-w-2xl">
+      <div class="micro text-fg-secondary flex items-center gap-2"><i class="mark w-3" aria-hidden="true"></i>Pack builder</div>
+      {% include "packs/partials/pack_title.html" %}
+    </div>
+
+    <div class="work-toolbar justify-between">
+      {% include "packs/partials/visibility.html" %}
+      <button type="button" class="btn btn-quiet btn-sm gap-1.5" data-dialog-open="pack-delete-dialog" aria-haspopup="dialog">{% include "partials/icon.html" with name="trash" size=15 %}<span>Delete pack</span></button>
+    </div>
+
+    <div class="builder-grid">
+      <div class="space-y-5 min-w-0">
+        <section class="builder-section" aria-labelledby="pack-details-title">
+          <h2 id="pack-details-title" class="micro text-fg-secondary">Details</h2>
+          {# Three forms, so each field posts only itself and two quick edits never overwrite each other. #}
+          <form method="post" action="{{ details_url }}" hx-post="{{ details_url }}" hx-trigger="change" hx-target="#pack-save-status" hx-swap="outerHTML transition:false">{% csrf_token %}
+            <label class="builder-field"><span class="micro text-fg-muted">Title</span><input type="text" name="title" class="input w-full" value="{{ pack.title }}" maxlength="120" required></label>
+          </form>
+          <form method="post" action="{{ details_url }}" hx-post="{{ details_url }}" hx-trigger="change" hx-target="#pack-save-status" hx-swap="outerHTML transition:false">{% csrf_token %}
+            <label class="builder-field"><span class="micro text-fg-muted">Intended use</span><textarea name="description" class="textarea w-full" rows="3" maxlength="2000" placeholder="What is this kit for?">{{ pack.description }}</textarea></label>
+          </form>
+          <form method="post" action="{{ details_url }}" hx-post="{{ details_url }}" hx-trigger="change" hx-target="#pack-save-status" hx-swap="outerHTML transition:false">{% csrf_token %}
+            <label class="builder-field"><span class="micro text-fg-muted">Tags</span><input type="text" name="tags" class="input w-full" value="{{ pack.tags_text }}" maxlength="500" placeholder="stone, wood, medieval" aria-describedby="pack-tags-help"></label>
+            <p id="pack-tags-help" class="text-xs text-fg-weak mt-1.5">Separate tags with commas. They're tidied: “Mossy Stones” is stored as “mossy stone”.</p>
+          </form>
+          {% include "packs/partials/save_status.html" with state="idle" %}
+        </section>
+
+        {% include "packs/partials/items.html" %}
+      </div>
+
+      <section class="builder-section builder-aside" aria-labelledby="pack-add-title">
+        <h2 id="pack-add-title" class="micro text-fg-secondary">Add from my library</h2>
+        <label class="toolbar-search builder-search">
+          <span class="sr-only">Search your library</span>
+          {% include "partials/icon.html" with name="search" size=16 %}
+          <input type="search" id="pack-library-search" name="q" placeholder="Search titles, tags and notes" autocomplete="off"
+                 hx-get="{{ search_url }}" hx-trigger="load, input changed delay:300ms, packItemsChanged from:body" hx-target="#pack-library-results" hx-swap="outerHTML transition:false" hx-sync="this:replace">
+        </label>
+        <div id="pack-library-results" aria-live="polite"><p class="picker-empty">Loading your library…</p></div>
+      </section>
+    </div>
+  </section>
+
+  {# Delete pack: a plain (boosted) POST after this confirm. #}
+  <dialog id="pack-delete-dialog" class="picker-dialog" aria-labelledby="pack-delete-title">
+    <div class="picker-panel">
+      <header class="picker-head">
+        <div class="min-w-0 space-y-1"><p class="micro text-fg-muted">Delete pack</p><h2 id="pack-delete-title" class="picker-title">{{ pack.title }}</h2></div>
+        <form method="dialog"><button type="submit" value="close" class="picker-close" aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button></form>
+      </header>
+      <div class="picker-body">
+        <p class="text-sm text-fg">Delete this pack and its {{ items|length }} item{{ items|length|pluralize }}?</p>
+        <p class="picker-note">{% include "partials/icon.html" with name="info" size=14 %}<span>Everything stays in your library, with your notes, ratings and statuses.</span></p>
+      </div>
+      <footer class="picker-foot gap-2">
+        <form method="dialog"><button type="submit" value="close" class="btn btn-quiet btn-sm">Cancel</button></form>
+        <form method="post" action="{% url 'packs:delete' pack.pk %}">{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Delete pack</button></form>
+      </footer>
+    </div>
+  </dialog>
+{% endblock %}

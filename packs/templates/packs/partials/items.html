@@ -1,0 +1,14 @@
+{# The pack's items, in order. Adding, moving and removing an item each swap this whole list. #}
+<section id="pack-items" class="builder-section" aria-labelledby="pack-items-title">
+  <div class="flex items-center justify-between gap-3">
+    <h2 id="pack-items-title" class="micro text-fg-secondary">Items</h2>
+    <span id="pack-item-count" class="micro text-fg-muted">{{ items|length }} item{{ items|length|pluralize }}</span>
+  </div>
+  {% if items %}
+    <ol class="pack-items" aria-label="Items in this pack">
+      {% for item in items %}{% include "packs/partials/item_row.html" %}{% endfor %}
+    </ol>
+  {% else %}
+    <p class="picker-empty">This pack is empty. Add assets from your library, or from Discover with Add to pack.</p>
+  {% endif %}
+</section>

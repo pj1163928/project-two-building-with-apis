@@ -1,25 +1,20 @@
 {# The pack picker, once per page (Discover for members, and the library). A card's Add  #}
-{# to pack button fills in the asset's title and opens it (static/js/card-actions.js).  #}
-{# For now it's the interface only: Phase 7 fills the list with the member's packs and  #}
-{# makes choosing one call add_to_pack().                                                #}
-{% url 'packs:list' as packs_url %}
+{# to pack button fills in the asset's title, opens it, and loads the member's own packs #}
+{# into #pack-picker-list from its data-picker-url (static/js/card-actions.js), so the   #}
+{# list is always current. Choosing a pack calls add_to_pack() (packs:picker_add).       #}
 <dialog id="pack-picker" class="picker-dialog" aria-labelledby="pack-picker-title">
-  <form method="dialog" class="picker-panel">
+  <div class="picker-panel">
     <header class="picker-head">
       <div class="min-w-0 space-y-1">
         <p class="micro text-fg-muted">Add to pack</p>
         <h2 id="pack-picker-title" class="picker-title" data-picker-asset>This asset</h2>
       </div>
-      <button type="submit" value="close" class="picker-close" aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button>
+      <form method="dialog"><button type="submit" value="close" class="picker-close" aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button></form>
     </header>
     <div class="picker-body">
       <p class="micro text-fg-secondary">Your packs</p>
-      <ul class="picker-list" aria-label="Your packs">
-        <li class="picker-empty">You don't have any packs yet.</li>
-      </ul>
-      <a href="{{ packs_url }}" class="btn btn-quiet btn-sm w-full">Go to Packs</a>
-      <p class="picker-note">{% include "partials/icon.html" with name="info" size=14 %}<span>Packs are on the way. Once they're here, pick one to add this asset to it.</span></p>
+      <div id="pack-picker-list" class="picker-body-list" aria-live="polite"><p class="picker-empty">Loading your packs…</p></div>
     </div>
-    <footer class="picker-foot"><button type="submit" value="close" class="btn btn-quiet btn-sm">Close</button></footer>
-  </form>
+    <footer class="picker-foot"><form method="dialog"><button type="submit" value="close" class="btn btn-quiet btn-sm">Close</button></form></footer>
+  </div>
 </dialog>

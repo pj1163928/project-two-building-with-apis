@@ -28,6 +28,111 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-05 — Axcenity Toolbox: Phase 7/13, Pack builder
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 7`.
+2. Looks good I would just make sure to combine multi-step database
+   operations in transactions where appropriate. This is mostly concerning
+   pack creation, item insertion, and ordering changes.
+3. Looks good move to next (approving TDD 1's test).
+4. Looks good move to next (approving TDD 2's test, after TDD 1 went green).
+5. Looks good move on (approving TDD 3's test, after TDD 2 went green).
+
+### Summary
+
+- **Outcome:** packs work end to end.
+  - A member can create a private pack with a title, an intended use and
+    comma-separated tags (tidied by `normalize_tag()`). They can switch it
+    public and back, rename it, edit it and delete it.
+  - The builder autosaves every control: the details, each item's variant
+    and import path, and Move up, Move down and Remove. "Add from my
+    library" searches as you type.
+  - The Add to pack picker on library cards and Discover results lists the
+    member's own packs. On Discover it saves the result first (To review).
+  - Remove from library now opens a dialog listing the packs the entry
+    will leave, and the drawer lists the packs an entry is in.
+  - 725 tests pass (650 before). `ruff check` and `ruff format --check` are
+    clean.
+- **Changes:**
+  - `packs/models.py`: `Pack` (with `create_pack()` and `free_slug()`, and
+    `owned_by()`), `PackItem`, `default_variant()` and `tags_from_text()`.
+    `packs/migrations/0001_initial.py`.
+  - `packs/services.py` (new): `add_to_pack()`, `add_from_provider()` and
+    `move_item()`, each in one transaction.
+  - `packs/forms.py` (new): `NewPackForm`, `PackDetailsForm` and
+    `PackItemForm`. The last two save only the posted field.
+  - `packs/views.py`, `packs/urls.py`: the pack list, New pack, the builder
+    and its eight POST URLs, Add from my library, and the picker with its
+    add. Members only, the owner's pack or a 404, with CSRF.
+  - `packs/admin.py`: Pack with its items inline.
+  - `packs/templates/packs/`: the list, New pack and the builder, plus
+    partials for the side panel, the title, the status lines, the
+    visibility switch, the items and their rows, the library search and the
+    picker list.
+  - `catalog/views.py`: `RemoveFromLibraryView` gains a GET confirm (the
+    dialog, or a page). `_own_entry()` prefetches the entry's packs.
+  - `catalog` templates: the picker loads its list over HTMX. Remove (card
+    and drawer) opens `#remove-dialog`. New `remove_dialog.html` and
+    `remove_confirm.html`. The drawer gains a Packs section.
+  - `static/js/card-actions.js`: loads the picker list on open, opens a
+    dialog HTMX has filled, `data-dialog-open` and `data-dialog-done`.
+  - `templates/partials/icon.html`: `arrow-up` and `arrow-down`.
+  - `styles/source.css`: the pack list, the builder, the picker's packs,
+    the Remove dialog, the drawer's packs and `.textarea`.
+  - Tests:
+    - new: `tests/test_packs.py` and `tests/test_pack_builder.py`
+    - `tests/test_access_control.py`: the Phase 7 access rules
+    - `tests/test_shell.py`: New pack in the page lists, and pack items'
+      type colour
+    - four library and drawer tests rewritten from the browser confirm to
+      the dialog
+  - Docs:
+    - `ARCHITECTURE.md`: a Packs section, the URLs and the Remove confirm
+    - `FRONTEND.md`: the packs pages, the picker and the Remove dialog
+    - `TESTING.md`: the new files
+  - Plan: Phase 7 ticked, with notes for Phase 8.
+- **TDD:** three behaviours, each red on an assertion first:
+  1. `add_to_pack()` appends once per entry and refuses another member's
+     entry. It was red because the stub reported `created=True` for the
+     duplicate.
+  2. `default_variant()` picks a 2K JPG, an MP3 for sounds, otherwise the
+     first variant. Seven cases. It was red because the stub returned "".
+  3. `add_from_provider()` saves a Discover result as To review first,
+     reuses an existing entry untouched, and on a `ProviderError` saves and
+     adds nothing. It was red because the stub saved nothing.
+- **Decisions:**
+  - The owner's pages use the pk (`/packs/<id>/edit/`), so `/packs/<slug>/`
+    stays free for Phase 8. The slug is set once and survives a rename.
+  - The order is changed with Move up and Move down, not drag and drop
+    (that would need a vendored JS library).
+  - Variant labels are matched ignoring case and hyphens (ambientCG writes
+    "2K-JPG") and stored as written.
+  - An import path must be relative, with no `..`, and up to 300
+    characters. Backslashes become `/`.
+  - Remove's confirm is a GET on `catalog:remove`, so it also works as a
+    page without JavaScript.
+  - Add from my library marks entries already in the pack "In pack" rather
+    than hiding them.
+- **Deviations:** at the user's request, pack creation, adding an item,
+  Discover's save-then-add and reordering each run in one
+  `transaction.atomic()`. `move_item()` also rewrites the positions, which
+  closes the gaps that removes leave.
+- **Sideways:**
+  - I wrote `default_variant()` before its test, then put it back to a stub
+    so TDD 2 could start from red.
+  - TDD 3's first run failed with `DoesNotExist`, not an assertion. The
+    test's lookup became `.filter().first()` (a mechanical change).
+  - The first run of the page tests had four mistakes, all in the tests:
+    - `HX-Trigger` is sent as JSON
+    - a split was off by one attribute
+    - an apostrophe isn't escaped in that template
+    - a leading newline in the reply
+  - The access tests caught a real gap: a signed-out plain GET on a pack's
+    fragment URL went to sign-in and came back to the fragment. Every pack
+    URL now returns to the builder.
+
 ## 2026-11-05 — Axcenity Toolbox: Phase 6/13, Library API and token page
 
 ### Prompts

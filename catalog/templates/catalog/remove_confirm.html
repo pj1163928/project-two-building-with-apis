@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Remove {{ entry.asset.title }} · Library{% endblock %}
+{% block breadcrumb %}{% url 'catalog:library' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="library" icon="library" %}{% url 'catalog:entry' entry.pk as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="entry" icon="expand" %}{% url 'catalog:remove' entry.pk as crumb3_url %}{% include "partials/crumb.html" with href=crumb3_url label="remove" icon="trash" current=True %}{% endblock %}
+{% block content %}
+  <section class="space-y-5">
+    <div class="remove-page">{% include "catalog/partials/remove_dialog.html" with as_page=True %}</div>
+  </section>
+{% endblock %}

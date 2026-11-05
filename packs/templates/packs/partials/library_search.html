@@ -1,0 +1,28 @@
+{# Add from my library: up to 12 of the owner's entries matching the search (filter_library), #}
+{# each with Add, or "In pack" once it's there. Add swaps the item list, and the list's    #}
+{# packItemsChanged event brings this back up to date.                                       #}
+{% url 'packs:add_item' pack.pk as add_url %}
+<div id="pack-library-results" aria-live="polite">
+  {% if library_empty %}
+    <p class="picker-empty">Your library is empty. <a href="{% url 'catalog:discover' %}" class="entry-link">Save assets from Discover</a> to add them here.</p>
+  {% elif not results.page.object_list %}
+    <p class="picker-empty">Nothing in your library matches “{{ query }}”.</p>
+  {% else %}
+    <ul class="pack-picks" aria-label="Your library">
+      {% for entry in results.page.object_list %}{% with asset=entry.asset %}
+        <li class="pack-pick" id="pick-{{ entry.pk }}">
+          <div class="min-w-0">
+            <p class="pack-pick-title">{{ asset.title }}</p>
+            <p class="micro text-fg-muted">{{ asset.get_kind_display }} · {{ asset.get_provider_display }}</p>
+          </div>
+          {% if entry.pk in in_pack %}
+            <span class="pack-pick-in micro">{% include "partials/icon.html" with name="check" size=13 %}In pack</span>
+          {% else %}
+            <form method="post" action="{{ add_url }}" hx-post="{{ add_url }}" hx-target="#pack-items" hx-swap="outerHTML transition:false" hx-disabled-elt="find button">{% csrf_token %}<input type="hidden" name="entry" value="{{ entry.pk }}"><button type="submit" class="btn btn-quiet btn-xs" aria-label="Add {{ asset.title }} to this pack">Add</button></form>
+          {% endif %}
+        </li>
+      {% endwith %}{% endfor %}
+    </ul>
+    {% if results.page.paginator.count > results.page.object_list|length %}<p class="text-xs text-fg-weak">Showing {{ results.page.object_list|length }} of {{ results.page.paginator.count }}. Type to narrow it down.</p>{% endif %}
+  {% endif %}
+</div>

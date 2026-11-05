@@ -1,0 +1,37 @@
+{# One item: the stored Asset's thumbnail over its type icon (in the type colour, as it    #}
+{# shows the type), then this pack's variant and import path, each saving on change into #}
+{# the item's own status line. Move up, Move down and Remove swap the whole list. Nothing #}
+{# private from the library entry (notes, rating, status) shows here.                     #}
+{% with asset=item.saved_asset.asset %}{% with tile=asset.tile %}
+{% url 'packs:item_update' pack.pk item.pk as update_url %}{% url 'packs:item_move' pack.pk item.pk as move_url %}{% url 'packs:item_remove' pack.pk item.pk as remove_url %}
+<li class="pack-item" id="item-{{ item.pk }}" data-kind="{{ asset.kind }}">
+  <div class="pack-item-thumb">
+    <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=20 %}</span>
+    {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+  </div>
+  <div class="pack-item-main">
+    <p class="library-type"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=12 %}</span><span class="micro">{{ asset.get_kind_display }} · {{ asset.get_provider_display }}</span></p>
+    <p class="pack-item-title">{{ asset.title }}</p>
+    <div class="pack-item-fields">
+      <form method="post" action="{{ update_url }}" hx-post="{{ update_url }}" hx-trigger="change" hx-target="#item-{{ item.pk }}-status" hx-swap="outerHTML transition:false">{% csrf_token %}
+        <label class="toolbar-field pack-item-field"><span class="micro text-fg-muted">Variant</span>
+          <select name="preferred_variant"{% if not item.variant_labels %} disabled{% endif %}>
+            {% for label in item.variant_labels %}<option value="{{ label }}"{% if label == item.preferred_variant %} selected{% endif %}>{{ label }}</option>{% empty %}<option value="">No files listed</option>{% endfor %}
+          </select>
+        </label>
+      </form>
+      <form method="post" action="{{ update_url }}" hx-post="{{ update_url }}" hx-trigger="change" hx-target="#item-{{ item.pk }}-status" hx-swap="outerHTML transition:false">{% csrf_token %}
+        <label class="toolbar-field pack-item-field pack-item-path"><span class="micro text-fg-muted">Import path</span>
+          <input type="text" name="import_path" value="{{ item.import_path }}" placeholder="{{ item.default_import_path }}" maxlength="300" autocomplete="off" spellcheck="false">
+        </label>
+      </form>
+    </div>
+    {% include "packs/partials/item_status.html" with state="idle" %}
+  </div>
+  <div class="pack-item-actions">
+    <form method="post" action="{{ move_url }}" hx-post="{{ move_url }}" hx-target="#pack-items" hx-swap="outerHTML transition:false">{% csrf_token %}<input type="hidden" name="direction" value="up"><button type="submit" class="card-action" aria-label="Move {{ asset.title }} up"{% if forloop.first %} disabled{% endif %}>{% include "partials/icon.html" with name="arrow-up" size=15 %}<span class="card-tip" aria-hidden="true">Move up</span></button></form>
+    <form method="post" action="{{ move_url }}" hx-post="{{ move_url }}" hx-target="#pack-items" hx-swap="outerHTML transition:false">{% csrf_token %}<input type="hidden" name="direction" value="down"><button type="submit" class="card-action" aria-label="Move {{ asset.title }} down"{% if forloop.last %} disabled{% endif %}>{% include "partials/icon.html" with name="arrow-down" size=15 %}<span class="card-tip" aria-hidden="true">Move down</span></button></form>
+    <form method="post" action="{{ remove_url }}" hx-post="{{ remove_url }}" hx-target="#pack-items" hx-swap="outerHTML transition:false">{% csrf_token %}<button type="submit" class="card-action" aria-label="Remove {{ asset.title }} from this pack">{% include "partials/icon.html" with name="close" size=15 %}<span class="card-tip" aria-hidden="true">Remove</span></button></form>
+  </div>
+</li>
+{% endwith %}{% endwith %}

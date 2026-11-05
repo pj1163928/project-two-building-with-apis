@@ -9,6 +9,7 @@
 {# notes save 0.7 s after typing stops, and on leaving the box. Each reply replaces      #}
 {# #entry-save-status only, never the notes, so a failed save keeps the text (and        #}
 {# static/js/entry-drawer.js keeps a draft in this browser until it saves).              #}
+{# After "License and credit": the packs the entry is in, each opening its builder.     #}
 {% with asset=entry.asset %}{% with tile=asset.tile %}{% url 'catalog:update' entry.pk as update_url %}
 <article class="entry" data-kind="{{ asset.kind }}" aria-labelledby="entry-title">
   <div class="entry-thumb">
@@ -56,6 +57,17 @@
       {% with tags=asset.tags.all %}{% if tags %}<div><dt class="micro">Tags</dt><dd>{{ tags|join:", " }}</dd></div>{% endif %}{% endwith %}
       <div><dt class="micro">Saved</dt><dd><time datetime="{{ entry.saved_at|date:'c' }}">{{ entry.saved_at|date:"j M Y" }}</time></dd></div>
     </dl>
+  </section>
+
+  <section class="entry-section" aria-labelledby="entry-packs-title">
+    <h3 id="entry-packs-title" class="micro text-fg-secondary">Packs</h3>
+    {% with pack_items=entry.pack_items.all %}{% if pack_items %}
+      <ul id="entry-packs" class="entry-packs">
+        {% for item in pack_items %}<li><a href="{% url 'packs:builder' item.pack_id %}" class="entry-link">{{ item.pack.title }}</a>{% if item.preferred_variant %}<span>{{ item.preferred_variant }}</span>{% endif %}</li>{% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-fg-weak">It isn't in any of your packs yet. Use Add to pack on its card.</p>
+    {% endif %}{% endwith %}
   </section>
 
   <section class="entry-section" aria-labelledby="entry-files-title">

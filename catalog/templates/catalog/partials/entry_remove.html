@@ -1,7 +1,10 @@
-{# Remove from library, the drawer's Delete: the same catalog:remove as a card's Remove,  #}
-{# after the browser's confirm. In the drawer it swaps the library's results for the     #}
-{# same view and closes the drawer (static/js/entry-drawer.js). On the full page it's a  #}
-{# plain (boosted) POST that returns to the library. Phase 7 swaps the confirm for a    #}
-{# dialog listing the packs the entry leaves.                                            #}
+{# Remove from library, the drawer's Delete. In the drawer it opens the library's Remove    #}
+{# dialog, which lists the packs the entry will leave; confirming swaps the results for the #}
+{# same view and closes the drawer. On the full page it's a link to the same confirm as a  #}
+{# page, which returns to the library.                                                     #}
 {% url 'catalog:remove' entry.pk as remove_url %}
-<form method="post" action="{{ remove_url }}"{% if not as_page %} hx-post="{{ remove_url }}" hx-target="#library-results" hx-swap="outerHTML transition:false" data-drawer-remove{% endif %} hx-confirm="Remove “{{ entry.asset.title }}” from your library?" hx-disabled-elt="find button">{% csrf_token %}<button type="submit" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="trash" size=15 %}<span>Remove from library</span></button></form>
+{% if as_page %}
+  <a href="{{ remove_url }}" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="trash" size=15 %}<span>Remove from library</span></a>
+{% else %}
+  <button type="button" class="btn btn-quiet btn-sm gap-1.5" hx-get="{{ remove_url }}" hx-target="#remove-dialog" hx-swap="innerHTML transition:false" aria-haspopup="dialog">{% include "partials/icon.html" with name="trash" size=15 %}<span>Remove from library</span></button>
+{% endif %}

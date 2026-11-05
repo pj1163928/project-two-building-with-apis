@@ -2,6 +2,8 @@ from urllib.parse import urlsplit
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
+from django.db.models import Prefetch
+from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseBadRequest, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -9,6 +11,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from django_htmx.http import HttpResponseClientRedirect, push_url, replace_url
 
+from packs.models import PackItem
 from providers import PROVIDERS_BY_KEY, ProviderError
 
 from .discover import (
@@ -197,18 +200,33 @@ def _library_context(user, params) -> dict:
 
 
 class RemoveFromLibraryView(LoginRequiredMixin, View):
-    """Remove one of the member's own entries: the POST behind a library card's Remove.
+    """Remove one of the member's own entries, after a confirm that lists the
+    packs it will leave.
 
-    Members only, with CSRF. Another member's entry, or one that doesn't
-    exist, is a 404. The shared Asset stays. The library's HTMX request gets
-    the results fragment again, for the view the member was on (read from
-    HX-Current-URL), with the status bar's saved count out of band. That
-    includes the drawer's Remove, which posts from the library page. Any
-    other request, the full entry page's boosted form included, is sent back
-    to the library.
+    GET is the confirm: the library's Remove dialog for its HTMX request (a
+    card's Remove, or the drawer's), or the same as a page for any other.
+    POST removes it: members only, with CSRF. Another member's entry, or one
+    that doesn't exist, is a 404. Its pack items go with it (CASCADE), and the
+    shared Asset stays. The library's HTMX request gets the results fragment
+    again, for the view the member was on (read from HX-Current-URL), with
+    the status bar's saved count out of band. Any other request, the confirm
+    page's boosted form included, is sent back to the library.
     """
 
-    http_method_names = ["post"]
+    http_method_names = ["get", "post"]
+
+    def get(self, request, pk):
+        entry = get_object_or_404(
+            SavedAsset.objects.for_user(request.user).select_related("asset"), pk=pk
+        )
+        context = {
+            "entry": entry,
+            "pack_items": entry.pack_items.select_related("pack").order_by(Lower("pack__title")),
+            "active_nav": "library",
+        }
+        if _wants_fragment(request):
+            return render(request, "catalog/partials/remove_dialog.html", context)
+        return render(request, "catalog/remove_confirm.html", context)
 
     def handle_no_permission(self):
         login = redirect_to_login(reverse("catalog:library"))
@@ -327,7 +345,10 @@ class UpdateEntryView(LoginRequiredMixin, View):
 def _own_entry(user, pk) -> SavedAsset:
     """The member's own entry `pk` with its Asset, or a 404."""
     entries = SavedAsset.objects.for_user(user).with_community_rating().select_related("asset")
-    return get_object_or_404(entries.prefetch_related("asset__tags"), pk=pk)
+    pack_items = Prefetch(
+        "pack_items", PackItem.objects.select_related("pack").order_by(Lower("pack__title"))
+    )
+    return get_object_or_404(entries.prefetch_related("asset__tags", pack_items), pk=pk)
 
 
 def _current_library_params(request) -> QueryDict:

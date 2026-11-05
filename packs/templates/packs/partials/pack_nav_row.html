@@ -1,0 +1,2 @@
+{# One pack in the side panel. With oob, it follows a rename made in the builder. #}
+<a id="pack-nav-{{ nav_pack.pk }}" class="panel-row" href="{% url 'packs:builder' nav_pack.pk %}"{% if nav_pack.pk == pack.pk %} aria-current="page"{% endif %}{% if oob %} hx-swap-oob="true"{% endif %}><span class="truncate">{{ nav_pack.title }}</span></a>

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}New pack{% endblock %}
+{% block breadcrumb %}{% url 'packs:list' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="packs" icon="pack" %}{% url 'packs:create' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="new" icon="plus" current=True %}{% endblock %}
+{% block side_panel %}{% include "packs/partials/pack_nav.html" %}{% endblock %}
+{% block content %}
+  <section class="space-y-5">
+    {% include "partials/page_header.html" with label="New pack" heading="Start a pack." lead="Name the kit and say what it's for. It stays private until you make it public." compact=True %}
+    <form id="new-pack-form" method="post" action="{% url 'packs:create' %}" class="pack-form space-y-5" novalidate>{% csrf_token %}
+      {% include "partials/form_fields.html" %}
+      <div class="flex items-center gap-3 pt-2">
+        <button type="submit" class="btn btn-primary">Create pack</button>
+        <a href="{% url 'packs:list' %}" class="btn btn-quiet">Cancel</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

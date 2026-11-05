@@ -1,0 +1,32 @@
+{# Remove from library, confirmed: the entry's title and the packs it will leave. In the    #}
+{# library it fills <dialog id="remove-dialog"> (card-actions.js opens it), and confirming  #}
+{# swaps the results for the same view, then closes the dialog and any open drawer. As a    #}
+{# page (as_page) it's a plain (boosted) POST that returns to the library.                  #}
+{% url 'catalog:remove' entry.pk as remove_url %}{% url 'catalog:entry' entry.pk as entry_url %}
+<div class="picker-panel">
+  <header class="picker-head">
+    <div class="min-w-0 space-y-1">
+      <p class="micro text-fg-muted">Remove from library</p>
+      {% if as_page %}<h1 id="remove-dialog-title" class="picker-title">{{ entry.asset.title }}</h1>{% else %}<h2 id="remove-dialog-title" class="picker-title">{{ entry.asset.title }}</h2>{% endif %}
+    </div>
+    {% if not as_page %}<form method="dialog"><button type="submit" value="close" class="picker-close" aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button></form>{% endif %}
+  </header>
+  <div class="picker-body">
+    {% if pack_items %}
+      <p class="text-sm text-fg">It will also leave {% if pack_items|length == 1 %}this pack{% else %}these {{ pack_items|length }} packs{% endif %}:</p>
+      <ul id="remove-packs" class="remove-packs" aria-label="Packs it will leave">{% for item in pack_items %}<li>{% include "partials/icon.html" with name="pack" size=14 %}<span>{{ item.pack.title }}</span></li>{% endfor %}</ul>
+    {% else %}
+      <p class="text-sm text-fg">It isn't in any of your packs.</p>
+    {% endif %}
+    <p class="picker-note">{% include "partials/icon.html" with name="info" size=14 %}<span>Your notes, rating and status for it go too. The asset stays in the Toolbox, so you can save it again later.</span></p>
+  </div>
+  <footer class="picker-foot gap-2">
+    {% if as_page %}
+      <a href="{{ entry_url }}" class="btn btn-quiet btn-sm">Cancel</a>
+      <form method="post" action="{{ remove_url }}">{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Remove</button></form>
+    {% else %}
+      <form method="dialog"><button type="submit" value="close" class="btn btn-quiet btn-sm">Cancel</button></form>
+      <form method="post" action="{{ remove_url }}" hx-post="{{ remove_url }}" hx-target="#library-results" hx-swap="outerHTML transition:false" hx-disabled-elt="find button" data-drawer-remove data-dialog-done>{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Remove</button></form>
+    {% endif %}
+  </footer>
+</div>

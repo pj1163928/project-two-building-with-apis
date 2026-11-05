@@ -1,0 +1,26 @@
+{# The Add to pack picker's list (into #pack-picker-list), loaded each time it opens: the   #}
+{# member's own packs, each a button that adds the asset, or "In pack" when it's there. A  #}
+{# Discover result is posted as its provider and ID, and saved to the library first.       #}
+{% if error %}<p class="picker-alert" role="alert">{% include "partials/icon.html" with name="alert" size=14 %}<span>{{ error }}</span></p>{% endif %}
+{% if added_to %}<p class="picker-added" role="status">{% include "partials/icon.html" with name="check" size=14 %}<span>Added to “{{ added_to.title }}”.</span></p>{% endif %}
+{% if packs %}
+  <ul class="picker-list" aria-label="Your packs">
+    {% for pack in packs %}
+      <li>
+        {% if pack.pk in holding %}
+          <span class="picker-pack is-in"><span class="picker-pack-title">{{ pack.title }}</span><span class="picker-pack-meta micro">{% include "partials/icon.html" with name="check" size=13 %}In pack</span></span>
+        {% else %}
+          {% url 'packs:picker_add' pack.pk as add_url %}
+          <form method="post" action="{{ add_url }}" hx-post="{{ add_url }}" hx-target="#pack-picker-list" hx-swap="innerHTML transition:false" hx-disabled-elt="find button">{% csrf_token %}
+            {% if target.entry %}<input type="hidden" name="entry" value="{{ target.entry.pk }}">{% else %}<input type="hidden" name="provider" value="{{ target.provider }}"><input type="hidden" name="external_id" value="{{ target.external_id }}">{% endif %}
+            <button type="submit" class="picker-pack"><span class="picker-pack-title">{{ pack.title }}</span><span class="picker-pack-meta micro">{{ pack.item_count }} item{{ pack.item_count|pluralize }}</span></button>
+          </form>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="picker-empty">You don't have any packs yet.</p>
+{% endif %}
+<a href="{% url 'packs:create' %}" class="btn btn-quiet btn-sm w-full gap-1.5">{% include "partials/icon.html" with name="plus" size=14 %}<span>New pack</span></a>
+{% if count_oob %}{% include "partials/saved_count.html" with oob=True %}{% endif %}

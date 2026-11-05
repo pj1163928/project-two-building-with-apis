@@ -1,0 +1,4 @@
+{# One item's status line: empty until a change, then "Saved" or the problem (nothing saved). #}
+<p id="item-{{ item.pk }}-status" class="entry-save-status pack-item-status" data-save-status="{{ state|default:'idle' }}" role="{% if state == 'error' %}alert{% else %}status{% endif %}">
+  {% if state == "saved" %}{% include "partials/icon.html" with name="check" size=13 %}<span>Saved</span>{% elif state == "error" %}{% include "partials/icon.html" with name="alert" size=13 %}<span>{{ message }}</span>{% endif %}
+</p>

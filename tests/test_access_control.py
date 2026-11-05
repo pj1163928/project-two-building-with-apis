@@ -54,6 +54,20 @@ Phase 5 rules (the drawer):
 - Every update needs a valid CSRF token; the header base.html sends is
   enough.
 
+Phase 7 rules (packs):
+- New pack, the builder and every pack URL send signed-out visitors to
+  sign-in (an HTMX request redirects the whole window), back to the builder
+  (or the Discover page a picker was on), and change nothing.
+- Another member's pack is a 404 for the builder and every edit URL, and
+  stays as it was.
+- Adding another member's SavedAsset to your pack is a 404 through the
+  builder's Add and the picker (add_to_pack()'s own refusal is in
+  test_packs.py). Adding your SavedAsset to another member's pack is a 404.
+- Removing an entry from the library: the confirm (GET) is a 404 for
+  another member's entry too.
+- Every pack write needs a valid CSRF token; the header base.html sends is
+  enough.
+
 Phase 6 rules:
 - The API token page sends signed-out visitors to sign-in and back (it's in
   MEMBERS_ONLY_PAGES). The library API's own rules (401 signed out, 404 for
@@ -75,6 +89,7 @@ PUBLIC_PAGES = ["packs:home", "catalog:discover"]
 MEMBERS_ONLY_PAGES = [
     "catalog:library",
     "packs:list",
+    "packs:create",
     "accounts:profile",
     "accounts:settings",
     "accounts:token",
@@ -597,3 +612,148 @@ def test_updating_succeeds_with_the_pages_csrf_header(csrf_client, member, mine)
     assert response.status_code == 200
     mine.refresh_from_db()
     assert mine.rating == 5
+
+
+# ---------------------------------------------------------------- packs (Phase 7)
+
+
+@pytest.fixture
+def my_pack(member, mine):
+    from packs.models import Pack
+    from packs.services import add_to_pack
+
+    pack = Pack.objects.create_pack(member, "My Pack")
+    add_to_pack(pack, mine)
+    return pack
+
+
+@pytest.fixture
+def their_pack(theirs):
+    from packs.models import Pack
+    from packs.services import add_to_pack
+
+    pack = Pack.objects.create_pack(theirs.user, "Their Pack", tags="secret")
+    add_to_pack(pack, theirs)
+    return pack
+
+
+def _pack_gets(pack):
+    """Every GET on one pack: the builder and Add from my library."""
+    return [
+        reverse("packs:builder", args=[pack.pk]),
+        reverse("packs:library_search", args=[pack.pk]),
+    ]
+
+
+def _pack_writes(pack, entry):
+    """Every POST that changes one pack, with data that would succeed for its owner."""
+    item = pack.items.get()
+    return [
+        (reverse("packs:details", args=[pack.pk]), {"title": "Changed"}),
+        (reverse("packs:visibility", args=[pack.pk]), {"visibility": "public"}),
+        (reverse("packs:add_item", args=[pack.pk]), {"entry": entry.pk}),
+        (reverse("packs:item_update", args=[pack.pk, item.pk]), {"import_path": "changed/"}),
+        (reverse("packs:item_move", args=[pack.pk, item.pk]), {"direction": "down"}),
+        (reverse("packs:item_remove", args=[pack.pk, item.pk]), {}),
+        (reverse("packs:picker_add", args=[pack.pk]), {"entry": entry.pk}),
+        (reverse("packs:delete", args=[pack.pk]), {}),
+    ]
+
+
+def _pack_state(pack):
+    from packs.models import Pack
+
+    pack = Pack.objects.filter(pk=pack.pk).first()
+    if pack is None:
+        return None
+    items = list(pack.items.values_list("saved_asset", "import_path", "position"))
+    return (pack.title, pack.is_public, items)
+
+
+def test_a_visitor_is_sent_to_sign_in_from_every_pack_url_and_nothing_changes(
+    client, my_pack, mine
+):
+    builder = reverse("packs:builder", args=[my_pack.pk])
+    before = _pack_state(my_pack)
+    for url in _pack_gets(my_pack):
+        assert client.get(url).url == login_url_for(builder)
+    for url, data in _pack_writes(my_pack, mine):
+        response = client.post(url, data)
+        assert response.status_code == 302 and response.url.startswith(reverse("accounts:login"))
+        htmx = client.post(url, data, headers={"HX-Request": "true"})
+        assert htmx["HX-Redirect"].startswith(reverse("accounts:login"))
+    assert _pack_state(my_pack) == before
+
+
+def test_a_visitors_builder_returns_to_it_after_sign_in(client, member, password, my_pack):
+    builder = reverse("packs:builder", args=[my_pack.pk])
+    response = client.post(
+        login_url_for(builder), {"username": member.username, "password": password}
+    )
+    assert response.url == builder
+
+
+def test_a_visitors_picker_goes_to_sign_in_and_back_to_the_page_it_was_on(client, mine):
+    discover = "/discover/?type=texture&q=brick"
+    response = client.get(
+        reverse("packs:picker"),
+        {"entry": mine.pk},
+        headers={"HX-Request": "true", "HX-Current-URL": f"http://testserver{discover}"},
+    )
+    assert response["HX-Redirect"] == login_url_for(discover)
+
+
+def test_another_members_pack_is_a_404_everywhere_and_stays(
+    member_client, their_pack, theirs, mine
+):
+    before = _pack_state(their_pack)
+    for url in _pack_gets(their_pack):
+        assert member_client.get(url, headers={"HX-Request": "true"}).status_code == 404
+    # Even with the member's own entry, so the entry check isn't what refuses it.
+    for url, data in _pack_writes(their_pack, mine):
+        assert member_client.post(url, data, headers={"HX-Request": "true"}).status_code == 404
+    assert _pack_state(their_pack) == before
+    html = member_client.get(reverse("packs:list")).content.decode()
+    assert "Their Pack" not in html
+
+
+def test_adding_another_members_entry_to_your_pack_is_a_404(member_client, my_pack, theirs):
+    before = _pack_state(my_pack)
+    for url in (
+        reverse("packs:add_item", args=[my_pack.pk]),
+        reverse("packs:picker_add", args=[my_pack.pk]),
+    ):
+        response = member_client.post(url, {"entry": theirs.pk}, headers={"HX-Request": "true"})
+        assert response.status_code == 404
+    picker = member_client.get(reverse("packs:picker"), {"entry": theirs.pk})
+    assert picker.status_code == 404
+    assert _pack_state(my_pack) == before
+
+
+def test_the_remove_confirm_is_a_404_for_another_members_entry(member_client, theirs, their_pack):
+    response = member_client.get(
+        reverse("catalog:remove", args=[theirs.pk]), headers={"HX-Request": "true"}
+    )
+    assert response.status_code == 404
+    assert "Their Pack" not in response.content.decode()
+
+
+def test_every_pack_write_rejects_a_post_without_a_csrf_token(csrf_client, member, my_pack, mine):
+    csrf_client.force_login(member)
+    before = _pack_state(my_pack)
+    for url, data in _pack_writes(my_pack, mine):
+        assert csrf_client.post(url, data, headers={"HX-Request": "true"}).status_code == 403
+    assert csrf_client.post(reverse("packs:create"), {"title": "New"}).status_code == 403
+    assert _pack_state(my_pack) == before
+
+
+def test_pack_writes_succeed_with_the_pages_csrf_header(csrf_client, member, my_pack, mine):
+    from packs.models import Pack
+
+    csrf_client.force_login(member)
+    page = csrf_client.get(reverse("packs:builder", args=[my_pack.pk])).content.decode()
+    token = re.search(r"hx-headers='\{\"X-CSRFToken\": \"([^\"]+)\"\}'", page).group(1)
+    headers = {"HX-Request": "true", "X-CSRFToken": token}
+    for url, data in _pack_writes(my_pack, mine):
+        assert csrf_client.post(url, data, headers=headers).status_code in (200, 302)
+    assert not Pack.objects.filter(pk=my_pack.pk).exists()

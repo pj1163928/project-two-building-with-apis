@@ -14,7 +14,7 @@ phases add.
 | `providers` | API clients for ambientCG, Poly Haven and Openverse (plain Python, not a Django app) | — |
 | `accounts` | Sign-up, sign-in, sign-out, profile, settings, and the API token page | `accounts:` |
 | `catalog` | Discover and the library; Asset, Tag and SavedAsset; saving; the library API | `catalog:` |
-| `packs` | Home and the public gallery; Pack and PackItem, the builder, export and the pack API *(planned)* | `packs:` |
+| `packs` | Home; Pack and PackItem, the member's packs, the builder and the Add to pack picker; the public gallery, export and the pack API *(planned)* | `packs:` |
 
 `config/urls.py` mounts `accounts.urls` at `/accounts/`, and mounts
 `catalog.urls` and `packs.urls` at the root.
@@ -30,10 +30,18 @@ phases add.
 | `catalog:save` | `/library/save/` | Members; POST only, with CSRF (an HTMX fragment) |
 | `catalog:entry` | `/library/<id>/` | Members, own entries only (anything else is **404**). The library's HTMX request gets the drawer; any other request gets the full page |
 | `catalog:update` | `/library/<id>/update/` | Members, own entries only (**404** otherwise); POST only, with CSRF. Saves whichever of `status`, `rating`, `notes` is posted |
-| `catalog:remove` | `/library/<id>/remove/` | Members, own entries only (anything else is **404**); POST only, with CSRF (HTMX gets the results fragment) |
+| `catalog:remove` | `/library/<id>/remove/` | Members, own entries only (anything else is **404**). GET is the confirm listing the packs it will leave (the library's dialog for HTMX, a page otherwise); POST removes it, with CSRF (HTMX gets the results fragment) |
 | `catalog:api_library` | `/api/library/` | API: signed in by token or session (401 otherwise). GET lists the caller's entries; POST saves one |
 | `catalog:api_entry` | `/api/library/<id>/` | API: the caller's own entries only (**404** otherwise). GET, PATCH, PUT, DELETE |
-| `packs:list` | `/packs/` | Members |
+| `packs:list` | `/packs/` | Members: their own packs |
+| `packs:create` | `/packs/new/` | Members; POST with CSRF creates a private pack and opens its builder |
+| `packs:builder` | `/packs/<id>/edit/` | The owner only (**404** otherwise) |
+| `packs:details`, `packs:visibility`, `packs:delete` | `/packs/<id>/details/`, `…/visibility/`, `…/delete/` | The owner only; POST only, with CSRF. Details saves whichever of `title`, `description`, `tags` is posted; visibility takes `public` or `private` |
+| `packs:library_search` | `/packs/<id>/library/?q=` | The owner only; the builder's Add from my library fragment (any other request goes to the builder) |
+| `packs:add_item` | `/packs/<id>/items/` | The owner only; POST `entry` (their own, **404** otherwise), with CSRF |
+| `packs:item_update`, `packs:item_move`, `packs:item_remove` | `/packs/<id>/items/<item>/`, `…/move/`, `…/remove/` | The owner only; POST only, with CSRF. Update saves whichever of `preferred_variant`, `import_path` is posted; move takes `direction` `up` or `down` |
+| `packs:picker` | `/packs/picker/?entry=<id>` or `?provider=&external_id=` | Members; the Add to pack picker's list of their own packs |
+| `packs:picker_add` | `/packs/<id>/add/` | The owner only; POST `entry`, or `provider` and `external_id` (a Discover result), with CSRF |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
 | `accounts:login` | `/accounts/login/` | Everyone |
 | `accounts:logout` | `/accounts/logout/` | POST only, with CSRF |
@@ -41,8 +49,9 @@ phases add.
 | `accounts:settings` | `/accounts/settings/` | Members |
 | `accounts:token` | `/accounts/token/` | Members; creates the member's API token on the first visit, never cached |
 
-Planned additions: `/packs/<slug>/` (slugs are unique
-site-wide), and `/api/packs/` and `/api/packs/{id}/export/`.
+Planned additions: `/packs/<slug>/` (Phase 8, the public page; slugs are
+unique site-wide, which is why the owner's pages use the pk), and
+`/api/packs/` and `/api/packs/{id}/export/`.
 
 ## Discover
 
@@ -187,8 +196,10 @@ site-wide), and `/api/packs/` and `/api/packs/{id}/export/`.
   `HX-Replace-Url` keeps the address bar right when the page shrinks away.
   The saved count comes along out of band. A plain POST redirects to the
   library. A signed-out visitor goes to sign-in and back to the library.
-  Phase 7 adds the list of packs the entry leaves, and Phase 6 the API's
-  DELETE.
+  *(Phase 7)* A GET on the same URL is the confirm: the entry's title and
+  the packs it will leave (its PackItems, A–Z), as the library's Remove
+  dialog for HTMX or as a page otherwise. Confirming deletes the entry, and
+  its PackItems cascade; the packs' other items and the Asset stay.
 - **The drawer** *(Phase 5)*: `/library/<id>/` (`EntryView`) shows one of
   the member's entries: the stored Asset's details, license and
   attribution, source link, tags and file variants, then the member's
@@ -219,10 +230,14 @@ site-wide), and `/api/packs/` and `/api/packs/{id}/export/`.
   so the notes being typed aren't lost (user request, 2026-11-05). A
   plain POST is still sent to sign-in. The API (Phase 6) gets its own
   serializer, with the same rules.
-- **Remove from the drawer or the full page:** the drawer's Delete posts to
-  `catalog:remove` from the library page, so it gets the results for the
-  same view. On the full page it's a boosted form, and a boosted request
-  is redirected to the library like a plain one.
+- **Remove from the drawer or the full page:** the drawer's Delete opens the
+  library's Remove dialog (`catalog:remove`'s GET), which posts from the
+  library page, so it gets the results for the same view. On the full page
+  it's a link to the confirm page, whose boosted form is redirected to the
+  library like a plain POST.
+- **The drawer's packs** *(Phase 7)*: after "License and credit", the packs
+  the entry is in (`_own_entry()` prefetches them), each linking to its
+  builder, with the item's variant.
 - **Community rating** *(user request, 2026-11-05)*: each member's own
   rating stays private, but every page that shows an asset can show the
   average of all members' ratings for it and how many rated it. It never
@@ -244,6 +259,74 @@ site-wide), and `/api/packs/` and `/api/packs/{id}/export/`.
     ratings off the public pack pages, or allow for them.
 - **Saved count:** `config.context_processors.shell` adds `saved_count`
   (the member's own entries) for signed-in members only.
+
+## Packs
+
+*(Phase 7.)* `packs/models.py`, `packs/services.py` (the cross-model
+workflows), `packs/forms.py` and `packs/views.py`.
+
+- **Models:**
+  - `Pack`: `owner`, `title` (up to 120), `slug`, `description` ("intended
+    use", up to 2,000), `tags` (to `Tag`), `is_public` (False),
+    `copied_from` (nullable, for Phase 11) and created/updated timestamps.
+    `Pack.objects.create_pack(owner, title, description, tags)` writes the
+    pack, a free slug and its tags in **one transaction**. The slug is the
+    slugified title, then `-2`, `-3`… (`free_slug()`), unique site-wide,
+    and it never changes on a rename. `Pack.objects.owned_by(user)` is the
+    only way pages read packs, and it's empty for a visitor.
+  - `PackItem`: `pack`, `saved_asset`, `preferred_variant` (a variant's
+    label), `import_path` and `position`. Unique on (pack, saved_asset).
+    Both links `CASCADE`: deleting a pack or an entry deletes its items,
+    and `SavedAsset.asset` is still `PROTECT`, so the Asset stays.
+    `default_import_path` is `<kind>s/<external_id>/`.
+  - Tags typed as text go through `tags_from_text()`: split on commas, then
+    `Tag.objects.from_names()` (so `normalize_tag()`).
+- **`default_variant(kind, variants)`:** the label of a 2K JPG (an MP3 for
+  sounds) when the asset has one, otherwise the first variant, or "".
+  Labels are compared ignoring case and hyphens (`squeeze_label()`), so
+  ambientCG's "2K-JPG" counts; the label is stored as the provider wrote it,
+  for Phase 8's export to look up.
+- **Services** (`packs/services.py`), each in **one transaction**:
+  - `add_to_pack(pack, saved_asset)` returns `(item, created)`. It raises
+    `NotYourEntryError` (writing nothing) unless the entry is the pack
+    owner's. An entry already in the pack returns its item untouched.
+    Otherwise the item goes at the end (`Max(position) + 1`) on the default
+    variant with a blank import path.
+  - `add_from_provider(pack, provider_key, external_id)` is Discover's Add
+    to pack: `save_to_library()` for the pack's owner (an entry they have
+    is used as it is, otherwise a new To review one), then `add_to_pack()`.
+    An `UnknownProviderError` or `ProviderError` saves and adds nothing.
+  - `move_item(item, step)` swaps an item with its neighbour (`-1` up, `1`
+    down) and rewrites the positions 0, 1, 2…, closing any gaps a Remove
+    left. It returns False, writing nothing, at either end.
+- **Forms:** `NewPackForm` (title, intended use, tags). `PackDetailsForm`
+  and `PackItemForm` bind only the posted fields, like `ReviewForm`, so each
+  autosaving field writes only itself. A variant must be one of the asset's
+  labels. An import path is optional, up to 300 characters, backslashes
+  become `/`, and it must be relative (no leading `/`, no drive like `C:`)
+  with no `..` segment. A bad value is a **400** with one sentence.
+- **Views:** all members only (`PacksPageMixin`). A signed-out visitor goes
+  to sign-in and back to `login_return_url()`: the builder for any of a
+  pack's URLs, the page a picker was on, otherwise the page itself. An HTMX
+  request gets `HX-Redirect`. `OwnPackMixin.get_pack()` looks the pack up
+  through `owned_by()`, and items through that pack, so another member's
+  pack or item is a **404**. Entries come through
+  `SavedAsset.objects.for_user()`, so another member's entry is a **404**
+  too, before `add_to_pack()` is ever called.
+  - The builder's add, move and remove reply with the item list
+    (`packs/partials/items.html`) and `HX-Trigger: packItemsChanged`, which
+    refreshes Add from my library. Details, variant and import path reply
+    with a status line. Any non-HTMX POST redirects to the builder.
+  - Add from my library is `filter_library(user, {"q": q})`: the first 12
+    matches, those already in the pack marked "In pack".
+  - The picker (`PickerView`) takes the member's `entry`, or a `provider`
+    and `external_id`, checked before any provider is called (**400**
+    otherwise). It lists `owned_by()` packs with their item counts and
+    marks those the asset is already in. `PickerAddView` adds it and
+    replies with the list again, "Added to …", and (for Discover) the saved
+    count out of band, or the `ProviderError` message with nothing saved.
+- **Side panel:** every packs page lists the member's packs
+  (`packs/partials/pack_nav.html`, `my_packs`), with New.
 
 ## Library API
 
@@ -273,8 +356,8 @@ views are thin: they call the same `filter_library()` and
   `ReviewForm`, so a script and the drawer's notes autosave never overwrite
   each other). Anything else in the body (the asset, `id`, `saved_at`,
   `community`) is ignored. DELETE is a **204**; it removes the entry from
-  the member's packs too (the PackItems cascade, Phase 7), and the shared
-  Asset stays. The view's docstring says so, and DRF serves it as the
+  the member's packs too (the PackItems cascade), and the shared Asset
+  stays. The view's docstring says so, and DRF serves it as the
   `OPTIONS` description.
 - **The owner serializer** (`LibraryEntrySerializer`): `id`, the nested
   read-only `asset` (`AssetSerializer`: Asset fields only, tags as names),
@@ -323,14 +406,14 @@ Every rule has a test (see [TESTING.md](TESTING.md)).
 ## Shared functions
 
 Each of these has exactly one implementation, used by both the pages and
-the API. `normalize_tag()`, `filter_library()`, `search_records()` and `fetch_record()` are built; the rest are *(planned)*:
+the API. `normalize_tag()`, `filter_library()`, `add_to_pack()`, `search_records()` and `fetch_record()` are built; the rest are *(planned)*:
 
 | Function | Purpose |
 |---|---|
 | `normalize_tag()` | Built (Phase 3), `catalog/tags.py`. The one way to tidy tag names: lowercase, trimmed, single spaces; number-only tags dropped; a plural "s" stripped from the last word unless it ends in "ss". Returns `None` for a dropped tag |
 | `filter_library(user, params)` | Built (Phase 4), `catalog/library.py`. Library search (title, tags, notes), filters (type, provider, status, tags, minimum rating), sorts and pages of 12, for the caller's own entries only (see "Library and saving") |
 | `filter_public_packs(params)` | Gallery search, type filter, sorts, pages of 12 |
-| `add_to_pack(pack, saved_asset)` | Adds an item and enforces ownership |
+| `add_to_pack(pack, saved_asset)` | Built (Phase 7), `packs/services.py`. Adds an item at the end on the default variant, once per entry, and refuses another member's entry (see "Packs") |
 | Manifest builder | The Option A export shape, locked by a golden file |
 | `search_records()` | Built (Phase 2a). Returns `AssetRecord`s (`providers/records.py`), next to the console's `search()` |
 | `fetch_record()` | Built (Phase 3). One asset's full `AssetRecord` with its `variants`, next to the console's `get_details()`. ambientCG: one variant per download zip. Poly Haven: `_cached_info()` plus `/files`, keeping every URL; loose maps grouped by resolution and format ("2K JPG"), and each bundle (glTF, Blend…) its own variant with its included files. Openverse: the main file, then one per other file type. An ID that isn't a plain slug is refused before any request |

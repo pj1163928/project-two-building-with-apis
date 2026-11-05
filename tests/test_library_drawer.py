@@ -184,11 +184,13 @@ def test_the_drawer_shows_the_assets_details_license_source_and_files(entry, mem
     thumb = html.split('<div class="entry-thumb">', 1)[1].split("</div>", 1)[0]
     assert 'src="https://cdn.polyhaven.com/thumbs/red_brick_03.png"' in thumb
     assert 'referrerpolicy="no-referrer"' in thumb and "mark" not in thumb
-    # And Remove, through the same URL as a card's.
+    # The packs it's in (none yet), after "License and credit".
+    assert text.index("License and credit") < text.index("Packs") < text.index("Files")
+    assert "It isn't in any of your packs yet." in text
+    # And Remove, through the same URL as a card's: it opens the library's Remove dialog.
     remove = reverse("catalog:remove", args=[entry.pk])
-    assert (
-        f'hx-post="{remove}" hx-target="#library-results"' in html and "data-drawer-remove" in html
-    )
+    assert f'hx-get="{remove}" hx-target="#remove-dialog"' in html
+    assert "hx-confirm" not in html
 
 
 def test_an_asset_with_no_files_says_so(member, make_asset, member_client):
@@ -338,8 +340,11 @@ def test_remove_from_the_full_page_returns_to_the_library(entry, member_client):
 
     html = member_client.get(reverse("catalog:entry", args=[entry.pk])).content.decode()
     remove = reverse("catalog:remove", args=[entry.pk])
-    form = re.search(rf'<form method="post" action="{remove}"[^>]*>', html).group(0)
-    assert "hx-post" not in form and "hx-confirm=" in form
+    # The page links to the confirm as a page, whose form is a plain (boosted) POST.
+    assert f'<a href="{remove}" class="btn btn-quiet btn-sm gap-1.5">' in html
+    confirm = member_client.get(remove).content.decode()
+    form = re.search(rf'<form method="post" action="{remove}"[^>]*>', confirm).group(0)
+    assert "hx-post" not in form
     # Boosted, as the page's form is sent: the whole library comes back, not a fragment.
     response = member_client.post(remove, headers={**HTMX, "HX-Boosted": "true"})
     assert response.status_code == 302 and response.url == reverse("catalog:library")
