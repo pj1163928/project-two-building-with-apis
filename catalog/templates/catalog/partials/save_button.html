@@ -1,15 +1,16 @@
-{# A result's Save slot, at the card's foot (never on the thumbnail, so the logo mark #}
-{# in "In library" never sits on a provider's image). Already saved: the badge.     #}
-{# A member: a form that posts the provider and ID and swaps itself for the reply.  #}
-{# A visitor: a link to sign in that comes back to this Discover search.           #}
+{# A result's Save action, the first square in the card's corner (.card-actions).      #}
+{# Already saved: the "In library" check. A member: a form that posts the provider   #}
+{# and ID and swaps itself for the reply. A visitor: a link to sign in that comes    #}
+{# back to this Discover search. The logo mark is never used here: the corner sits   #}
+{# on the provider's thumbnail.                                                       #}
 {% if record.external_id in saved_ids %}
   {% include "catalog/partials/in_library.html" %}
 {% elif user.is_authenticated %}
   <form class="save-slot" hx-post="{% url 'catalog:save' %}" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button">
     <input type="hidden" name="provider" value="{{ record.provider }}">
     <input type="hidden" name="external_id" value="{{ record.external_id }}">
-    <button type="submit" class="save-button" aria-label="Save {{ record.title }} to your library">{% include "partials/icon.html" with name="plus" size=14 %}<span class="save-label">Save to library</span><span class="save-busy">Saving…</span></button>
+    <button type="submit" class="card-action save-button" aria-label="Save {{ record.title }} to your library">{% include "partials/icon.html" with name="plus" size=15 %}<span class="card-tip" aria-hidden="true"><span class="save-label">Save to library</span><span class="save-busy">Saving…</span></span></button>
   </form>
 {% else %}
-  <a class="save-slot save-button" href="{% url 'accounts:login' %}?next={{ shelf.page_url|urlencode }}" aria-label="Sign in to save {{ record.title }}">{% include "partials/icon.html" with name="plus" size=14 %}<span>Save to library</span></a>
+  <a class="save-slot save-button card-action" href="{% url 'accounts:login' %}?next={{ shelf.page_url|urlencode }}" aria-label="Sign in to save {{ record.title }}">{% include "partials/icon.html" with name="plus" size=15 %}<span class="card-tip" aria-hidden="true">Save to library</span></a>
 {% endif %}

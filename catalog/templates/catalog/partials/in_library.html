@@ -1,4 +1,5 @@
-{# The "In library" badge, with the logo mark: in place of Save once a result is saved. #}
-{# After a save it also brings the status bar's saved count up to date, out of band.   #}
-<a href="{% url 'catalog:library' %}" class="save-slot in-library"><i class="mark w-3.5" aria-hidden="true"></i><span>In library</span></a>
+{# "In library": a filled check in the card's corner, in place of Save once a result is   #}
+{# saved, linking to the library. No logo mark: the corner sits on the provider's image. #}
+{# After a save it also brings the status bar's saved count up to date, out of band.     #}
+<a href="{% url 'catalog:library' %}" class="save-slot in-library card-action is-on" aria-label="In library. Open your library">{% include "partials/icon.html" with name="check" size=15 %}<span class="card-tip" aria-hidden="true">In library</span></a>
 {% if count_oob %}{% include "partials/saved_count.html" with oob=True %}{% endif %}

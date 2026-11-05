@@ -1,0 +1,8 @@
+{# Add to pack: opens the page's pack picker (catalog/partials/pack_picker.html) for this #}
+{# card's asset, given `title`. A visitor gets a link to sign in instead, coming back   #}
+{# to `next`. The picker is the interface only until Phase 7 builds packs.             #}
+{% if user.is_authenticated %}
+  <button type="button" class="card-action" data-picker="pack-picker" data-picker-asset="{{ title }}" aria-haspopup="dialog" aria-label="Add {{ title }} to a pack">{% include "partials/icon.html" with name="pack-add" size=15 %}<span class="card-tip" aria-hidden="true">Add to pack</span></button>
+{% else %}
+  <a class="card-action" href="{% url 'accounts:login' %}?next={{ next|urlencode }}" aria-label="Sign in to add {{ title }} to a pack">{% include "partials/icon.html" with name="pack-add" size=15 %}<span class="card-tip" aria-hidden="true">Add to pack</span></a>
+{% endif %}

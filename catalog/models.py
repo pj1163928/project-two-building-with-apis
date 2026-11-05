@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
-from django.db.models import F, Q
+from django.db.models import Count, F, Q
 from django.db.models.functions import Lower
 from django.utils import timezone
 
@@ -37,6 +37,20 @@ class TagManager(models.Manager):
             tag for tag in (normalize_tag(name) for name in names if isinstance(name, str)) if tag
         )
         return [self.get_or_create(name=name)[0] for name in normalized]
+
+    def in_library(self, user) -> models.QuerySet["Tag"]:
+        """The tags on `user`'s saved assets, from every provider, most used first.
+
+        Each Tag carries `uses`: how many of the member's entries have it.
+        Ties go A–Z. A signed-out visitor has none.
+        """
+        if not user.is_authenticated:
+            return self.none()
+        return (
+            self.filter(assets__saves__user=user)
+            .annotate(uses=Count("assets__saves", distinct=True))
+            .order_by("-uses", "name")
+        )
 
 
 class Tag(models.Model):
@@ -158,6 +172,16 @@ class SavedAssetQuerySet(models.QuerySet):
             entries = entries.filter(
                 Q(asset__title__icontains=word) | Q(notes__icontains=word) | Q(asset__in=tagged)
             )
+        return entries
+
+    def tagged(self, names: Iterable[str]) -> "SavedAssetQuerySet":
+        """Entries whose asset has every tag in `names` (exact, normalized names).
+
+        Each tag matches through a subquery, so an entry is never listed twice.
+        """
+        entries = self
+        for name in names:
+            entries = entries.filter(asset__in=Asset.objects.filter(tags__name=name))
         return entries
 
     def sorted_by(self, sort: str) -> "SavedAssetQuerySet":

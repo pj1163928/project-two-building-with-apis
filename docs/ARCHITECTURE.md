@@ -26,8 +26,9 @@ phases add.
 | `packs:home` | `/` | Everyone |
 | `catalog:discover` | `/discover/?type=<kind>&q=<query>` | Everyone |
 | `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>&page=<n>` | Everyone (an HTMX fragment; `page` is optional, 1 to 20) |
-| `catalog:library` | `/library/?q=&type=&provider=&status=&min_rating=&sort=&page=` | Members (the controls' HTMX requests get the results fragment) |
+| `catalog:library` | `/library/?q=&type=&provider=&status=&tag=&min_rating=&sort=&page=` | Members (the controls' HTMX requests get the results fragment) |
 | `catalog:save` | `/library/save/` | Members; POST only, with CSRF (an HTMX fragment) |
+| `catalog:remove` | `/library/<id>/remove/` | Members, own entries only (anything else is **404**); POST only, with CSRF (HTMX gets the results fragment) |
 | `packs:list` | `/packs/` | Members |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
 | `accounts:login` | `/accounts/login/` | Everyone |
@@ -136,9 +137,19 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
     `SavedAsset.objects.for_user(user)`, so no parameter can reach another
     member's entries, and a visitor gets none. The API (Phase 6) calls it
     with `request.query_params`; it takes a QueryDict or a plain dict.
-  - **Parameters:** `q`, `type`, `provider` and `status` (each may repeat),
-    `min_rating` (1 to 5), `sort` (`newest`, the default, `oldest`, `title`,
-    `rating`) and `page`.
+  - **Parameters:** `q`, `type`, `provider`, `status` and `tag` (each may
+    repeat), `min_rating` (1 to 5), `sort` (`newest`, the default, `oldest`,
+    `title`, `rating`) and `page`.
+  - **Tags** *(Phase 4 polish, 2026-11-05, at the user's request)*: `tag`
+    keeps entries whose asset has **every** chosen tag
+    (`SavedAssetQuerySet.tagged()`, one subquery per tag, so no entry is
+    listed twice). Tags are stored normalized, so one tag gathers the same
+    word from all three providers. Each value goes through `normalize_tag()`
+    (a hand-typed "Bricks" finds "brick"); only the first 10 are read, and
+    they're kept A–Z. `Tag.objects.in_library(user)` lists the member's own
+    tags with `uses` (how many of their entries carry each), most used
+    first; `filter_groups()` turns the first 24, plus any chosen beyond
+    those, into the side panel's Tags chips.
   - `clean_library_params()` tidies them and never fails: unknown filter
     values are dropped, an unknown sort is `newest`, a page that isn't a
     whole number from 1 is 1, and a page past the end is the last page.
@@ -162,6 +173,16 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
   after a swap) get the whole page. A signed-out fragment request gets
   `HX-Redirect` to sign-in with `next` set to the full library URL, so
   the sign-in page never lands inside the results.
+- **Remove** *(Phase 4 polish)*: `RemoveFromLibraryView` deletes one of the
+  member's own entries (`get_object_or_404` over `for_user()`, so anything
+  else is a 404). The shared Asset stays (`PROTECT`). An HTMX request gets
+  `library_results.html` again for the view it came from: the parameters
+  are read from `HX-Current-URL`, but only when that's a library URL, and
+  `HX-Replace-Url` keeps the address bar right when the page shrinks away.
+  The saved count comes along out of band. A plain POST redirects to the
+  library. A signed-out visitor goes to sign-in and back to the library.
+  Phase 7 adds the list of packs the entry leaves, and Phase 6 the API's
+  DELETE.
 - **Saved count:** `config.context_processors.shell` adds `saved_count`
   (the member's own entries) for signed-in members only.
 
@@ -198,7 +219,7 @@ the API. `normalize_tag()`, `filter_library()`, `search_records()` and `fetch_re
 | Function | Purpose |
 |---|---|
 | `normalize_tag()` | Built (Phase 3), `catalog/tags.py`. The one way to tidy tag names: lowercase, trimmed, single spaces; number-only tags dropped; a plural "s" stripped from the last word unless it ends in "ss". Returns `None` for a dropped tag |
-| `filter_library(user, params)` | Built (Phase 4), `catalog/library.py`. Library search (title, tags, notes), filters (type, provider, status, minimum rating), sorts and pages of 12, for the caller's own entries only (see "Library and saving") |
+| `filter_library(user, params)` | Built (Phase 4), `catalog/library.py`. Library search (title, tags, notes), filters (type, provider, status, tags, minimum rating), sorts and pages of 12, for the caller's own entries only (see "Library and saving") |
 | `filter_public_packs(params)` | Gallery search, type filter, sorts, pages of 12 |
 | `add_to_pack(pack, saved_asset)` | Adds an item and enforces ownership |
 | Manifest builder | The Option A export shape, locked by a golden file |

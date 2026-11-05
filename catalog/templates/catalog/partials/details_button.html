@@ -1,0 +1,4 @@
+{# Keeps a card's details panel open until pressed again (or Escape), for reading it in  #}
+{# full. Hovering still shows the panel for a moment, as before. static/js/card-actions.js #}
+{# sets the card's data-details and this button's aria-pressed.                           #}
+<button type="button" class="card-action" data-card-details aria-pressed="false" aria-label="Keep the details of {{ title }} open">{% include "partials/icon.html" with name="info" size=15 %}<span class="card-tip" aria-hidden="true">Details</span></button>

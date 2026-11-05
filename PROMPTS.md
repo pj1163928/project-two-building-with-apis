@@ -28,6 +28,165 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-05 — Axcenity Toolbox: Phase 4 polish, card actions, tag filter and Remove
+
+### Prompts
+
+1. Currently I have textures setup to be viewable in images, however the
+   texture itself seems to be slightly cutoff from the top and the bottom
+   can you have it to where it shows the entire texture. When I click on a
+   texture or add it to the library it retains the information popup menu,
+   I would like for this to go away uness I click another button that
+   allows me to see it in full detail, or I can just hover over it as
+   normal and view it that way. Next the library button is a bit in the
+   way I would like a button likely in the top right or left of the logo
+   that can add it to the library. Then I would like another button where
+   I can add it to a collection and it allows me to then add it to a
+   collection of my choosing. Collections have not been fully implemented
+   yet so a button with the ui for now should be good and updating the
+   plan to complement these changes should suffice. Next I would like to
+   be able to sort the library based on tags from all 3 api sources and
+   have a way to remove items from the library, as well as in the library
+   a way for me to add an item to a pack. After completing these changes
+   please update PROMPTS.md according to source formatting and include any
+   chats that are made hearafter as well.
+2. Alright I beleive there may be some confusion regarding packs and
+   collections. I really just want to keep it down to packs remove
+   collections as all functionality will be focused around packs
+
+### Summary
+
+- **Outcome:** the polish was built as asked, outside the plan's phase
+  order and recorded as "Phase 4 polish".
+  - Texture thumbnails show whole.
+  - The hover details go away after a click unless Details keeps them
+    open.
+  - Save, Add to collection and Details sit in each card's top-right
+    corner.
+  - The library has a cross-provider Tags filter, Remove, and Add to pack
+    and Add to collection buttons.
+  - Collections and Add to pack are the interface only, as asked for
+    collections. Packs don't exist until Phase 7.
+  - The plan gains Phase 7b (Collections), and the PRD gains stories
+    87–92.
+  - 524 tests pass (497 before). `ruff check` and `ruff format --check`
+    are clean. A one-off `tailwind build` emits the new rules.
+- **Changes:**
+  - `catalog/templates/catalog/partials/result_card.html`: `data-kind` on
+    the card, and the `.card-actions` corner (Save, Add to collection,
+    Details) in place of the `.result-actions` row. The details list every
+    tag.
+  - `catalog/templates/catalog/partials/save_button.html`,
+    `in_library.html`, `save_error.html`: Save, "In library" (a filled
+    check, no logo mark) and Try again are corner squares. The error
+    message wraps below them.
+  - `catalog/templates/catalog/partials/details_button.html`,
+    `picker_button.html`, `picker_dialog.html`, `remove_button.html` (new):
+    the Details toggle, the Add to collection / Add to pack buttons, the
+    UI-only picker `<dialog>`, and Remove (a POST with `hx-confirm`).
+  - `catalog/templates/catalog/partials/library_card.html`: `data-kind`,
+    the corner actions (Add to pack, Add to collection, Details, Remove), a
+    details panel with the stored tags, and `.star-rating` in place of
+    `.rating`.
+  - `catalog/templates/catalog/library.html`: the Tags chip group with
+    counts (or a hint when there are no tags yet), and both pickers.
+    `library_results.html` sends the saved count out of band after a
+    Remove. `discover.html` holds the collection picker for members.
+  - `catalog/models.py`: `Tag.objects.in_library(user)` (the member's tags
+    with `uses`, most used first) and `SavedAssetQuerySet.tagged(names)`
+    (every name, one subquery each).
+  - `catalog/library.py`: `LibraryParams.tags` (in `is_filtered` and the
+    tidy URL), `tag` read through `normalize_tag()` (first 10, A–Z),
+    `filter_library()` filtering on it and prefetching tags,
+    `filter_groups(params, tags)` with a Tags group (top 24 plus chosen),
+    and `FilterChip.count`.
+  - `catalog/views.py`, `catalog/urls.py`: `RemoveFromLibraryView` at
+    `catalog:remove` (`/library/<id>/remove/`). The library context is
+    shared through `_library_context()`, and `_current_library_params()`
+    reads the view from `HX-Current-URL`.
+  - `styles/source.css`: square, `contain` texture frames; the corner
+    actions, their tips and their error line; details on `:hover`,
+    `:has(:focus-visible)` or `data-details="open"`, never `:focus-within`;
+    the tag-chip count; the picker dialog; `.star-rating`; the
+    reduced-motion rules.
+  - `static/js/card-actions.js` (new, loaded in `templates/base.html`):
+    the Details toggle (with Escape), opening a picker with the asset's
+    title, and closing on a backdrop click.
+  - `templates/partials/icon.html`: `check`, `info`, `collection`,
+    `pack-add`, `trash`, `close`.
+  - `tests/test_discover.py`, `tests/test_library_save.py`: the card
+    regexes follow the new markup. Rewritten tests cover all tags in the
+    details and "In library" as a corner check with no mark. New tests
+    cover the details going after a click, the Details toggle, square
+    textures and the corner actions.
+  - `tests/test_library_filter.py`: tag filter tests: across providers,
+    every tag needed, listed once, tidied values, never another member's,
+    the URL, `in_library()` and the chips.
+  - `tests/test_library_page.py`: the Tags chips, the card's corner
+    actions, details and pickers, Remove (the asset stays, the same view,
+    falling back a page, from another page, the last entry, without HTMX,
+    POST only) and the star class.
+  - `tests/test_access_control.py`: Remove's sign-in, 404 and CSRF rules,
+    and tags never leaking another member's entries or tags.
+  - `docs/ARCHITECTURE.md`, `docs/FRONTEND.md`, `docs/TESTING.md`: the
+    remove URL, tags, the corner actions, the details behaviour, the
+    pickers and the new tests.
+  - `prd/axcenity-toolbox.md`: stories 87–92, the Collection model,
+    dated notes under Discover, Library and branding, and a collections
+    row in the access table.
+  - `plans/axcenity-toolbox.md`: a ticked "Phase 4 polish" section,
+    "already in place" notes in Phases 5, 6 and 7, and the new Phase 7b:
+    Collections.
+- **TDD:** not used. This was a user-requested polish rather than a plan
+  phase run through `/implement`. Tests were written alongside each
+  change, including the tag filter's owner rule and Remove's access rules.
+- **Decisions:**
+  - "Top right or left of the logo" was read as the card thumbnail's top
+    right, because a sound's play button already holds the top left.
+  - "In library" in the corner is a check without the logo mark, because
+    the brand rule (story 76) keeps the logo off provider thumbnails.
+  - Only textures get the square frame. Other kinds keep 4:3 cover.
+  - Tags were built as a filter (an entry needs every chosen tag), not a
+    sort order. The side panel shows the top 24 tags with counts.
+  - Remove uses the browser's confirm until Phase 7's dialog that lists
+    packs.
+  - Library cards got the details panel and Add to collection too, to
+    match Discover.
+  - Collections went in as Phase 7b in `catalog`, private and website
+    only. Adding an unsaved Discover result saves it first.
+- **Deviations:** "a way to add an item to a pack" is the interface only.
+  The button and picker are in place, but no Pack model exists until
+  Phase 7, which wires them to `add_to_pack()`.
+- **Follow-up (prompt 2):** collections were removed. Everything centres
+  on packs.
+  - Discover cards' Add to collection became **Add to pack**, and library
+    cards lost their collection button. The corners are now Save / Add to
+    pack / Details on Discover, and Add to pack / Details / Remove in the
+    library.
+  - `picker_button.html` and `picker_dialog.html` became `pack_button.html`
+    and `pack_picker.html`. The `collection` icon and the `.picker-new`
+    styles were deleted.
+  - The plan's Phase 7b was deleted. Phase 7 now notes that its picker is
+    already in place on both cards, and gains a criterion: adding a
+    Discover result to a pack saves it to the library first.
+  - In the PRD, story 92 is now Add to pack from Discover. The Collection
+    model, the Collections section and its access row are gone.
+  - FRONTEND.md and the tests follow. The tests now also check that no
+    "collection" text is left on Discover or the library. 524 tests pass,
+    and ruff is clean.
+- **Sideways:**
+  - The first scripted edit of `catalog/library.py` broke on nested
+    quotes and wrote nothing. It was redone with exact edits.
+  - Changing the card markup failed 27 tests whose regexes matched the old
+    `<li class="result-card">` and `.result-actions`. The helpers were
+    updated, and the six tests whose behaviour changed were rewritten.
+  - One new CSS assertion came out convoluted and was simplified. A blanket
+    "no `:focus-within`" check would have caught the search bars' own
+    legitimate use, so it was narrowed to cards.
+  - A headless-Firefox preview of the library showed the stars as grey
+    blocks. DaisyUI's `.rating` component had been overriding them since
+    Phase 3. The class was renamed `.star-rating`, with a test.
+
 ## 2026-11-05 — Axcenity Toolbox: Phase 4/13, Library browsing
 
 ### Prompts

@@ -172,6 +172,15 @@ asset catalog and pack creator for the engine.
 85. As a maintainer, I want the code linted and formatted by Ruff, so that it stays consistent. **[T1]**
 86. As a maintainer, I want the existing console script to keep working unchanged, so that the earlier deliverable isn't broken. **[T1]**
 
+### Added 2026-11-05 (at the user's request)
+
+87. As a member, I want a texture's whole thumbnail shown, not cropped at the top and bottom, so that I can judge the texture at a glance. **[T1]**
+88. As a member, I want a result's details to show only while I hover it, unless I press its Details button to keep them open, so that clicking or saving a result doesn't leave a panel over the card. **[T1]**
+89. As a member, I want Save, Add to pack and Details as small buttons in the corner of each result, so that they don't take up the card. **[T1]**
+90. As a member, I want to filter my library by tags, with the same tag from all three providers counted as one, so that I can gather every "brick" asset whatever its source. **[T1]**
+91. As a member, I want to remove an item from my library straight from its card, so that my library holds only what I still want. **[T1]**
+92. As a member, I want an Add to pack button on Discover results as well as library cards, saving the asset to my library first if needed, so that I can put an asset into a pack the moment I find it. **[T1]**
+
 ### Requirement traceability
 
 | Graded requirement | User stories |
@@ -291,6 +300,15 @@ asset catalog and pack creator for the engine.
     shows its full title, author, license, source and tags.
   - "Save to library" swaps itself for an "In library" badge. Results
     already in the user's library render as "In library".
+  - *(Changed 2026-11-05 at the user's request.)* Save, Add to pack and
+    Details are small buttons in each result's top-right corner, in
+    place of the full-width Save row. "In library" is a filled check there,
+    without the logo mark, because the corner sits on the provider's
+    thumbnail. The hover details go away once the pointer leaves, even
+    after a click; Details keeps them open until it's pressed again.
+    Texture thumbnails are shown whole (square), never cropped. Add to
+    pack on a result that isn't saved yet saves it first (To review), then
+    calls `add_to_pack()`.
 - **Library**
   - A private card grid, with its filters in the collapsible side panel.
   - One shared `filter_library(user, params)` function handles search
@@ -310,6 +328,15 @@ asset catalog and pack creator for the engine.
     removed from.
   - **Add to pack:** each card has a dropdown that calls the shared
     `add_to_pack(pack, saved_asset)` function.
+  - *(Added 2026-11-05 at the user's request.)* A **Tags** filter in the
+    side panel lists the tags on the member's own saved assets, from every
+    provider, most used first with counts. An entry must carry every chosen
+    tag. `filter_library()` takes it as `tag`.
+  - *(Added 2026-11-05 at the user's request.)* Each card has corner
+    buttons: Add to pack, Details and **Remove**.
+    Remove asks the browser to confirm until the Delete dialog that lists
+    packs exists, then removes the entry and refreshes the results in
+    place.
 - **Pack builder** (owner only)
   - Pack details: title, description, comma-separated tags, and the
     public/private switch.
@@ -461,7 +488,9 @@ so any change to the shape fails the tests.
   - **[T1]** The logo files are copied from the engine's branding assets.
     Static uses: the wordmark in the title bar, the icon tile, the favicon
     (the 32 px PNG), the "In library" badge mark, a ghost mark for empty
-    states, and a giant cropped wordmark in the footer.
+    states, and a giant cropped wordmark in the footer. *(Changed
+    2026-11-05: "In library" moved onto the thumbnail's corner as a check,
+    so it no longer uses the mark.)*
   - **[T2]** The wordmark wipes in and gets a periodic shine sweep, the
     tile cuts in on load, a giant parallax watermark sits behind the
     content, and the mark with a light sweep is the loader instead of

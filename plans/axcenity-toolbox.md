@@ -424,6 +424,49 @@ library and an empty result each say what to do next.
   URL send signed-out visitors to sign in. Filter parameters can't expose
   another member's entries.
 
+### Phase 4 polish (2026-11-05, at the user's request)
+
+Added after the phase. The PRD records it as stories 87–92 and under
+Discover and Library. Add to pack works in Phase 7; only its interface is
+built here. (Collections were first planned too, as Phase 7b, then
+dropped the same day at the user's request: everything centres on packs.)
+
+- [x] **Whole texture thumbnails:** a texture's card frame is square with
+  `object-fit: contain`, so the tile is no longer cut at the top and
+  bottom. Other kinds keep the 4:3 cover frame.
+- [x] **Details only while hovered:** the details panel shows on hover or
+  on keyboard focus (`:has(:focus-visible)`), no longer on
+  `:focus-within`, so it goes once the pointer leaves after a click or a
+  save. A **Details** button keeps it open until it's pressed again or
+  Escape is pressed. While kept open it scrolls, and it lists every tag.
+- [x] **Corner actions:** small buttons in each card's top-right corner
+  replace the full-width Save row.
+  - Discover: Save (then a filled "In library" check with no logo mark, as
+    the corner sits on the thumbnail), Add to pack and Details.
+  - Library: Add to pack, Details and Remove.
+  - A visitor's Save and Add to pack sign in and come back.
+- [x] **Add to pack picker:** the interface only. One `<dialog>` per page
+  (`catalog/partials/pack_picker.html`) shows the asset's title, "You
+  don't have any packs yet.", Go to Packs, and a note that packs are on
+  the way.
+- [x] **Tag filter:** `tag` (repeatable) in `filter_library()` keeps
+  entries with every chosen tag. Tags are normalized, so a tag joins all
+  three providers. The side panel lists the member's own top 24 tags with
+  counts, plus any chosen tag beyond those. `Tag.objects.in_library()`
+  never counts another member's entries.
+- [x] **Remove from library:** `POST /library/<id>/remove/`
+  (`catalog:remove`) works for the owner only (otherwise **404**), with
+  CSRF, after the browser's confirm. The shared Asset stays. HTMX gets the
+  results for the same view back, with the saved count out of band and
+  `HX-Replace-Url` when the page shrinks away.
+- [x] **Fixed on the way:** library stars used the class `.rating`, which
+  DaisyUI's rating component painted as grey blocks. It's now
+  `.star-rating`.
+- [x] Standard gate (see top). Access rules: Remove sends a visitor to
+  sign in and removes nothing, returns 404 for another member's entry,
+  and rejects a POST without CSRF. The tag filter and the tag chips never
+  show another member's entries or tags.
+
 ---
 
 ## Phase 5: Library drawer
@@ -443,6 +486,12 @@ the same URL directly shows it as a full page. The drawer shows:
 Status and stars save at once, and the rating can be cleared. Notes save
 on their own after a short debounce. Out-of-band swaps keep the card
 behind the drawer in step with any change.
+
+> **Already in place (Phase 4 polish, 2026-11-05):** library cards have
+> corner actions (Add to pack, Details, Remove) and a details panel. The card's title still opens the provider's page. Make
+> the title open the drawer, keep the corner actions above the stretched
+> link, and give the drawer the same Remove (`catalog:remove`) as its
+> Delete.
 
 ### Acceptance criteria
 
@@ -479,13 +528,15 @@ member's profile shows their API token and creates it on the first visit.
 `/api/library/` is built as the PRD's API table sets out:
 
 - **List:** goes through `filter_library()`, with the same parameters
-  and pages of 12.
+  and pages of 12. That includes `tag` (Phase 4 polish), which may
+  repeat.
 - **Create:** takes the provider and external_id, plus optional notes,
   rating and status. It reuses the local Asset or calls `fetch_record()`.
 - **Read and update:** read one entry, or update its notes, rating and
   status with PATCH or PUT. Asset fields are read-only.
 - **Delete:** its documentation says the entry is also removed from the
-  member's packs.
+  member's packs. The website's Remove (`catalog:remove`, Phase 4
+  polish) already deletes the same way.
 
 The owner serializer includes notes, rating and status.
 
@@ -550,6 +601,22 @@ Library cards get an "Add to pack" dropdown that also calls
 an HTMX confirm dialog that lists the packs the item will be removed
 from.
 
+> **Already in place (Phase 4 polish, 2026-11-05):**
+>
+> - Library cards and Discover results have an Add to pack corner button
+>   (`data-picker="pack-picker"`). It opens
+>   `catalog/partials/pack_picker.html`, which shows "You don't have any
+>   packs yet." and Go to Packs. Wire it up rather than adding a separate
+>   dropdown. Load the list of the member's own packs through HTMX when
+>   the picker opens, so it's always current, and make choosing one call
+>   `add_to_pack()`.
+> - On Discover, choosing a pack for a result that isn't in the library
+>   saves it first (`save_to_library()`, To review), then adds it. A
+>   `ProviderError` shows its message, and nothing is saved or added.
+> - The card's Remove (`catalog:remove`) uses the browser's confirm
+>   (`hx-confirm`). Replace that with the HTMX dialog that lists the packs
+>   the entry will leave.
+
 ### Acceptance criteria
 
 - [ ] Typing tags "Rocks, rock, 2048,  Mossy  Stones" stores the tags
@@ -574,6 +641,9 @@ from.
   SavedAssets.
 - [ ] The library card's "Add to pack" dropdown lists only the member's
   own packs.
+- [ ] Adding a Discover result to a pack saves it to the library first
+  when needed (To review) and reuses an existing entry untouched. A
+  `ProviderError` saves and adds nothing.
 
 ### Completion gate
 

@@ -200,8 +200,14 @@ def test_saving_swaps_the_button_for_in_library_and_updates_the_count(
     response = save(member_client)
     assert response.status_code == 200
     html = response.content.decode()
-    assert re.search(r'<a href="/library/" class="save-slot in-library"><i class="mark[^"]*"', html)
+    # A filled check in the card's corner. No logo mark: the corner sits on the thumbnail.
+    assert re.search(
+        r'<a href="/library/" class="save-slot in-library card-action is-on" '
+        r'aria-label="In library\. Open your library">\s*<svg',
+        html,
+    )
     assert "In library" in html
+    assert 'class="mark' not in html
     assert "Save to library" not in html
     # The status bar's count comes along out of band.
     assert '<span id="saved-count" class="ml-auto" hx-swap-oob="true">' in html
@@ -296,7 +302,7 @@ def shelf(client, page=None):
 
 def save_slots(html):
     """{external_id: the card's Save slot HTML}, for each result card."""
-    pattern = r'href="https://polyhaven\.com/a/(\w+)".*?<div class="result-actions">(.*?)</div>\n'
+    pattern = r'href="https://polyhaven\.com/a/(\w+)".*?<div class="card-actions">(.*?)</div>\n'
     return dict(re.findall(pattern, html, re.S))
 
 
@@ -338,17 +344,26 @@ def test_a_visitors_save_button_is_a_link_to_sign_in_and_back_to_discover(two_re
     back = quote("/discover/?type=texture&q=brick")
     assert slots
     for slot in slots.values():
-        assert f'<a class="save-slot save-button" href="/accounts/login/?next={back}"' in slot
-        assert "hx-post" not in slot
+        assert (
+            f'<a class="save-slot save-button card-action" href="/accounts/login/?next={back}"'
+            in slot
+        )
+        # Add to pack signs a visitor in too, and back to the same search.
+        assert f'<a class="card-action" href="/accounts/login/?next={back}"' in slot
+        assert "hx-post" not in slot and "data-picker" not in slot
 
 
 def test_the_in_library_badge_never_sits_on_a_thumbnail(
     two_results, make_asset, member, member_client
 ):
-    """The badge carries the logo mark, and the logo never goes on a provider's image."""
+    """The "In library" check sits in the card's corner, over the provider's image,
+    so it never carries the logo mark (PRD story 76)."""
     SavedAsset.objects.create(user=member, asset=make_asset(external_id="red_brick_03"))
     html = shelf(member_client)
     thumbs = re.findall(r'<div class="result-thumb">(.*?)</div>', html, re.S)
     assert thumbs
     for thumb in thumbs:
         assert "mark" not in thumb and "In library" not in thumb
+    slots = save_slots(html)
+    assert "In library" in slots["red_brick_03"]
+    assert all("mark" not in slot for slot in slots.values())

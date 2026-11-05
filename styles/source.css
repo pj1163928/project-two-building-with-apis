@@ -259,13 +259,19 @@
      whole card opens the provider's page; a sound's play button sits above it. */
   .result-card { position: relative; display: flex; flex-direction: column; height: 100%;
     background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line); transition: box-shadow 0.15s; }
-  html[data-pointer] .result-card:hover, .result-card:focus-within { box-shadow: inset 0 0 0 1px var(--color-fg-secondary); }
+  /* Keyboard focus, not a mouse click, keeps the edge lit (and the details open). */
+  html[data-pointer] .result-card:hover, .result-card:has(:focus-visible), .result-card[data-details="open"] {
+    box-shadow: inset 0 0 0 1px var(--color-fg-secondary); }
   .result-link::after { content: ""; position: absolute; inset: 0; z-index: 1; }
   .result-link:focus-visible { outline: none; }
   .result-card:has(.result-link:focus-visible) { box-shadow: inset 0 0 0 2px var(--color-ink); }
   .result-thumb { position: relative; display: grid; place-items: center; aspect-ratio: 4 / 3; overflow: hidden;
     background: var(--color-inset); }
   .result-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  /* A texture's thumbnail is a square tile: a square frame shows all of it, and
+     contain keeps any odd-shaped one whole too, never cropped top and bottom. */
+  .result-card[data-kind="texture"] .result-thumb { aspect-ratio: 1 / 1; }
+  .result-card[data-kind="texture"] .result-thumb img { object-fit: contain; }
   /* The type icon under the thumbnail: seen only when there is no image to cover it. */
   .result-fallback { opacity: 0.7; }
   /* Status bar: each provider's last known status, in monochrome only. */
@@ -285,30 +291,45 @@
   /* A long author list is cut with an ellipsis; the details panel shows it whole. */
   .result-author { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* Save to library: its own row at the card's foot (2.5rem: the button plus its
-     padding), above the stretched link. The details panel stops above the row,
-     so hovering a card never hides its button; a save error's longer message
-     hides the panel instead. Monochrome, inverting on hover like the chrome. */
-  .result-actions { position: relative; z-index: 3; margin-top: auto; padding: 0 0.75rem 0.75rem; }
-  .result-card:has(.result-actions) .result-details { bottom: 2.5rem; }
-  .result-card:has(.save-error) .result-details { display: none; }
-  .save-slot { display: grid; gap: 0.5rem; }
-  .save-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; width: 100%;
-    height: 1.75rem; font-size: 12px; color: var(--color-fg); box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  /* Card actions: small squares in the card's top-right corner, over the
+     thumbnail and above the stretched link. Discover: Save (or the "In library"
+     check), Add to pack, Details. Library: Add to pack, Details, Remove. Translucent until hovered, then inverted like the chrome.
+     The row lets the pointer through between its squares, so those clicks still
+     open the card's link. Forms inside it are display: contents, so a save
+     error's message can wrap onto its own line below the squares. */
+  .card-actions { position: absolute; top: 0.5rem; right: 0.5rem; left: 0.5rem; z-index: 3; display: flex;
+    flex-wrap: wrap; justify-content: flex-end; gap: 0.25rem; pointer-events: none; }
+  .card-actions > * { pointer-events: auto; }
+  .card-actions form { display: contents; }
+  .card-action { position: relative; display: grid; place-items: center; width: 1.75rem; height: 1.75rem;
+    color: var(--color-fg-strong); background: color-mix(in srgb, var(--color-app) 80%, transparent);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong); backdrop-filter: blur(6px);
     transition: color 0.15s, background-color 0.15s; }
-  html[data-pointer] .save-button:hover, .save-button:focus-visible { color: var(--color-on-ink);
+  html[data-pointer] .card-action:hover, .card-action:focus-visible { color: var(--color-on-ink);
     background: var(--color-ink); outline: none; }
-  .save-button:disabled { opacity: 0.6; cursor: progress; }
+  /* "In library" and a pinned Details stay inverted. */
+  .card-action.is-on, .card-action[aria-pressed="true"] { color: var(--color-on-ink); background: var(--color-ink); box-shadow: none; }
+  .card-action:disabled { cursor: progress; }
+  .card-actions .htmx-request .card-action, .card-actions .htmx-request.card-action { animation: shelf-pulse 1s ease-in-out infinite; }
+  /* Each square's name, in a small mono tip below it, after a short hover. */
+  .card-tip { position: absolute; top: calc(100% + 0.3rem); right: 0; padding: 0.25rem 0.4rem; white-space: nowrap;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1;
+    color: var(--color-on-ink); background: var(--color-ink); opacity: 0; transform: translateY(-0.2rem);
+    pointer-events: none; transition: opacity 0.15s, transform 0.15s; }
+  html[data-pointer] .card-action:hover .card-tip, .card-action:focus-visible .card-tip { opacity: 1; transform: none;
+    transition-delay: 0.2s; }
   .save-busy { display: none; }
   .save-slot.htmx-request .save-label { display: none; }
   .save-slot.htmx-request .save-busy { display: inline; }
-  /* "In library": a filled chip with the logo mark, linking to the library. */
-  .in-library { display: flex; align-items: center; justify-content: center; gap: 0.4rem; height: 1.75rem;
-    font-size: 12px; font-weight: 500; color: var(--color-fg-strong); background: var(--color-control);
-    transition: background-color 0.15s; }
-  html[data-pointer] .in-library:hover, .in-library:focus-visible { background: var(--color-control-hover); outline: none; }
-  .save-error-text { display: flex; gap: 0.4rem; font-size: 11.5px; line-height: 1.35; color: var(--color-fg-secondary); }
+  /* A failed save: Save becomes Try again (the alert icon in the error colour) and
+     the message sits on its own line under the squares. It hides the details. */
+  .card-action.is-error > svg { color: var(--color-error); }
+  html[data-pointer] .card-action.is-error:hover > svg, .card-action.is-error:focus-visible > svg { color: inherit; }
+  .save-error-text { order: 1; flex-basis: 100%; display: flex; gap: 0.4rem; padding: 0.5rem 0.6rem; font-size: 11.5px;
+    line-height: 1.35; color: var(--color-fg-secondary); background: var(--color-elevated);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong); }
   .save-error-text > svg { flex: none; margin-top: 1px; color: var(--color-error); }
+  .result-card:has(.save-error) .result-details { display: none; }
 
   /* Library cards: the result card's frame, with the type (its icon in the type
      colour), the title, and a row holding the status chip and the rating. */
@@ -320,19 +341,27 @@
   .status-chip[data-status="testing"] { color: var(--color-fg-strong); box-shadow: inset 0 0 0 1px var(--color-fg-secondary); }
   .status-chip[data-status="approved"] { color: var(--color-on-ink); background: var(--color-ink); box-shadow: none; }
   .status-chip[data-status="rejected"] { color: var(--color-fg-muted); text-decoration: line-through; }
-  .rating { display: flex; gap: 1px; color: var(--color-fg-muted); }
-  .rating .star { display: grid; }
-  .rating .is-on { color: var(--color-fg-strong); }
-  .rating .is-on svg { fill: currentColor; }
+  /* .star-rating, not .rating: DaisyUI's own .rating component paints every child as a
+     grey 24 px block, which hid these stars. */
+  .star-rating { display: flex; gap: 1px; color: var(--color-fg-muted); }
+  .star-rating .star { display: grid; }
+  .star-rating .is-on { color: var(--color-fg-strong); }
+  .star-rating .is-on svg { fill: currentColor; }
   .rating-none { font-size: 11.5px; color: var(--color-fg-muted); }
 
-  /* Hover or focus shows the card's full details, rising over the lower part of
-     the thumbnail. It ignores the pointer, so a click still opens the source. */
-  .result-details { position: absolute; inset: auto 0 0; z-index: 2; max-height: 88%; overflow: hidden;
+  /* Hover or keyboard focus shows the card's full details, rising over the lower
+     part of the thumbnail and stopping under the corner actions. It ignores the
+     pointer, so a click still opens the source. A mouse click leaves no
+     :focus-visible behind, so the panel goes once the pointer leaves, unless
+     Details keeps it open (data-details="open", static/js/card-actions.js). */
+  .result-details { position: absolute; inset: auto 0 0; z-index: 2; max-height: calc(100% - 2.75rem); overflow: hidden;
     display: grid; gap: 0.5rem; padding: 0.7rem 0.75rem 0.75rem; pointer-events: none;
     background: var(--color-elevated); box-shadow: inset 0 0 0 1px var(--color-fg-secondary);
     opacity: 0; transform: translateY(0.5rem); transition: opacity 0.18s, transform 0.18s; }
-  html[data-pointer] .result-card:hover .result-details, .result-card:focus-within .result-details { opacity: 1; transform: none; }
+  html[data-pointer] .result-card:hover .result-details, .result-card:has(:focus-visible) .result-details,
+  .result-card[data-details="open"] .result-details { opacity: 1; transform: none; }
+  /* Kept open, it takes the pointer, so a long tag list can scroll. */
+  .result-card[data-details="open"] .result-details { pointer-events: auto; overflow-y: auto; }
   .result-details-title { font-size: 13.5px; font-weight: 600; line-height: 1.3; color: var(--color-fg-strong);
     overflow-wrap: anywhere; }
   .result-details-list { display: grid; gap: 0.3rem; font-size: 11.5px; color: var(--color-fg-secondary); }
@@ -384,6 +413,32 @@
   html[data-pointer] .filter-chip:has(:checked):hover:not(:has(:disabled)) { color: var(--color-on-ink); background: var(--color-ink); }
   .filter-chip:has(:focus-visible) { outline: 2px solid var(--color-ink); outline-offset: 2px; }
   .filter-chip:has(:disabled) { color: var(--color-fg-muted); box-shadow: inset 0 0 0 1px var(--color-line); cursor: not-allowed; }
+  /* A tag chip's count: how many of the member's entries carry the tag. */
+  .filter-chip-count { margin-left: 0.4rem; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-fg-muted); }
+  .filter-chip:has(:checked) .filter-chip-count { color: inherit; opacity: 0.7; }
+
+  /* The pack picker: a square native <dialog> over a dimmed page, opened by a
+     card's Add to pack button. */
+  .picker-dialog { width: min(26rem, calc(100vw - 2rem)); margin: auto; padding: 0; color: var(--color-fg);
+    background: var(--color-panel); border: 1px solid var(--color-line-strong);
+    box-shadow: 0 24px 60px color-mix(in srgb, var(--color-shade) 50%, transparent); }
+  .picker-dialog::backdrop { background: color-mix(in srgb, var(--color-shade) 55%, transparent); }
+  .picker-panel { display: grid; }
+  .picker-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+    padding: 1.1rem 1.25rem 0.9rem; border-bottom: 1px solid var(--color-line); }
+  .picker-title { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; line-height: 1.3;
+    letter-spacing: -0.02em; color: var(--color-fg-strong); overflow-wrap: anywhere; }
+  .picker-close { display: grid; place-items: center; flex: none; width: 2rem; height: 2rem; color: var(--color-fg-secondary);
+    transition: color 0.15s, background-color 0.15s; }
+  html[data-pointer] .picker-close:hover, .picker-close:focus-visible { color: var(--color-on-ink); background: var(--color-ink); outline: none; }
+  .picker-body { display: grid; gap: 0.75rem; padding: 1rem 1.25rem; }
+  .picker-list { display: grid; gap: 0.25rem; }
+  .picker-empty { padding: 1rem; text-align: center; font-size: 13px; color: var(--color-fg-weak);
+    background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); }
+    background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); outline: none; }
+  .picker-note { display: flex; gap: 0.5rem; font-size: 12px; line-height: 1.45; color: var(--color-fg-weak); }
+  .picker-note > svg { flex: none; margin-top: 1px; }
+  .picker-foot { display: flex; justify-content: flex-end; padding: 0 1.25rem 1.1rem; }
 
   /* Sign-in and sign-up: one bordered container holding a plain form column
      and the branding panel, which sits on a soft monochrome radial glow. */
@@ -569,7 +624,8 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .type-tile-bar { transition: none; }
   .result-details, .sound-play { transition: none; }
   .result-card[data-sound="loading"] .sound-play { animation: none; }
-  .save-button, .in-library { transition: none; }
+  .card-action, .card-tip, .picker-close { transition: none; }
+  .card-actions .htmx-request .card-action, .card-actions .htmx-request.card-action { animation: none; }
 }
 
 /* ---------- Light mode ----------

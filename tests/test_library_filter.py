@@ -347,3 +347,94 @@ def test_the_url_holds_search_filters_sort_and_page_and_leaves_out_defaults(memb
     )
     assert result.previous_url == result.url.replace("&page=2", "")
     assert result.next_url == ""
+
+
+# ---------------------------------------------------------------- tags (Phase 4 polish)
+
+
+def _tag(entry, *names):
+    from catalog.models import Tag
+
+    entry.asset.tags.set(Tag.objects.from_names(names))
+    return entry
+
+
+def test_a_tag_filter_finds_entries_from_every_provider(member, save):
+    _tag(save(title="ACG Bricks", provider="ambientcg"), "brick", "red")
+    _tag(save(title="PH Bricks", provider="polyhaven"), "Bricks")
+    _tag(save(title="OV Brick Hit", provider="openverse", kind="sound"), "brick")
+    _tag(save(title="Wood"), "wood")
+    result = filter_library(member, {"tag": "brick"})
+    assert sorted(_titles(result)) == ["ACG Bricks", "OV Brick Hit", "PH Bricks"]
+
+
+def test_several_tags_need_every_one(member, save):
+    _tag(save(title="Red Brick"), "brick", "red")
+    _tag(save(title="Grey Brick"), "brick", "grey")
+    assert _titles(filter_library(member, {"tag": ["brick", "red"]})) == ["Red Brick"]
+    assert _titles(filter_library(member, {"tag": ["red", "grey"]})) == []
+
+
+def test_an_entry_is_listed_once_whatever_tags_and_search_match_it(member, save):
+    _tag(save(title="Brick Wall"), "brick", "brick wall", "red brick")
+    result = filter_library(member, {"tag": ["brick", "red brick"], "q": "brick"})
+    assert _titles(result) == ["Brick Wall"]
+
+
+def test_tag_values_are_tidied_like_tags_and_junk_is_dropped(member, save):
+    from catalog.library import MAX_TAG_FILTERS
+
+    _tag(save(title="Mossy"), "mossy stone")
+    result = filter_library(member, {"tag": ["  Mossy   Stones ", "2048", "", "mossy stone"]})
+    assert result.params.tags == ("mossy stone",)
+    assert _titles(result) == ["Mossy"]
+    # Only the first MAX_TAG_FILTERS values are read; the rest are ignored.
+    many = [f"tag {n}" for n in range(MAX_TAG_FILTERS)] + ["mossy stone"]
+    assert "mossy stone" not in filter_library(member, {"tag": many}).params.tags
+    # A tag nobody has finds nothing, rather than failing.
+    assert _titles(filter_library(member, {"tag": "planet"})) == []
+
+
+def test_a_tag_filter_never_reaches_another_members_entries(member, other, save):
+    mine = _tag(save(title="Mine"), "rock")
+    # The other member shares the same asset and has their own tagged one.
+    SavedAsset.objects.create(user=other, asset=mine.asset)
+    _tag(save(user=other, title="Theirs"), "rock", "secret")
+    assert _titles(filter_library(member, {"tag": "rock"})) == ["Mine"]
+    assert _titles(filter_library(member, {"tag": "secret"})) == []
+
+
+def test_the_url_holds_the_chosen_tags_a_to_z(member, save):
+    result = filter_library(member, {"tag": ["wood", "brick"], "type": "texture"})
+    assert result.params.is_filtered
+    assert result.url == "/library/?type=texture&tag=brick&tag=wood"
+
+
+def test_in_library_lists_only_the_members_tags_most_used_first(member, other, save):
+    from django.contrib.auth.models import AnonymousUser
+
+    from catalog.models import Tag
+
+    _tag(save(title="A", provider="ambientcg"), "brick", "red")
+    _tag(save(title="B", provider="openverse", kind="sound"), "brick", "loud")
+    _tag(save(user=other, title="C"), "brick", "secret")
+    tags = Tag.objects.in_library(member)
+    # Counts only the member's own entries; ties go A–Z.
+    assert [(tag.name, tag.uses) for tag in tags] == [("brick", 2), ("loud", 1), ("red", 1)]
+    assert not Tag.objects.in_library(AnonymousUser()).exists()
+
+
+def test_the_tag_chips_show_the_most_used_and_keep_a_chosen_one_beyond_them():
+    from types import SimpleNamespace
+
+    from catalog.library import TAG_CHIP_LIMIT, clean_library_params, filter_groups
+
+    tags = [SimpleNamespace(name=f"tag {n:02}", uses=50 - n) for n in range(TAG_CHIP_LIMIT + 5)]
+    chosen = f"tag {TAG_CHIP_LIMIT + 3:02}"
+    groups = filter_groups(clean_library_params({"tag": chosen}), tags)
+    [group] = [group for group in groups if group.name == "tag"]
+    assert group.title == "Tags" and group.multiple
+    names = [chip.value for chip in group.chips]
+    assert names == [f"tag {n:02}" for n in range(TAG_CHIP_LIMIT)] + [chosen]
+    assert [chip.value for chip in group.chips if chip.checked] == [chosen]
+    assert group.chips[0].count == 50

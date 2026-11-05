@@ -34,6 +34,15 @@ Phase 4 rules:
 - No search, filter, sort or page parameter on the page or its fragment
   shows another member's entries. (filter_library()'s own rule is in
   test_library_filter.py.)
+
+Phase 4 polish rules (Remove, tags):
+- Removing an entry needs sign-in: a visitor is sent to sign-in and back to
+  the library (an HTMX remove redirects the whole window), and nothing is
+  removed.
+- Another member's entry, or one that doesn't exist, is a 404, and stays.
+- Removing needs a valid CSRF token; the header base.html sends is enough.
+- The tag filter and the side panel's tag chips never show another
+  member's entries or tags.
 """
 
 import re
@@ -400,3 +409,78 @@ def test_library_parameters_never_show_another_members_entries(
         html = member_client.get(reverse("catalog:library") + query, headers=headers)
         html = html.content.decode()
         assert "Their Secret Brick" not in html and "secret note" not in html, query
+
+
+# ---------------------------------------------------------------- Remove and tags (Phase 4 polish)
+
+
+@pytest.fixture
+def mine(member, make_asset):
+    from catalog.models import SavedAsset
+
+    return SavedAsset.objects.create(user=member, asset=make_asset(external_id="mine"))
+
+
+def test_a_visitors_remove_is_sent_to_sign_in_and_back_to_the_library(client, mine):
+    from catalog.models import SavedAsset
+
+    url = reverse("catalog:remove", args=[mine.pk])
+    response = client.post(url)
+    assert response.status_code == 302
+    assert response.url == login_url_for(reverse("catalog:library"))
+    htmx = client.post(url, headers={"HX-Request": "true"})
+    assert htmx["HX-Redirect"] == login_url_for(reverse("catalog:library"))
+    assert SavedAsset.objects.filter(pk=mine.pk).exists()
+
+
+def test_removing_another_members_entry_is_a_404_and_it_stays(
+    member_client, make_asset, django_user_model, password
+):
+    from catalog.models import SavedAsset
+
+    other = django_user_model.objects.create_user("other_member", password=password)
+    theirs = SavedAsset.objects.create(user=other, asset=make_asset(external_id="theirs"))
+    for headers in ({}, {"HX-Request": "true"}):
+        response = member_client.post(reverse("catalog:remove", args=[theirs.pk]), headers=headers)
+        assert response.status_code == 404
+    assert SavedAsset.objects.filter(pk=theirs.pk).exists()
+    assert member_client.post(reverse("catalog:remove", args=[99999])).status_code == 404
+
+
+def test_removing_rejects_a_post_without_a_csrf_token(csrf_client, member, mine):
+    from catalog.models import SavedAsset
+
+    csrf_client.force_login(member)
+    url = reverse("catalog:remove", args=[mine.pk])
+    assert csrf_client.post(url, headers={"HX-Request": "true"}).status_code == 403
+    assert SavedAsset.objects.filter(pk=mine.pk).exists()
+
+
+def test_removing_succeeds_with_the_pages_csrf_header(csrf_client, member, mine):
+    from catalog.models import SavedAsset
+
+    csrf_client.force_login(member)
+    page = csrf_client.get(reverse("catalog:library")).content.decode()
+    token = re.search(r"hx-headers='\{\"X-CSRFToken\": \"([^\"]+)\"\}'", page).group(1)
+    response = csrf_client.post(
+        reverse("catalog:remove", args=[mine.pk]),
+        headers={"HX-Request": "true", "X-CSRFToken": token},
+    )
+    assert response.status_code == 200
+    assert not SavedAsset.objects.filter(pk=mine.pk).exists()
+
+
+def test_tags_never_show_another_members_entries_or_tags(
+    member_client, mine, make_asset, django_user_model, password
+):
+    from catalog.models import SavedAsset, Tag
+
+    mine.asset.tags.set(Tag.objects.from_names(["brick"]))
+    other = django_user_model.objects.create_user("other_member", password=password)
+    theirs = make_asset(external_id="theirs", title="Their Secret Brick")
+    theirs.tags.set(Tag.objects.from_names(["brick", "classified"]))
+    SavedAsset.objects.create(user=other, asset=theirs)
+    for query in ("?tag=brick", "?tag=classified", "?tag=brick&tag=classified"):
+        html = member_client.get(reverse("catalog:library") + query).content.decode()
+        assert "Their Secret Brick" not in html, query
+        assert 'value="classified"' not in html.split('id="library-filters"', 1)[1], query

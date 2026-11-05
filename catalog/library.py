@@ -7,7 +7,7 @@ SavedAsset. Browsing is filter_library(), shared by the library page and
 the API.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import urlencode
@@ -19,7 +19,8 @@ from django.urls import reverse
 from providers import KINDS, PROVIDERS_BY_KEY
 
 from .discover import KIND_TILES, clean_query
-from .models import LIBRARY_SORTS, PROVIDER_CHOICES, Asset, SavedAsset
+from .models import LIBRARY_SORTS, PROVIDER_CHOICES, Asset, SavedAsset, Tag
+from .tags import normalize_tag
 
 
 class UnknownProviderError(LookupError):
@@ -63,6 +64,10 @@ PAGE_SIZE = 12
 DEFAULT_SORT = "newest"
 # The minimum-rating filter's values, as they arrive in the query string.
 MIN_RATINGS = ("1", "2", "3", "4", "5")
+# The side panel shows this many of the member's most used tags (plus any chosen).
+TAG_CHIP_LIMIT = 24
+# Only this many tag filters are read from one query string.
+MAX_TAG_FILTERS = 10
 # The sort select's options, in the PRD's order; the keys are LIBRARY_SORTS'.
 SORT_LABELS = {
     "newest": "Newest saved",
@@ -80,6 +85,7 @@ class LibraryParams:
     types: tuple[str, ...] = ()
     providers: tuple[str, ...] = ()
     statuses: tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
     min_rating: int | None = None
     sort: str = DEFAULT_SORT
     page: int = 1
@@ -87,7 +93,9 @@ class LibraryParams:
     @property
     def is_filtered(self) -> bool:
         """Whether a search or any filter narrows the library."""
-        return bool(self.q or self.types or self.providers or self.statuses or self.min_rating)
+        return bool(
+            self.q or self.types or self.providers or self.statuses or self.tags or self.min_rating
+        )
 
     def url(self, page: int | None = None) -> str:
         """The library URL for these parameters (or for another `page` of them).
@@ -99,6 +107,7 @@ class LibraryParams:
         pairs += [("type", value) for value in self.types]
         pairs += [("provider", value) for value in self.providers]
         pairs += [("status", value) for value in self.statuses]
+        pairs += [("tag", value) for value in self.tags]
         if self.min_rating:
             pairs.append(("min_rating", self.min_rating))
         if self.sort != DEFAULT_SORT:
@@ -134,6 +143,7 @@ class FilterChip:
     value: str
     label: str
     checked: bool
+    count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -147,8 +157,13 @@ class FilterGroup:
     chips: list[FilterChip]
 
 
-def filter_groups(params: LibraryParams) -> list[FilterGroup]:
-    """The side panel's filter chips, each checked to match `params`."""
+def filter_groups(params: LibraryParams, tags: Iterable[Tag] = ()) -> list[FilterGroup]:
+    """The side panel's filter chips, each checked to match `params`.
+
+    `tags` are the member's own tags, most used first, each with its `uses`
+    (Tag.objects.in_library). The Tags group shows the first TAG_CHIP_LIMIT,
+    plus any chosen tag beyond those, so a chosen chip never disappears.
+    """
 
     def chips(options, chosen):
         return [FilterChip(value, label, value in chosen) for value, label in options]
@@ -164,7 +179,14 @@ def filter_groups(params: LibraryParams) -> list[FilterGroup]:
         FilterGroup("provider", "Provider", True, chips(PROVIDER_CHOICES, params.providers)),
         FilterGroup("status", "Status", True, chips(SavedAsset.Status.choices, params.statuses)),
         FilterGroup("min_rating", "Minimum rating", False, chips(ratings, (rating,))),
+        FilterGroup("tag", "Tags", True, _tag_chips(tags, params.tags)),
     ]
+
+
+def _tag_chips(tags: Iterable[Tag], chosen: tuple[str, ...]) -> list[FilterChip]:
+    tags = list(tags)
+    shown = tags[:TAG_CHIP_LIMIT] + [tag for tag in tags[TAG_CHIP_LIMIT:] if tag.name in chosen]
+    return [FilterChip(tag.name, tag.name, tag.name in chosen, tag.uses) for tag in shown]
 
 
 def _values(params: Mapping[str, Any], name: str) -> list[str]:
@@ -192,6 +214,7 @@ def clean_library_params(params: Mapping[str, Any]) -> LibraryParams:
         types=_known(_values(params, "type"), KINDS),
         providers=_known(_values(params, "provider"), PROVIDERS_BY_KEY),
         statuses=_known(_values(params, "status"), SavedAsset.Status.values),
+        tags=_tags(_values(params, "tag")),
         min_rating=int(rating) if rating in MIN_RATINGS else None,
         sort=sort if sort in LIBRARY_SORTS else DEFAULT_SORT,
         page=_page_number(page),
@@ -206,6 +229,13 @@ def _page_number(raw: str) -> int:
     return 1
 
 
+def _tags(given: list[str]) -> tuple[str, ...]:
+    """The given tag names through normalize_tag(), once each, A–Z. Names that
+    normalize to nothing are dropped, and only the first MAX_TAG_FILTERS are read."""
+    names = {normalize_tag(value) for value in given[:MAX_TAG_FILTERS]} - {None}
+    return tuple(sorted(names))
+
+
 def _known(given: list[str], allowed) -> tuple[str, ...]:
     """The allowed values among `given`, once each, in `allowed`'s order."""
     return tuple(value for value in allowed if value in given)
@@ -215,14 +245,17 @@ def filter_library(user, params: Mapping[str, Any]) -> LibraryPage:
     """One page of `user`'s library for the library's query parameters.
 
     The page and the API both use it. It searches the title, tags and notes
-    (q), filters by type, provider, status and min_rating, sorts by one of
-    LIBRARY_SORTS and pages by PAGE_SIZE. Bad values fall back to the
+    (q), filters by type, provider, status, tag (every chosen tag, whichever
+    provider it came from) and min_rating, sorts by one of LIBRARY_SORTS and
+    pages by PAGE_SIZE. Bad values fall back to the
     defaults (see clean_library_params), and a page past the end is the last
     page. Only `user`'s own entries are ever returned, and none for a
     signed-out visitor.
     """
     cleaned = clean_library_params(params)
-    entries = SavedAsset.objects.for_user(user).select_related("asset")
+    entries = (
+        SavedAsset.objects.for_user(user).select_related("asset").prefetch_related("asset__tags")
+    )
     if cleaned.q:
         entries = entries.search(cleaned.q)
     if cleaned.types:
@@ -231,6 +264,8 @@ def filter_library(user, params: Mapping[str, Any]) -> LibraryPage:
         entries = entries.filter(asset__provider__in=cleaned.providers)
     if cleaned.statuses:
         entries = entries.filter(status__in=cleaned.statuses)
+    if cleaned.tags:
+        entries = entries.tagged(cleaned.tags)
     if cleaned.min_rating:
         entries = entries.filter(rating__gte=cleaned.min_rating)
     page = Paginator(entries.sorted_by(cleaned.sort), PAGE_SIZE).get_page(cleaned.page)

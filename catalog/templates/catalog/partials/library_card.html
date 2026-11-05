@@ -2,9 +2,11 @@
 {# every provider down. The thumbnail is the provider's URL (linked, never copied),    #}
 {# over the type icon that shows when it's missing or broken. The type's icon takes    #}
 {# its type colour, because it shows the asset's type. The title opens the provider's  #}
-{# page until the drawer arrives (Phase 5).                                             #}
+{# page until the drawer arrives (Phase 5). The corner actions: Add to pack (its       #}
+{# picker is the interface only until Phase 7), Details and Remove.                    #}
+{# The details panel works as on Discover, with the asset's tags from its provider.    #}
 {% with asset=entry.asset %}{% with tile=asset.tile %}
-<li class="result-card library-card" id="entry-{{ entry.pk }}">
+<li class="result-card library-card" id="entry-{{ entry.pk }}" data-kind="{{ asset.kind }}">
   <div class="result-thumb">
     <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=28 %}</span>
     {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
@@ -15,11 +17,21 @@
     <div class="library-meta">
       <span class="status-chip micro" data-status="{{ entry.status }}">{{ entry.get_status_display }}</span>
       {% if entry.rating %}
-        <span class="rating" role="img" aria-label="Rated {{ entry.rating }} out of 5">{% for on in entry.stars %}<span class="star{% if on %} is-on{% endif %}">{% include "partials/icon.html" with name="star" size=12 %}</span>{% endfor %}</span>
+        <span class="star-rating" role="img" aria-label="Rated {{ entry.rating }} out of 5">{% for on in entry.stars %}<span class="star{% if on %} is-on{% endif %}">{% include "partials/icon.html" with name="star" size=12 %}</span>{% endfor %}</span>
       {% else %}
         <span class="rating-none">Not rated</span>
       {% endif %}
     </div>
+  </div>
+  <div class="card-actions">{% include "catalog/partials/pack_button.html" with title=asset.title %}{% include "catalog/partials/details_button.html" with title=asset.title %}{% include "catalog/partials/remove_button.html" %}</div>
+  <div class="result-details" aria-hidden="true">
+    <p class="result-details-title">{{ asset.title }}</p>
+    <dl class="result-details-list">
+      {% if asset.author %}<div><dt class="micro">By</dt><dd>{{ asset.author }}</dd></div>{% endif %}
+      <div><dt class="micro">License</dt><dd>{{ asset.license }}</dd></div>
+      <div><dt class="micro">From</dt><dd>{{ asset.get_provider_display }}</dd></div>
+      {% with tags=asset.tags.all %}{% if tags %}<div><dt class="micro">Tags</dt><dd>{{ tags|join:", " }}</dd></div>{% endif %}{% endwith %}
+    </dl>
   </div>
 </li>
 {% endwith %}{% endwith %}

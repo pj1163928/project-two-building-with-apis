@@ -174,7 +174,9 @@ def entries(make_asset, member):
 
 
 def _cards(html):
-    return re.findall(r'<li class="result-card library-card" id="entry-\d+">.*?</li>', html, re.S)
+    return re.findall(
+        r'<li class="result-card library-card" id="entry-\d+" data-kind="\w+">.*?</li>', html, re.S
+    )
 
 
 def test_the_grid_shows_each_entry_newest_saved_first(entries, member_client):
@@ -430,3 +432,155 @@ def test_a_search_is_shown_escaped(entries, member_client):
     html = member_client.get("/library/?q=<script>x</script>").content.decode()
     assert "<script>x</script>" not in html
     assert "&lt;script&gt;x&lt;/script&gt;" in html
+
+
+# ---------------------------------------------------------------- tags, card actions, Remove (Phase 4 polish)
+
+
+def test_an_empty_library_explains_the_tags_group(library_html):
+    filters = library_html.split('id="library-filters"', 1)[1].split("</section>", 1)[0]
+    assert '<div class="filter-group" role="group" aria-label="Tags">' in filters
+    assert "The tags on your saved assets, from every provider, show here." in filters
+
+
+def test_the_side_panel_offers_the_members_own_tags_with_their_counts(
+    entries, member_client, make_asset, django_user_model, password
+):
+    from catalog.models import SavedAsset, Tag
+
+    brick, sunset, footsteps = entries
+    brick.asset.tags.set(Tag.objects.from_names(["brick", "red"]))
+    sunset.asset.tags.set(Tag.objects.from_names(["sky", "red"]))
+    footsteps.asset.tags.set(Tag.objects.from_names(["footsteps"]))
+    other = django_user_model.objects.create_user("other_member", password=password)
+    theirs = make_asset(external_id="theirs")
+    theirs.tags.set(Tag.objects.from_names(["secret"]))
+    SavedAsset.objects.create(user=other, asset=theirs)
+
+    html = member_client.get(reverse("catalog:library") + "?tag=sky").content.decode()
+    filters = html.split('id="library-filters"', 1)[1].split("</section>", 1)[0]
+    chips = re.findall(
+        r'form="library-toolbar" name="tag" value="([^"]+)"( checked)?><span>[^<]+</span>'
+        r'<span class="filter-chip-count">(\d+)</span>',
+        filters,
+    )
+    # Most used first, then A–Z; tags from every provider, never another member's.
+    assert chips == [
+        ("red", "", "2"),
+        ("brick", "", "1"),
+        ("footstep", "", "1"),
+        ("sky", " checked", "1"),
+    ]
+    assert "secret" not in filters
+    assert _titles(_content(html)) == ["Sunset Sky"]
+
+
+def test_each_library_card_has_its_corner_actions_and_full_details(entries, member_client):
+    from catalog.models import Tag
+
+    brick = entries[0]
+    brick.asset.tags.set(Tag.objects.from_names(["red", "brick"]))
+    content = _content(member_client.get(reverse("catalog:library")).content.decode())
+    card = _cards(content)[-1]
+    assert 'data-kind="texture"' in card
+    actions = re.search(r'<div class="card-actions">(.*?)</div>\n', card, re.S).group(1)
+    tips = re.findall(r'<span class="card-tip" aria-hidden="true">([^<]+)</span>', actions)
+    assert tips == ["Add to pack", "Details", "Remove"]
+    assert 'data-picker="pack-picker" data-picker-asset="Red Brick 03"' in actions
+    remove = reverse("catalog:remove", args=[brick.pk])
+    assert (
+        f'<form class="card-action-form" method="post" action="{remove}" hx-post="{remove}" '
+        'hx-target="#library-results" hx-swap="outerHTML" '
+        'hx-confirm="Remove “Red Brick 03” from your library?"'
+    ) in actions
+    assert 'name="csrfmiddlewaretoken"' in actions
+    assert "mark" not in actions
+    # The details panel: as on Discover, with the asset's stored tags.
+    details = re.search(r'<div class="result-details" aria-hidden="true">(.*?)</dl>', card, re.S)
+    text = " ".join(re.sub(r"<[^>]+>", " ", details.group(1)).split())
+    assert text == "Red Brick 03 By Rob Tuytel License CC0 From Poly Haven Tags brick, red"
+    # The pack picker the button opens, once. The interface only until Phase 7.
+    assert content.count('<dialog id="pack-picker" class="picker-dialog"') == 1
+    assert "You don't have any packs yet." in content
+    assert "collection" not in content.lower()
+
+
+def _remove(client, entry, current="http://testserver/library/", htmx=True):
+    headers = {"HX-Request": "true", "HX-Current-URL": current} if htmx else {}
+    return client.post(reverse("catalog:remove", args=[entry.pk]), headers=headers)
+
+
+def test_remove_deletes_the_entry_and_keeps_the_shared_asset(entries, member_client):
+    from catalog.models import Asset, SavedAsset
+
+    response = _remove(member_client, entries[0])
+    assert response.status_code == 200
+    assert not SavedAsset.objects.filter(pk=entries[0].pk).exists()
+    assert Asset.objects.filter(pk=entries[0].asset_id).exists()
+    # The results come back without the card, the count and the status bar in step.
+    html = response.content.decode()
+    assert html.strip().startswith('<div id="library-results"')
+    assert _titles(html) == ["Footsteps", "Sunset Sky"]
+    assert "1–2 of 2 entries" in html
+    assert '<span id="saved-count" class="ml-auto" hx-swap-oob="true">' in html
+    assert '<b class="text-fg-strong">2</b> saved' in html
+    assert response["HX-Replace-Url"] == "/library/"
+
+
+def test_remove_returns_the_view_the_member_was_on(many, member_client):
+    from catalog.models import SavedAsset
+
+    sky = SavedAsset.objects.get(asset__external_id="sky")
+    response = _remove(member_client, sky, "http://testserver/library/?sort=title&page=2")
+    assert _titles(response.content.decode()) == ["Brick 12", "Brick 13"]
+    assert response["HX-Replace-Url"] == "/library/?sort=title&page=2"
+
+
+def test_removing_the_only_entry_on_the_last_page_falls_back_a_page(many, member_client):
+    from catalog.models import SavedAsset
+
+    view = "http://testserver/library/?q=brick&sort=title&page=2"
+    for title in ("Brick 12", "Brick 13"):
+        response = _remove(member_client, SavedAsset.objects.get(asset__title=title), view)
+    html = response.content.decode()
+    assert len(_cards(html)) == 12 and 'id="library-pager"' not in html
+    assert response["HX-Replace-Url"] == "/library/?q=brick&sort=title"
+
+
+def test_removing_from_another_page_returns_the_whole_library(entries, member_client):
+    response = _remove(member_client, entries[0], "http://testserver/discover/?type=sound")
+    assert _titles(response.content.decode()) == ["Footsteps", "Sunset Sky"]
+    assert response["HX-Replace-Url"] == "/library/"
+
+
+def test_removing_the_last_entry_shows_the_empty_library(make_asset, member, member_client):
+    from catalog.models import SavedAsset
+
+    only = SavedAsset.objects.create(user=member, asset=make_asset())
+    html = _remove(member_client, only).content.decode()
+    assert "Your library is empty." in html
+    assert '<b class="text-fg-strong">0</b> saved' in html
+
+
+def test_remove_without_htmx_returns_to_the_library(entries, member_client):
+    from catalog.models import SavedAsset
+
+    response = _remove(member_client, entries[0], htmx=False)
+    assert response.status_code == 302
+    assert response.url == reverse("catalog:library")
+    assert SavedAsset.objects.count() == 2
+
+
+def test_remove_is_post_only(entries, member_client):
+    from catalog.models import SavedAsset
+
+    response = member_client.get(reverse("catalog:remove", args=[entries[0].pk]))
+    assert response.status_code == 405
+    assert SavedAsset.objects.count() == 3
+
+
+def test_the_stars_avoid_daisyuis_rating_component(entries, member_client):
+    """DaisyUI's .rating paints every child as a grey block, which hid the stars."""
+    html = _content(member_client.get(reverse("catalog:library")).content.decode())
+    assert '<span class="star-rating" role="img" aria-label="Rated 3 out of 5">' in html
+    assert 'class="rating"' not in html

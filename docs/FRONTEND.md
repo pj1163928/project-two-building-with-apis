@@ -122,8 +122,11 @@ this only matters on a full load or refresh.
   image URLs come from `{% static %}` through `--mark-url` and `--word-url`
   on `<html>`.
 - The ghost mark is the empty state in `partials/empty_state.html`.
-- The "In library" badge carries a small `.mark`. It sits in the card's
-  Save row, never on the thumbnail.
+- "In library" used to be a badge with a small `.mark` in a Save row at the
+  card's foot. Since the Phase 4 polish (2026-11-05) Save lives in the
+  card's top-right corner, over the thumbnail, so "In library" is a filled
+  check there and carries **no** mark (the logo never sits on a provider's
+  image).
 - **Never** put the logo on a provider thumbnail.
 
 ## The shell (`templates/base.html`)
@@ -284,8 +287,8 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
 - **Scripts:** every script loads once, in `base.html`'s `<head>`, for
   every page. A swap doesn't run a new page's `<head>`, so there's no
   per-page scripts block. Scripts listen on the `document` (delegation)
-  rather than binding to elements a swap replaces, as `shell.js` and
-  `password-toggle.js` do.
+  rather than binding to elements a swap replaces, as `shell.js`,
+  `password-toggle.js`, `sound-preview.js` and `card-actions.js` do.
 - **Preserved:** the title-bar logo link (`#brand-link`) is
   `hx-preserve`, so it isn't rebuilt on each swap. A rebuilt image left a
   blank frame with the chips sliding left. Its `<img>` also has
@@ -373,7 +376,11 @@ library is empty.
 - `#library-filters` sits in the side panel, below the usual rows,
   because the PRD puts the filters there. It has `.filter-group`s of
   square `.filter-chip`s: Type, Provider and Status are checkboxes (any
-  number on), and Minimum rating is a radio group (Any, 1+ … 5). Each chip
+  number on), and Minimum rating is a radio group (Any, 1+ … 5). Tags
+  (Phase 4 polish) are checkboxes too, one per tag on the member's saved
+  assets from every provider, most used first, each with its count
+  (`.filter-chip-count`); an entry needs every chosen tag. With no tags
+  yet, the group says where they'll come from. Each chip
   is a `<label>` around a `sr-only` input, so it works with the keyboard
   (a focus ring on the chip), and a chip that's on is inverted (ink). The
   inputs carry `form="library-toolbar"`, so they belong to the toolbar's
@@ -403,8 +410,10 @@ library is empty.
   box and chips reset too. A swap of only the results would leave them
   set.
 
-**Library cards** (`<li class="result-card library-card" id="entry-<pk>">`)
-reuse the result card's frame, thumbnail and stretched title link:
+**Library cards** (`<li class="result-card library-card" id="entry-<pk>"
+data-kind="<kind>">`) reuse the result card's frame, thumbnail (square for
+textures), stretched title link, corner actions and details panel (see
+"Result cards"):
 
 - the provider's thumbnail over the type icon, as on Discover
 - the type: its icon in the type colour, then the singular label in mono
@@ -412,8 +421,33 @@ reuse the result card's frame, thumbnail and stretched title link:
 - the title, which opens the provider's page until Phase 5's drawer
 - a `.library-meta` row: a monochrome `.status-chip` (`data-status`;
   Approved is inverted, Rejected struck through) and five star icons
-  (`.rating`, filled with `.is-on`, `role="img"` with "Rated N out of 5"),
-  or "Not rated"
+  (`.star-rating`, filled with `.is-on`, `role="img"` with "Rated N out of 5"),
+  or "Not rated". Never call it `.rating`: that's DaisyUI's rating
+  component, whose `.rating *` rule painted each star as a grey 24 px block
+  (fixed 2026-11-05).
+- **Corner actions:** Add to pack, Details and Remove.
+  - Add to pack opens the page's pack picker. It's the interface only
+    until Phase 7 builds packs.
+  - Remove (`catalog/partials/remove_button.html`) is a POST form with the
+    browser's confirm (`hx-confirm`). It swaps `#library-results` for the
+    same view, and the saved count follows out of band. Phase 7 replaces
+    the confirm with a dialog listing the packs the entry leaves.
+- **Details:** the provider's name and the asset's stored tags.
+
+**Pack picker** (`catalog/partials/pack_picker.html`): one native
+`<dialog id="pack-picker" class="picker-dialog">` on the library and on a
+member's Discover page.
+- A card's Add to pack button (`catalog/partials/pack_button.html`)
+  carries `data-picker="pack-picker"` and `data-picker-asset="<title>"`.
+  `static/js/card-actions.js` writes the title into the dialog and calls
+  `showModal()`.
+- It's square, on the panel colour, over a `shade` backdrop. A backdrop
+  click, Close, the × button or Escape shuts it. The × and Close submit a
+  `method="dialog"` form, which htmx's boost leaves alone.
+- For now it shows "You don't have any packs yet.", Go to Packs, and a
+  note that packs are on the way. Phase 7 fills the list. Collections were
+  tried the same day and dropped at the user's request: everything
+  centres on packs.
 
 ## Home hero
 
@@ -488,39 +522,63 @@ The shelf header shows a number (`01`), the provider's name, a rule, and
   A failed page leaves the cards already shown in place.
 
 **Result cards** (`catalog/partials/result_card.html`) are `<li
-class="result-card">`s:
+class="result-card" data-kind="<kind>">`s:
 
 - **Whole-card link:** the title's `.result-link` opens the provider's page
   in a new tab, and its `::after` is stretched over the card, so the whole
-  card is clickable. Interactive parts (the play button) sit above it with
-  a higher `z-index`. Keyboard focus on the link draws a 2 px ink ring on
-  the card.
+  card is clickable. Interactive parts (the play button, the corner
+  actions) sit above it with a higher `z-index`. Keyboard focus on the link
+  draws a 2 px ink ring on the card.
 - **Thumbnail:** the provider's URL (`referrerpolicy="no-referrer"`, never
-  the logo) over the type-icon fallback.
+  the logo) over the type-icon fallback. The frame is 4:3 with
+  `object-fit: cover`, except for textures (`data-kind="texture"`). Their
+  thumbnails are square tiles, which 4:3 cut off at the top and bottom, so
+  a texture's frame is square with `object-fit: contain`, showing the whole
+  tile (user request, 2026-11-05).
 - **Author:** `.result-author` is cut with an ellipsis. `.result-body`'s
   column is `minmax(0, 1fr)`; without it, the column grows to fit a long
   author list and the line runs out of the card. That happened with Poly
   Haven's multi-author textures.
-- **Details on hover:** `.result-details` (`aria-hidden`, because the card
-  already holds the same text) rises over the lower thumbnail on hover
-  (behind the hover gate) or `:focus-within`. It shows the full title,
-  author, license, source and the first six tags. It has
-  `pointer-events: none`, so a click still opens the source.
-- **Save to library:** every card ends with a `.result-actions` row
-  (`catalog/partials/save_button.html`), above the stretched link
-  (`z-index: 3`). The card is a flex column, so the row sits at its foot,
-  and `.result-details` stops 2.5 rem short so hovering never hides it.
+- **Corner actions** (`.card-actions`, Phase 4 polish, 2026-11-05): small
+  translucent squares (`.card-action`, 1.75 rem) in the card's top-right
+  corner, above the stretched link (`z-index: 3`).
+  - On Discover they are Save, Add to pack and Details. Library
+    cards have their own set (see "Library cards").
+  - Each inverts on hover, like the chrome, and has a mono `.card-tip`
+    label below it after 0.2 s.
+  - The row lets the pointer through between its squares. Forms inside it
+    are `display: contents`, so a save error's message can wrap onto its
+    own line.
+  - They replaced the full-width "Save to library" row at the card's foot,
+    which the user found in the way.
+- **Details:** `.result-details` (`aria-hidden`, because the card already
+  holds the same text) rises over the lower thumbnail and stops under the
+  corner row. It shows the full title, author, license, source and every
+  tag. It has `pointer-events: none`, so a click still opens the source.
+  - It shows on hover (behind the hover gate) or on keyboard focus inside
+    the card (`:has(:focus-visible)`).
+  - It used to show on `:focus-within`, so it stayed up after a mouse
+    click on the card or Save. A mouse click leaves no `:focus-visible`, so
+    now it goes once the pointer leaves.
+  - **Details** (`data-card-details`, `aria-pressed`) keeps it open
+    (`data-details="open"` on the card, set by `static/js/card-actions.js`)
+    until it's pressed again or Escape is pressed. Kept open, it takes the
+    pointer, so a long tag list scrolls.
+- **Save to library** (`catalog/partials/save_button.html`), the first
+  corner square:
   - A member gets a `<form class="save-slot">` that `hx-post`s the
     provider and ID to `catalog:save` and swaps itself (`outerHTML`) for
-    the reply. "Saving…" shows while it runs.
-  - The reply is the "In library" badge (`in_library.html`: a filled chip
-    with the mark, linking to the library) plus the saved count out of
-    band. On a `ProviderError` it's `save_error.html`: the message
-    (`role="alert"`, the error colour on its icon only) and Try again,
-    which posts the same save. That also hides the hover details.
-  - A result the member already has renders the badge straight away.
+    the reply. The square pulses while it runs.
+  - The reply is the "In library" square (`in_library.html`: a filled
+    check, no logo mark, linking to the library) plus the saved count out
+    of band.
+  - On a `ProviderError` the reply is `save_error.html`. The square
+    becomes Try again (the alert icon in the error colour), which posts the
+    same save. The message (`role="alert"`) drops onto its own line under
+    the squares, and the hover details are hidden.
+  - A result the member already has renders "In library" straight away.
   - A visitor gets a link to sign in, with `next` set to this Discover
-    search.
+    search. So does Add to pack.
 - **Sound preview:** a card with a `preview_url` gets a square ink
   `.sound-play` button at the thumbnail's top left, and a 2 px
   `.sound-progress` line along its foot. `static/js/sound-preview.js`

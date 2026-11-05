@@ -15,4 +15,6 @@ urlpatterns = [
     path("library/", views.LibraryView.as_view(), name="library"),
     # POST only: saves one provider asset (provider, external_id) to the member's library.
     path("library/save/", views.SaveAssetView.as_view(), name="save"),
+    # POST only: removes one of the member's own entries (the shared Asset stays).
+    path("library/<int:pk>/remove/", views.RemoveFromLibraryView.as_view(), name="remove"),
 ]

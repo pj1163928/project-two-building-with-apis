@@ -293,7 +293,7 @@ def fetch_shelf(client, kind, provider, query="brick"):
 
 
 def cards(html):
-    return re.findall(r'<li class="result-card">.*?</li>', html, re.S)
+    return re.findall(r'<li class="result-card" data-kind="\w+">.*?</li>', html, re.S)
 
 
 def test_a_normal_shelf_shows_thumbnail_title_author_and_license(client, monkeypatch):
@@ -816,14 +816,74 @@ def test_hovering_a_card_shows_its_full_details(client, monkeypatch):
         ".result-author { min-width: 0; overflow: hidden; text-overflow: ellipsis; "
         "white-space: nowrap; }"
     ) in css
-    # ...and the details panel shows everything, the first six tags included.
+    # ...and the details panel shows everything, every tag included.
     details = re.search(r'<div class="result-details" aria-hidden="true">(.*?)</dl>', card, re.S)
     text = " ".join(re.sub(r"<[^>]+>", " ", details.group(1)).split())
     assert text == (
         f"Moon 03 By {long_author} License CC0 From Poly Haven "
-        "Tags moon, rock, crater, space, grey, rough"
+        "Tags moon, rock, crater, space, grey, rough, dust"
     )
     assert "html[data-pointer] .result-card:hover .result-details" in css
-    assert ".result-card:focus-within .result-details" in css
     # The panel lets clicks through to the card's link.
     assert re.search(r"\.result-details \{[^}]*pointer-events: none;", css)
+
+
+def test_the_details_go_away_after_a_click_unless_details_keeps_them_open(client, monkeypatch):
+    """Clicking a card (or Save) leaves mouse focus inside it. Only keyboard focus
+    (:focus-visible) shows the panel, so it goes once the pointer leaves, unless
+    the card's Details button keeps it open."""
+    monkeypatch.setattr(
+        polyhaven, "search_records", lambda query, kind, limit=12, page=1: [record()]
+    )
+    [card] = cards(fetch_shelf(client, "texture", "polyhaven"))
+    css = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    assert ".result-card:focus-within" not in css
+    assert ".result-card:has(:focus-visible) .result-details" in css
+    assert (
+        '.result-card[data-details="open"] .result-details { opacity: 1; transform: none; }' in css
+    )
+    # Details: a toggle in the card's corner, wired by card-actions.js (loaded in base.html).
+    actions = re.search(r'<div class="card-actions">(.*?)</div>\n', card, re.S).group(1)
+    assert re.search(
+        r'<button type="button" class="card-action" data-card-details aria-pressed="false" '
+        r'aria-label="Keep the details of Red Brick 03 open">',
+        actions,
+    )
+    script = (settings.BASE_DIR / "static" / "js" / "card-actions.js").read_text(encoding="utf-8")
+    assert 'card.dataset.details = "open"' in script
+    assert 'button.setAttribute("aria-pressed", String(open))' in script
+    page = client.get(reverse("catalog:discover")).content.decode()
+    assert "js/card-actions.js" in page
+
+
+def test_a_textures_thumbnail_is_square_and_shown_whole(client, monkeypatch):
+    monkeypatch.setattr(
+        polyhaven, "search_records", lambda query, kind, limit=12, page=1: [record()]
+    )
+    [card] = cards(fetch_shelf(client, "texture", "polyhaven"))
+    assert card.startswith('<li class="result-card" data-kind="texture">')
+    css = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    assert '.result-card[data-kind="texture"] .result-thumb { aspect-ratio: 1 / 1; }' in css
+    assert '.result-card[data-kind="texture"] .result-thumb img { object-fit: contain; }' in css
+
+
+def test_each_card_has_its_actions_in_the_corner_and_never_the_logo(member_client, monkeypatch):
+    monkeypatch.setattr(
+        polyhaven, "search_records", lambda query, kind, limit=12, page=1: [record()]
+    )
+    [card] = cards(fetch_shelf(member_client, "texture", "polyhaven"))
+    actions = re.search(r'<div class="card-actions">(.*?)</div>\n', card, re.S).group(1)
+    tips = re.findall(
+        r'<span class="card-tip" aria-hidden="true">(.*?)</span>(?:</button>|</a>)', actions
+    )
+    tips = [re.sub(r"<[^>]+>", "", tip).replace("Saving…", "") for tip in tips]
+    assert tips == ["Save to library", "Add to pack", "Details"]
+    assert 'data-picker="pack-picker" data-picker-asset="Red Brick 03"' in actions
+    # The corner sits on the provider's thumbnail, so the logo mark never appears there.
+    assert "mark" not in actions
+    # The old full-width Save row at the card's foot is gone.
+    assert "result-actions" not in card
+    # A member's Discover page holds the pack picker the buttons open.
+    page = member_client.get(reverse("catalog:discover")).content.decode()
+    assert page.count('<dialog id="pack-picker" class="picker-dialog"') == 1
+    assert "collection" not in page.lower()

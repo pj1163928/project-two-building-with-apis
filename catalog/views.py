@@ -1,11 +1,13 @@
+from urllib.parse import urlsplit
+
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
-from django.http import Http404, HttpResponseBadRequest
-from django.shortcuts import redirect, render
+from django.http import Http404, HttpResponseBadRequest, QueryDict
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView
-from django_htmx.http import HttpResponseClientRedirect, push_url
+from django_htmx.http import HttpResponseClientRedirect, push_url, replace_url
 
 from providers import PROVIDERS_BY_KEY, ProviderError
 
@@ -23,7 +25,7 @@ from .discover import (
     shuffle_url,
 )
 from .library import SORT_LABELS, filter_groups, filter_library, save_to_library
-from .models import SavedAsset
+from .models import SavedAsset, Tag
 
 
 class DiscoverView(TemplateView):
@@ -157,16 +159,11 @@ class LibraryView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        results = filter_library(self.request.user, self.request.GET)
+        context.update(_library_context(self.request.user, self.request.GET))
         context.update(
-            results=results,
-            params=results.params,
-            entries=results.page.object_list,
-            library_empty=not (
-                results.page.paginator.count
-                or SavedAsset.objects.for_user(self.request.user).exists()
+            filter_groups=filter_groups(
+                context["params"], Tag.objects.in_library(self.request.user)
             ),
-            filter_groups=filter_groups(results.params),
             sort_labels=SORT_LABELS,
         )
         return context
@@ -177,3 +174,57 @@ class LibraryView(LoginRequiredMixin, TemplateView):
             response = render(request, self.results_template_name, context)
             return push_url(response, context["results"].url)
         return self.render_to_response(context)
+
+
+def _library_context(user, params) -> dict:
+    """What the library's results fragment needs, for `params` from a query string."""
+    results = filter_library(user, params)
+    return {
+        "results": results,
+        "params": results.params,
+        "entries": results.page.object_list,
+        "library_empty": not (
+            results.page.paginator.count or SavedAsset.objects.for_user(user).exists()
+        ),
+    }
+
+
+class RemoveFromLibraryView(LoginRequiredMixin, View):
+    """Remove one of the member's own entries: the POST behind a library card's Remove.
+
+    Members only, with CSRF. Another member's entry, or one that doesn't
+    exist, is a 404. The shared Asset stays. The library's HTMX request gets
+    the results fragment again, for the view the member was on (read from
+    HX-Current-URL), with the status bar's saved count out of band; any
+    other request is sent back to the library.
+    """
+
+    http_method_names = ["post"]
+
+    def handle_no_permission(self):
+        login = redirect_to_login(reverse("catalog:library"))
+        return HttpResponseClientRedirect(login.url) if self.request.htmx else login
+
+    def post(self, request, pk):
+        entry = get_object_or_404(SavedAsset.objects.for_user(request.user), pk=pk)
+        entry.delete()
+        if not request.htmx:
+            return redirect("catalog:library")
+        context = _library_context(request.user, _current_library_params(request))
+        response = render(
+            request, "catalog/partials/library_results.html", {**context, "count_oob": True}
+        )
+        # A page that no longer exists falls back to the last one; keep the address bar in step.
+        return replace_url(response, context["results"].url)
+
+
+def _current_library_params(request) -> QueryDict:
+    """The library parameters of the page the request came from, or none.
+
+    Only a library URL counts: a request from any other page gets the whole
+    library.
+    """
+    current = urlsplit(request.htmx.current_url or "")
+    if current.path != reverse("catalog:library"):
+        return QueryDict()
+    return QueryDict(current.query)

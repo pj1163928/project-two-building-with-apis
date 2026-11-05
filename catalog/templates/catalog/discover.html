@@ -48,4 +48,6 @@
       {% include "catalog/partials/shelf.html" %}
     {% endfor %}
   </div>
+  {# The shelves' "Add to pack" buttons open this; a visitor's buttons sign in instead. #}
+  {% if user.is_authenticated %}{% include "catalog/partials/pack_picker.html" %}{% endif %}
 {% endblock %}

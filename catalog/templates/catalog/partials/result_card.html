@@ -1,12 +1,14 @@
 {# One search result: the provider's thumbnail (linked, never copied; the logo never   #}
 {# sits on it), then title, author and license. The title's link is stretched over   #}
 {# the whole card, so the card opens the provider's page, while a sound's play       #}
-{# button sits above it. The type icon sits under the image: it shows when there is  #}
-{# no thumbnail URL, and shell.js removes an image that fails to load. Hovering or   #}
-{# focusing the card shows .result-details: the full title, author, license, source  #}
-{# and tags that the card itself cuts short. The Save slot has its own row at the     #}
-{# foot (catalog/partials/save_button.html), above the stretched link.               #}
-<li class="result-card">
+{# button and the corner actions sit above it. The type icon sits under the image:  #}
+{# it shows when there is no thumbnail URL, and shell.js removes an image that fails #}
+{# to load. A texture's thumbnail is square and shown whole (data-kind).            #}
+{# The corner actions (.card-actions), top right over the thumbnail: Save, Add to   #}
+{# pack, and Details, which keeps .result-details open. Hovering the card, or        #}
+{# keyboard focus inside it, shows .result-details too: the full title, author,      #}
+{# license, source and tags that the card itself cuts short.                         #}
+<li class="result-card" data-kind="{{ record.kind }}">
   <div class="result-thumb">
     <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=28 %}</span>
     {% if record.thumbnail_url %}<img src="{{ record.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
@@ -22,14 +24,14 @@
     <h3 class="result-title"><a href="{{ record.source_url }}" target="_blank" rel="noopener noreferrer" class="result-link">{{ record.title }}</a></h3>
     <p class="result-meta"><span class="result-author">{{ record.author }}</span><span class="micro text-fg-muted shrink-0">{{ record.license }}</span></p>
   </div>
-  <div class="result-actions">{% include "catalog/partials/save_button.html" %}</div>
+  <div class="card-actions">{% include "catalog/partials/save_button.html" %}{% include "catalog/partials/pack_button.html" with title=record.title next=shelf.page_url %}{% include "catalog/partials/details_button.html" with title=record.title %}</div>
   <div class="result-details" aria-hidden="true">
     <p class="result-details-title">{{ record.title }}</p>
     <dl class="result-details-list">
       <div><dt class="micro">By</dt><dd>{{ record.author }}</dd></div>
       <div><dt class="micro">License</dt><dd>{{ record.license }}</dd></div>
       <div><dt class="micro">From</dt><dd>{{ source_name }}</dd></div>
-      {% if record.tags %}<div><dt class="micro">Tags</dt><dd>{{ record.tags|slice:":6"|join:", " }}</dd></div>{% endif %}
+      {% if record.tags %}<div><dt class="micro">Tags</dt><dd>{{ record.tags|join:", " }}</dd></div>{% endif %}
     </dl>
   </div>
 </li>

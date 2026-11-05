@@ -5,6 +5,7 @@
 {# The library's filters live in the side panel (PRD). They belong to the toolbar's form  #}
 {# through form="library-toolbar", so one request carries the search, filters and sort.   #}
 {# Type, provider and status chips are checkboxes; minimum rating is one radio choice.    #}
+{# Tags: the member's most used tags, from every provider; an entry needs every chosen one. #}
 {# Disabled while the library is empty.                                                    #}
 {% block side_panel %}
   {{ block.super }}
@@ -14,7 +15,11 @@
       <legend class="sr-only">Filter your library</legend>
       {% for group in filter_groups %}
       <div class="filter-group" role="group" aria-label="{{ group.title }}"><p class="micro text-fg-muted">{{ group.title }}</p>
-        <div class="flex flex-wrap gap-1.5">{% for chip in group.chips %}<label class="filter-chip"><input type="{% if group.multiple %}checkbox{% else %}radio{% endif %}" class="library-control sr-only" form="library-toolbar" name="{{ group.name }}" value="{{ chip.value }}"{% if chip.checked %} checked{% endif %}><span>{{ chip.label }}</span></label>{% endfor %}</div>
+        {% if group.chips %}
+        <div class="flex flex-wrap gap-1.5">{% for chip in group.chips %}<label class="filter-chip"><input type="{% if group.multiple %}checkbox{% else %}radio{% endif %}" class="library-control sr-only" form="library-toolbar" name="{{ group.name }}" value="{{ chip.value }}"{% if chip.checked %} checked{% endif %}><span>{{ chip.label }}</span>{% if chip.count %}<span class="filter-chip-count">{{ chip.count }}</span>{% endif %}</label>{% endfor %}</div>
+        {% else %}
+        <p class="text-xs text-fg-muted">The tags on your saved assets, from every provider, show here.</p>
+        {% endif %}
       </div>
       {% endfor %}
     </fieldset>
@@ -50,4 +55,5 @@
 
     {% include "catalog/partials/library_results.html" %}
   </section>
+  {% include "catalog/partials/pack_picker.html" %}
 {% endblock %}

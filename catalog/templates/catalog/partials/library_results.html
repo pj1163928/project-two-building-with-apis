@@ -1,6 +1,7 @@
 {# The library's results: the whole page includes it, and the controls' HTMX requests get  #}
 {# it alone, swapped over itself (outerHTML). It holds one page of cards with the count    #}
-{# and the pager, or an empty state that says what to do next.                             #}
+{# and the pager, or an empty state that says what to do next. After a Remove it also     #}
+{# brings the status bar's saved count up to date, out of band.                            #}
 {% url 'catalog:discover' as discover_url %}{% url 'catalog:library' as library_url %}
 <div id="library-results" class="space-y-5">
   {% if library_empty %}
@@ -30,3 +31,4 @@
     {% endwith %}
   {% endif %}
 </div>
+{% if count_oob %}{% include "partials/saved_count.html" with oob=True %}{% endif %}

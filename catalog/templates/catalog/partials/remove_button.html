@@ -1,0 +1,6 @@
+{# Remove an entry from the library, after the browser's confirm. HTMX posts it and swaps #}
+{# the results for the same view (the count and pager stay right), with the saved count #}
+{# out of band. Without JavaScript it's a plain POST that returns to the library.        #}
+{# Phase 7 replaces the confirm with a dialog listing the packs it will leave.           #}
+{% url 'catalog:remove' entry.pk as remove_url %}
+<form class="card-action-form" method="post" action="{{ remove_url }}" hx-post="{{ remove_url }}" hx-target="#library-results" hx-swap="outerHTML" hx-confirm="Remove “{{ entry.asset.title }}” from your library?" hx-disabled-elt="find button">{% csrf_token %}<button type="submit" class="card-action" aria-label="Remove {{ entry.asset.title }} from your library">{% include "partials/icon.html" with name="trash" size=15 %}<span class="card-tip" aria-hidden="true">Remove</span></button></form>
