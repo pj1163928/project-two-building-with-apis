@@ -259,19 +259,19 @@ shelf keeps working.
 
 ### Acceptance criteria
 
-- [ ] A repeated identical search within the hour calls the provider
+- [x] A repeated identical search within the hour calls the provider
   once. Searches that differ only in case or whitespace share one cache
   entry.
-- [ ] A failed search followed by Retry calls the provider again, and a
+- [x] A failed search followed by Retry calls the provider again, and a
   success on Retry is shown and cached.
-- [ ] Poly Haven info is cached for 12 hours, wherever it's fetched.
-- [ ] Each shelf shows its provider's credit line.
-- [ ] A result with no thumbnail URL shows the type icon. A thumbnail
+- [x] Poly Haven info is cached for 12 hours, wherever it's fetched.
+- [x] Each shelf shows its provider's credit line.
+- [x] A result with no thumbnail URL shows the type icon. A thumbnail
   that fails to load is swapped for the type icon, and the logo never
   appears on a thumbnail.
-- [ ] After a shelf succeeds or fails, the status bar shows that
+- [x] After a shelf succeeds or fails, the status bar shows that
   provider's status. Providers not yet used show as unknown.
-- [ ] **Provider client tests (`responses`):** each of these gives its
+- [x] **Provider client tests (`responses`):** each of these gives its
   own friendly `ProviderError` message, and none leaks HTML or exception
   text (Phase 2a makes the messages safe; this phase proves it for each
   failure):
@@ -282,16 +282,34 @@ shelf keeps working.
   - Poly Haven's 404
   - Poly Haven's `keywordMatches == 0`, which counts as no results, not
     an error
-- [ ] **Application tests (`monkeypatch`):** each failure message reaches
+- [x] **Application tests (`monkeypatch`):** each failure message reaches
   the shelf alert unchanged, and failures never reach the cache.
-- [ ] **HTMX mixed shelves:** the Phase 2a test runs once for each failure
+- [x] **HTMX mixed shelves:** the Phase 2a test runs once for each failure
   type. In every case one shelf shows the alert and Retry while the other
   shows its results.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: Discover is still open to
+- [x] Standard gate (see top). Access rules: Discover is still open to
   signed-out visitors, and the status bar shows no member data to them.
+
+### Phase 2b polish (2026-11-04, at the user's request)
+
+Added after the phase, ahead of the PRD's Tier 3. The PRD now records it
+under Discover.
+
+- [x] **Sound previews:** a sound result plays its Openverse audio in the
+  page (`AssetRecord.preview_url`, streamed, never copied). One plays at a
+  time, and it stops when its card leaves the page.
+- [x] **Load more:** a full shelf ends with "Load 12 more", which appends
+  the next page up to page 20 (240 results). A failed page shows Retry in
+  place and keeps the cards already shown. Each page is cached on its own,
+  and a bad `page` is a **400** before any provider call.
+- [x] **Card details:** a long author list ends in an ellipsis inside the
+  card. Hover or focus shows the full title, author, license, source and
+  tags.
+- [x] **Random pick:** with no query, Discover searches a random featured
+  term for the type, with Shuffle. The command bar stays empty.
 
 ---
 

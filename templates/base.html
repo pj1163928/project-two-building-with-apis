@@ -49,6 +49,7 @@
   {# Scripts load once, here, for every page: a boosted swap doesn't run a new page's <head>. #}
   <script src="{% static 'js/shell.js' %}" defer></script>
   <script src="{% static 'js/password-toggle.js' %}" defer></script>
+  <script src="{% static 'js/sound-preview.js' %}" defer></script>
 </head>
 <body class="bg-app text-fg" hx-boost="true">
 {# The CSRF header lives on #app, not <body>: a boosted swap replaces #app but keeps <body>, #}
@@ -184,14 +185,10 @@
     </main>
   </div>
 
-  {# ---------- Status bar (monochrome; live provider status comes later) ---------- #}
+  {# ---------- Status bar (monochrome; each provider's last known status) ---------- #}
   <footer id="status-bar" class="h-6 shrink-0 flex items-center gap-4 px-3 text-[11.5px] bg-app border-t border-line text-fg-secondary">
     <span class="flex items-center gap-1.5 text-fg-strong"><i class="mark w-3" aria-hidden="true"></i>Toolbox</span>
-    {% for name in status_providers %}
-      <span class="flex items-center gap-1.5" title="{{ name }}: status unknown">
-        <span class="w-1.5 h-1.5 rounded-full bg-fg-muted" aria-hidden="true"></span>{{ name }}
-      </span>
-    {% endfor %}
+    {% for status in status_providers %}{% include "partials/provider_status.html" %}{% endfor %}
     {% if user.is_authenticated %}
       <span class="ml-auto">Library · <b class="text-fg-strong">—</b> saved</span>
     {% endif %}

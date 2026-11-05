@@ -12,8 +12,13 @@ Phase 2a rules:
 - Sign-out accepts only POST; a GET is rejected and leaves the member
   signed in.
 - Sign-up, sign-in and sign-out reject POSTs without a CSRF token.
+
+Phase 2b rules:
+- Discover and its shelves stay open to signed-out visitors, and the status
+  bar shows them provider status only, never member data.
 """
 
+import re
 from urllib.parse import quote
 
 import pytest
@@ -62,7 +67,7 @@ def test_anonymous_can_search_discover_and_load_its_shelves(client, monkeypatch,
         source_url="https://example.com/item_01",
     )
     monkeypatch.setattr(
-        PROVIDERS_BY_KEY[provider], "search_records", lambda query, kind, limit=12: [found]
+        PROVIDERS_BY_KEY[provider], "search_records", lambda query, kind, limit=12, page=1: [found]
     )
     page = client.get(reverse("catalog:discover"), {"type": kind, "q": "brick"})
     assert page.status_code == 200
@@ -186,3 +191,31 @@ def test_sign_in_succeeds_with_the_forms_csrf_token(csrf_client, member, passwor
     )
     assert response.status_code == 302
     assert csrf_client.session["_auth_user_id"] == str(member.pk)
+
+
+# ---------------------------------------------------------------- status bar (Phase 2b)
+
+
+def test_the_status_bar_shows_visitors_provider_status_and_no_member_data(
+    client, member_client, member, monkeypatch
+):
+    from providers import polyhaven
+
+    monkeypatch.setattr(polyhaven, "search_records", lambda query, kind, limit=12, page=1: [])
+    # A member's shelf sets Poly Haven's status, which is shared by everyone...
+    member_client.get(
+        reverse("catalog:discover_shelf", args=["texture", "polyhaven"]) + "?q=brick",
+        headers={"HX-Request": "true"},
+    )
+    visitor = Client()
+    page = visitor.get(reverse("catalog:discover"))
+    assert page.status_code == 200
+    footer = page.content.decode().split('id="status-bar"', 1)[1]
+    bar = footer.split(">", 1)[1].split("</footer>", 1)[0]
+    assert 'id="status-polyhaven" data-status="ok"' in bar
+    # ...but the visitor's bar holds the Toolbox label and the providers, nothing else.
+    text = " ".join(re.sub(r"<[^>]+>", " ", bar).split())
+    assert text == (
+        "Toolbox ambientCG : status unknown Poly Haven : OK Openverse Audio : status unknown"
+    )
+    assert member.username not in bar and "saved" not in bar

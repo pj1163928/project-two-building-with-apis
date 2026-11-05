@@ -1,0 +1,21 @@
+{# The slot under a shelf's grid. Load more fetches the next page into this slot      #}
+{# (outerHTML): the reply puts the next button here, or the end note, or an alert     #}
+{# whose Retry asks for the same page again. Its cards are appended to the grid.      #}
+<div id="{{ shelf.more_id }}" class="shelf-more">
+  {% if shelf.error %}
+    <div role="alert" class="alert alert-error shelf-alert">
+      {% include "partials/icon.html" with name="alert" size=20 %}
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-fg-strong">Couldn't load more from {{ shelf.name }}</p>
+        <p class="text-sm text-fg-secondary mt-0.5">{{ shelf.error }}</p>
+      </div>
+      <button type="button" class="btn btn-sm btn-quiet" hx-get="{{ shelf.url }}" hx-target="#{{ shelf.more_id }}" hx-swap="outerHTML" hx-disabled-elt="this">Retry</button>
+    </div>
+  {% elif shelf.has_more %}
+    <button type="button" class="btn btn-quiet shelf-more-button" hx-get="{{ shelf.next_url }}" hx-target="#{{ shelf.more_id }}" hx-swap="outerHTML" hx-disabled-elt="this">
+      <span class="shelf-more-label">Load {{ shelf.page_size }} more</span><span class="shelf-more-busy" aria-hidden="true">Loading…</span>
+    </button>
+  {% else %}
+    <p class="shelf-end">That's everything from {{ shelf.name }} for <span class="font-mono">“{{ shelf.query }}”</span>.</p>
+  {% endif %}
+</div>

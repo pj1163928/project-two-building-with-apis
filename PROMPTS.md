@@ -28,6 +28,264 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-04 — Axcenity Toolbox: Phase 2b polish (sound previews, Load more, card details, random picks)
+
+### Prompts
+
+1. (With a screenshot of a Poly Haven "Moon 03" card whose author line ran
+   past the card.) Ok thre are a few things that I want to improve upon
+   firstly the audio/sound section. I want to make this to where I can
+   actually play the audio clip in the website rather than it simply
+   redirecting me to the website where it was sourced from. Next As of now
+   I only have 12 searches being loaded at a time which is fine, however I
+   would like to add a load additional option that will progresively load
+   another 12 searches when clicked. The author test on some of these
+   textures loads outside of the box make this an elipsis and allow users
+   to hover over a specifc texture to get more information. Next I would
+   lik for you to include some random searches in the discover section
+   that way it gives something visual at all times rather than just an
+   empty search.
+2. Go ahead and include these other coverstations in PROMPTS.md
+
+### Summary
+
+- **Outcome:** four Discover improvements, built on top of the uncommitted
+  Phase 2b work.
+  - Sound results play their preview in the page.
+  - A full shelf ends with "Load 12 more", up to 240 results.
+  - Long author lists end in an ellipsis inside the card. Hover or focus
+    shows the full title, author, license, source and tags.
+  - With no query, Discover searches a random featured term for the type,
+    with Shuffle.
+  - 370 tests pass (339 before), and `ruff check` and
+    `ruff format --check` are clean.
+  - Checked in headless Edge against the live providers:
+    - The sound shelf showed play buttons, an ellipsis on a long author
+      and Load more.
+    - "moon" on textures showed the ellipsis working, after a fix (see
+      Sideways), and a details panel forced open in a scratch page.
+    - An empty HDRI search showed "HDRIs for “night”" with both shelves
+      filled.
+  - Audio playback and the Load more click weren't exercised headless;
+    they're in the browser test steps.
+- **Changes:**
+  - `providers/records.py`: `AssetRecord.preview_url` (default blank).
+  - `providers/openverse.py`: `preview_url` from the audio `url`; `page`
+    paging, and `MAX_DEPTH` (240), past which it returns `[]` without a
+    request.
+  - `providers/ambientcg.py`: `page` paging through `offset`.
+  - `providers/polyhaven.py`: page N asks `/search` for N × 12 hits, keeps
+    the last 12 and fetches `/info` only for those. Later pages stop at
+    `keywordMatches`.
+  - `catalog/discover.py`:
+    - `PAGE_SIZE`, `MAX_PAGE`, `FEATURED_QUERIES`, `clean_page()`,
+      `featured_query()` and `shuffle_url()`.
+    - `Shelf.page`, `has_more`, `next_url`, `shown_count` and the slot ids.
+    - The page goes into `shelf_url()`, `search_cache_key()` and
+      `load_shelf()`.
+  - `catalog/views.py`:
+    - `DiscoverView` shows a random pick when there's no query.
+    - `DiscoverShelfView` validates `page` (400) before the HTMX check, and
+      renders `shelf_more.html` for later pages.
+  - `catalog/templates/catalog/partials/`:
+    - `shelf.html`: the grid id, the count partial and Load more.
+    - New: `load_more.html` (the button, the end note, or an alert with
+      Retry), `shelf_more.html` (the reply: the slot, cards appended with
+      `hx-swap-oob="beforeend:…"`, the count and the status) and
+      `shelf_count.html`.
+  - `result_card.html`: an `<li class="result-card">` with a stretched
+    title link, a `.result-author` ellipsis, the `.result-details` panel,
+    and a play button plus progress line for sounds.
+  - `catalog/templates/catalog/discover.html`: the `#featured-pick` row with
+    Shuffle, which replaces the "Search to fill the shelves." empty state.
+  - `static/js/sound-preview.js` (new, loaded in `base.html`): delegated
+    playback, one preview at a time. It stops on swap and disables its
+    button on error.
+  - `templates/partials/icon.html`: play and pause icons.
+  - `styles/source.css`:
+    - the stretched link, `.result-body`'s `minmax(0, 1fr)` column and the
+      ellipsis
+    - the details panel, the play button and progress line, and Load more
+    - reduced-motion rules for the new transitions
+  - Tests:
+    - `tests/test_provider_records.py`: paging for each provider, and a
+      sound-only `preview_url`.
+    - `tests/test_discover.py`:
+      - Load more: the first page, the next page, the last page, an empty
+        page, a failed page, each page cached separately, page 20, and bad
+        pages refused for HTMX and direct requests alike.
+      - Sound buttons and the script.
+      - Hover details and the ellipsis.
+      - The random pick, Shuffle and "no pick with a query".
+      - The card helpers follow the new markup.
+    - Every test fake gained `page=1`.
+  - `docs/ARCHITECTURE.md`, `docs/FRONTEND.md`, `docs/TESTING.md`: the
+    shelf URL's `page` and its check order, paging per provider, sound
+    previews, result cards, Load more and the random pick.
+  - `prd/axcenity-toolbox.md`: Discover's bullets record the four changes.
+    "Load more" leaves the Tier 3 list, and "Paging inside Discover
+    shelves" leaves Out of Scope.
+  - `plans/axcenity-toolbox.md`: a ticked "Phase 2b polish" section under
+    Phase 2b.
+- **TDD:** none. This was a direct request rather than `/implement`. Each
+  behaviour got ordinary tests after it was built.
+- **Decisions:**
+  - Previews stream from the provider's URL with `new Audio()`, never
+    downloaded or proxied (the PRD's rule). Only Openverse sounds have one.
+  - The play button sits at the thumbnail's top left, above a title link
+    stretched over the card, so the card still opens the source and the
+    button plays rather than navigates.
+  - Load more appends cards out of band and replaces only its own slot, so
+    a failed page keeps the cards already shown. It stops at page 20,
+    Openverse's anonymous limit.
+  - The button shows only after a full page. An exact multiple of 12 costs
+    one click that ends with "That's everything".
+  - Poly Haven's later pages stop at the keyword matches, so Load more
+    never shows unrelated semantic guesses.
+  - Each random pick was checked live to fill both of its type's shelves.
+    ambientCG's 34 models are all food, so the model picks are apple,
+    bread, fruit and food.
+  - The pick isn't put in the command bar, and Shuffle never repeats it.
+  - The hover panel is `aria-hidden`, because the card already holds the
+    same text. It also opens on keyboard focus.
+- **Deviations:**
+  - "Load more" was a PRD Tier 3 stretch item, and shelf paging was out of
+    scope. They were built because the user asked, and the PRD and plan
+    were updated to match.
+  - This round wasn't logged until the user asked.
+- **Sideways:**
+  - The first headless screenshot showed long author lists still running
+    past the card. A grid column of `auto` grows to fit its content, so
+    the ellipsis never applied. `.result-body` now uses
+    `minmax(0, 1fr)`, and the test checks for it. The earlier test checked
+    only the ellipsis CSS, so it passed while the page was wrong.
+  - `featured_query()` first took `random.choice` as a default argument,
+    so the test's patch didn't apply. It now looks the function up at
+    call time.
+  - Two Bash heredocs failed to parse, so the tests and the doc edits were
+    written to scratch files and applied from there.
+  - The new card markup broke the old card helpers and the
+    "no query, no shelves" test. They were updated to the new structure
+    and behaviour.
+
+## 2026-11-04 — Axcenity Toolbox: Phase 2b/13, Caching, provider credits, fallback icons, status bar and failure tests
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 2b`.
+2. Everything looks good go ahead and start the tests
+3. Looks good move to next
+4. Looks good move to next
+5. Looks good move to next
+
+### Summary
+
+- **Outcome:** Discover now caches, credits its providers, never shows a
+  broken thumbnail, and reports each provider's status in the status bar.
+  - Successful searches are cached for 1 h per (provider, kind,
+    normalized query). Poly Haven `/info` is cached for 12 h. Failures are
+    never cached.
+  - Every shelf ends with its provider's credit line.
+  - A missing or broken thumbnail shows the type's icon.
+  - The status bar shows OK, error or unknown for each provider, updated
+    out of band as each shelf loads.
+  - Story 83's failure suite covers all three levels.
+  - 339 tests pass (283 before), and `ruff check` and
+    `ruff format --check` are clean. A one-off `tailwind build` emits every
+    new class.
+- **Changes:**
+  - `providers/cache.py` (new): `use_cache()` and `remember()`, an optional
+    cache with no Django import. A lookup that raises is never stored.
+  - `providers/polyhaven.py`: `INFO_CACHE_SECONDS` (12 h) and
+    `_cached_info()`, which `search_records()` now uses. The console's
+    `search()`, `get_details()` and `_info()` are untouched.
+  - `providers/ambientcg.py`, `polyhaven.py`, `openverse.py`: `CREDIT` and
+    `HOME_URL` in each Toolbox section. `providers/__init__.py` documents
+    them and the cache hook.
+  - `catalog/apps.py`: `ready()` installs Django's cache into
+    `providers.cache`.
+  - `catalog/discover.py`:
+    - `search_cache_key()` (the cleaned, case-folded and hashed query) and
+      the 1 h cache in `load_shelf()`.
+    - `ProviderStatus`, `record_status()`, `provider_status()` and
+      `provider_statuses()`.
+    - `Shelf.credit`, `credit_url`, `tile` and `status`.
+  - `config/context_processors.py`: the status bar gets
+    `provider_statuses()`.
+  - `templates/partials/provider_status.html` (new) and
+    `templates/base.html`: one status-bar item per provider, also used for
+    the out-of-band swap.
+  - `catalog/templates/catalog/partials/shelf.html`: the credit line, and
+    the status item out of band on a loaded shelf.
+  - `catalog/templates/catalog/partials/result_card.html`: the type icon
+    under the thumbnail, and `data-thumb-fallback` on the image.
+  - `static/js/shell.js`: a capture-phase `error` listener removes a
+    broken thumbnail, which uncovers the icon.
+  - `styles/source.css`: the status dot and item, the shelf credit, and
+    the thumbnail stacked over its fallback icon.
+  - `tests/test_provider_failures.py` (new): a timeout, a connection error
+    and a 429 for each provider, Openverse's 500 with HTML, Poly Haven's
+    404 on `/search` and on `/info`, `keywordMatches == 0`, and one
+    distinct message per failure.
+  - `tests/test_discover.py`:
+    - The three TDD tests.
+    - The mixed-shelves test, parametrized over six failures in both
+      directions.
+    - App-level checks that each failure reaches the alert unchanged and
+      stays out of the cache, plus the 1 h timeout.
+    - Credits in every shelf state.
+    - Fallback icons for all four types, and the out-of-band status.
+    - A cached shelf leaving the status alone.
+  - `tests/test_provider_records.py`: the `/info` cache (one fetch, 12 h,
+    failures not stored), no caching without an installed cache, and the
+    console `search()` never caching.
+  - `tests/test_access_control.py`: a visitor's status bar holds provider
+    status only. `tests/test_shell.py`: the placeholder test was renamed.
+  - `docs/ARCHITECTURE.md`, `docs/FRONTEND.md`, `docs/TESTING.md`: caching,
+    the cache hook, status, credits, fallback icons and the new test file.
+  - `plans/axcenity-toolbox.md`: every 2b box ticked.
+- **TDD:**
+  1. A repeated search, including one differing only in case or
+     whitespace, calls the provider once. Red, then green.
+  2. A failure is never cached, and a success on Retry is shown and
+     cached. Already green when first run, because behaviour 1's code
+     stores only on success. A temporary mutant, which kept the alert but
+     cached the failure as empty, made it fail on its Retry assertion, and
+     the mutant was reverted.
+  3. Shelf outcomes set the status bar to ok or error, and unused
+     providers read unknown. Red, then green.
+- **Decisions:**
+  - On a cache miss, the provider gets the first search's cleaned query
+    with its case kept. Only matching ignores case.
+  - Provider status lasts 1 h and is set only when a provider is actually
+    contacted, never by a cache hit.
+  - The cache hook keeps `providers` free of Django, so the console script
+    never caches.
+  - The fallback icon uses its type colour, because it shows the asset's
+    type.
+  - The status bar stays monochrome: a solid dot, an alert icon, or a
+    muted dot.
+  - Poly Haven's 404 is tested on both `/search` and `/info`.
+- **Deviations:** none. The brief and the three behaviours were approved
+  as proposed.
+  - **Open question:** `get_json()`'s 429 message cites Openverse's quota
+    even for ambientCG and Poly Haven. It's left unchanged here, because
+    `get_json()` also serves the console script.
+  - **Phase 3 note:** `fetch_record()` must use
+    `polyhaven._cached_info()`.
+- **Sideways:**
+  - The first cache key contained spaces, and Django warned that memcached
+    would reject it, so the query is now hashed.
+  - The credit line broke the 2a test's alert regex, which was anchored on
+    `</section>`. It was repaired mechanically to anchor on the credit
+    line.
+  - A Python-written test edit turned `\n` into real newlines inside a
+    string literal. The broken lines were rewritten with the Edit tool.
+  - A junk line was left in the new failure-test file and removed before
+    the run.
+  - The visitor status-bar test first split inside the `<footer>` tag, and
+    was fixed to start after it.
+
 ## 2026-10-31 — Axcenity Toolbox: Phase 2a/13, Discover with provider shelves and error handling
 
 ### Prompts

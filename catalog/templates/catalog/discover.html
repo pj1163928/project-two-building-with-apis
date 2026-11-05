@@ -32,11 +32,20 @@
     {% endfor %}
   </nav>
 
+  {# With no query, the shelves show a random pick for the type, so Discover always has #}
+  {# something to look at. Shuffle swaps it for a different one.                      #}
+  {% if featured %}
+    <div id="featured-pick" class="featured-pick">
+      <span class="micro text-fg-muted">Random pick</span>
+      <p class="text-fg-strong">{{ tile.label }} for <span class="font-mono">“{{ featured }}”</span></p>
+      <a href="{{ shuffle_url }}" class="btn btn-sm btn-quiet">Shuffle</a>
+      <p class="text-[12.5px] text-fg-weak basis-full">{{ tile.search_hint }}</p>
+    </div>
+  {% endif %}
+
   <div id="discover-shelves" class="space-y-10">
     {% for shelf in shelves %}
       {% include "catalog/partials/shelf.html" %}
-    {% empty %}
-      {% include "partials/empty_state.html" with title="Search to fill the shelves." body=tile.search_hint %}
     {% endfor %}
   </div>
 {% endblock %}

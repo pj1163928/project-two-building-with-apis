@@ -57,9 +57,10 @@ It's a throwaway prototype, so take its look, not its code.
 - **Type colours** are `texture`, `hdri`, `model` and `sound` (for example
   `text-texture`). Use them only to show an asset's type. Tailwind emits
   only the tokens that are used. Each has a dark and a light value. So far
-  they appear only on Discover's type tiles (the icon and the bar under
-  the current tile). `test_shell.py` keeps them out of the chrome on every
-  page, and out of every other page's content.
+  they appear only on Discover: its type tiles (the icon and the bar under
+  the current tile) and a result's fallback type icon, inside the shelf
+  fragments. `test_shell.py` keeps them out of the chrome on every page,
+  and out of every other page's content.
 - **Page drop colours (the one exception):** each page's content area has
   a "water drop" glow in three vivid colours, behind the hero and in the
   footer. The colours are chosen by `#content[data-drop="<active_nav>"]` in
@@ -128,7 +129,7 @@ this only matters on a full load or refresh.
 | Activity bar | `activity-bar` | A top slot (`h-14`) holding the panel toggle, then Discover, Library, Packs (`pt-1`, `gap-1`), then Account and Settings. Every icon is 20 px and has a `.tip` tooltip instead of a `title`. The bar is `relative z-20` so tooltips sit over the side panel. A view sets `extra_context = {"active_nav": "<key>"}` to mark its entry with `aria-current="page"` |
 | Side panel | `side-panel` | `{% block panel_title %}` and `{% block side_panel %}`. It slides shut (see below). The header is `h-14`, the same as the toggle slot, and rows use `.panel-row` (`h-11` with `gap-1` and `pt-1`, like the activity bar), so each row lines up with its icon. Keep these heights in step if either bar changes |
 | Content | `content` | `data-drop` = the page's `active_nav`. The hero glow (`.page-glow`), then `{% block content %}` in a `px-8 lg:px-12 pt-14 pb-12 space-y-8` wrapper, then the footer (`page-footer`): the drop glow, the faint giant watermark, and the `.brand-signature` row ("Built for Axcenity Engine", a small wordmark, "Axcenity Studios · 2026") |
-| Status bar | `status-bar` | Monochrome. It lists provider names from `config.context_processors.shell`. Member-only data (the saved count) appears only when signed in |
+| Status bar | `status-bar` | Monochrome. Each provider's last known status (`partials/provider_status.html`, from `config.context_processors.shell`): a solid ink dot for OK, an alert icon for an error, a muted dot for unknown, with the words in `title` and screen-reader text. Member-only data (the saved count) appears only when signed in |
 
 **Side panel collapse:** an inline script in `<head>` sets
 `<html data-panel="open|collapsed">` before first paint, from
@@ -396,20 +397,74 @@ outlined, square, and inverted on hover.
     bar grows in under the current tile. The colour classes are written
     out in full in `catalog/discover.py` (`KindTile`) so Tailwind finds
     them.
+- **Random pick:** with no query, `#featured-pick` shows "Random pick",
+  "<Type> for “<pick>”", a Shuffle button and the providers hint, and the
+  shelves search the pick.
 - **Shelves:** `#discover-shelves` holds one `catalog/partials/shelf.html`
-  per provider. With no query, it shows an empty state that names the
-  providers instead.
+  per provider.
 
 **Shelf states** (`<section id="shelf-<provider>">`, replaced whole):
 
 | State | What shows |
 |---|---|
 | Pending | `aria-busy`, `hx-get` of its own URL, `hx-trigger="load"`, `hx-swap="outerHTML"`, and six pulsing `.result-skeleton`s |
-| Results | A `.result-grid` of `.result-card`s. Each has the thumbnail (the provider's URL, `referrerpolicy="no-referrer"`, never the logo), title, author and license, and opens the provider's page in a new tab |
+| Results | A `.result-grid` (`#shelf-<provider>-results`) of `.result-card`s (see "Result cards"), then Load more when the page came back full |
 | No matches | `.shelf-empty`: "No <provider> matches for “q”." |
 | Failed | A DaisyUI `alert alert-error` (`.shelf-alert`, toned down and square, with the error colour only on the icon) holding the `ProviderError` message and a Retry button inside the alert. Retry `hx-get`s this shelf's own URL into `#shelf-<provider>` |
 
 The shelf header shows a number (`01`), the provider's name, a rule, and
-"Searching", "Unavailable" or the result count. Phase 2b adds the
-provider credit, the type-icon fallback for a missing or broken thumbnail
-(today the block is just left empty), and caching.
+"Searching", "Unavailable" or the result count.
+
+- **Credit:** every shelf, in every state, ends with a `.shelf-credit` line
+  linking to the provider ("Assets from ambientCG · CC0", "Powered by Poly
+  Haven", "Made with Openverse").
+- **Type-icon fallback:** `.result-thumb` always holds the type's icon
+  (`.result-fallback`, in the type colour, because it shows the asset's
+  type), and the thumbnail is positioned over it. With no thumbnail URL
+  there's no `<img>`, so the icon shows. An `<img data-thumb-fallback>`
+  that fails to load is removed by a capture-phase `error` listener in
+  `shell.js`, which uncovers the icon. The logo is never the fallback.
+- **Status out of band:** a loaded shelf's response also carries its
+  provider's status bar item with `hx-swap-oob="true"`, so the status bar
+  updates as soon as the shelf loads.
+- **Load more** (`catalog/partials/load_more.html`): a full-width square
+  `btn-quiet` in `#shelf-<provider>-more`, "Load 12 more" ("Loading…"
+  while the request runs). It fetches the next page into that slot
+  (`outerHTML`). The reply (`shelf_more.html`) holds:
+  - the new slot: the next button, the end note "That's everything from
+    <provider> for “q”.", or an alert whose Retry asks for the same page
+  - the new cards, in a `<ul hx-swap-oob="beforeend:#shelf-<provider>-results">`.
+    htmx appends the `<ul>`'s children, not the `<ul>` itself.
+  - the count (`#shelf-<provider>-count`) and the provider's status, both
+    out of band
+
+  A failed page leaves the cards already shown in place.
+
+**Result cards** (`catalog/partials/result_card.html`) are `<li
+class="result-card">`s:
+
+- **Whole-card link:** the title's `.result-link` opens the provider's page
+  in a new tab, and its `::after` is stretched over the card, so the whole
+  card is clickable. Interactive parts (the play button) sit above it with
+  a higher `z-index`. Keyboard focus on the link draws a 2 px ink ring on
+  the card.
+- **Thumbnail:** the provider's URL (`referrerpolicy="no-referrer"`, never
+  the logo) over the type-icon fallback.
+- **Author:** `.result-author` is cut with an ellipsis. `.result-body`'s
+  column is `minmax(0, 1fr)`; without it, the column grows to fit a long
+  author list and the line runs out of the card. That happened with Poly
+  Haven's multi-author textures.
+- **Details on hover:** `.result-details` (`aria-hidden`, because the card
+  already holds the same text) rises over the lower thumbnail on hover
+  (behind the hover gate) or `:focus-within`. It shows the full title,
+  author, license, source and the first six tags. It has
+  `pointer-events: none`, so a click still opens the source.
+- **Sound preview:** a card with a `preview_url` gets a square ink
+  `.sound-play` button at the thumbnail's top left, and a 2 px
+  `.sound-progress` line along its foot. `static/js/sound-preview.js`
+  (delegated, loaded in `base.html`) plays one preview at a time with
+  `new Audio(url)`. It sets the card's `data-sound` (`loading`, `playing`,
+  `paused`, `idle`, `error`) and `--progress`, and keeps the button's
+  `aria-pressed` and `aria-label` in step. A preview that can't load
+  disables its button ("Preview unavailable"). The sound stops when its
+  card leaves the page (`htmx:afterSwap`).

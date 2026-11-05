@@ -25,7 +25,7 @@ phases add.
 |---|---|---|
 | `packs:home` | `/` | Everyone |
 | `catalog:discover` | `/discover/?type=<kind>&q=<query>` | Everyone |
-| `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>` | Everyone (an HTMX fragment) |
+| `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>&page=<n>` | Everyone (an HTMX fragment; `page` is optional, 1 to 20) |
 | `catalog:library` | `/library/` | Members |
 | `packs:list` | `/packs/` | Members |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
@@ -46,23 +46,50 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
   maps the kinds it serves to its own filter value, and
   `providers_for_kind(kind)` returns the matching modules in shelf order.
 - **The page** (`DiscoverView`) never calls a provider. An unknown `type`
-  falls back to textures. With no `q` it shows a hint and no shelves.
-  Otherwise it renders one pending shelf per provider, and each shelf
-  fetches itself (`hx-trigger="load"`).
+  falls back to textures. It renders one pending shelf per provider, and
+  each shelf fetches itself (`hx-trigger="load"`). With no `q`, the
+  shelves search a random pick from `FEATURED_QUERIES` for the kind
+  (`featured_query()`), so Discover is never empty. The pick isn't put in
+  the command bar. Shuffle (`?shuffle=<pick>`) chooses a different one.
+  Each pick was checked live to fill both of its kind's shelves
+  (ambientCG's 34 models are all food, hence the model picks).
 - **A shelf** (`DiscoverShelfView`) checks things in this order:
   1. The kind and provider must be real, and the provider must serve that
      kind. Otherwise **404**.
   2. The query, after `clean_query()`, must not be blank. Otherwise
      **400**.
-  3. Only then does it look at HTMX. A plain or boosted request redirects
+  3. `page`, if given, must be a whole number from 1 to `MAX_PAGE` (20).
+     Otherwise **400**.
+  4. Only then does it look at HTMX. A plain or boosted request redirects
      to its Discover page. An HTMX request gets the fragment.
 
   So a bad shelf URL never becomes a redirect, and never reaches a
   provider.
+- **Load more:** each `search_records(query, kind, limit=12, page=1)` takes
+  a 1-based page. ambientCG sends `offset`, and Openverse sends `page` and
+  returns nothing past its anonymous depth of 240 without asking. Poly
+  Haven's `/search` has no offset, so page N asks for N x 12 hits, keeps
+  the last 12 and fetches `/info` only for those. Pages after the first
+  stop at `keywordMatches`, so Load more never shows unrelated semantic
+  guesses. A shelf offers Load more when its page came back full
+  (`Shelf.has_more`) and it isn't page 20. Each page is cached on its own.
+- **Sound previews:** `AssetRecord.preview_url` is Openverse's audio `url`
+  (often a Freesound preview MP3). The browser streams it from the
+  provider; the Toolbox never downloads or proxies it. Other kinds leave
+  it blank.
 - `catalog/discover.py` holds this logic: `clean_query()`, `clean_kind()`,
   `shelf_provider()`, `pending_shelves()` and `load_shelf()`. `load_shelf()`
   catches only `ProviderError`, so any other exception still surfaces as a
   bug.
+- **Provider status** (the status bar) comes from shelf outcomes, with no
+  health-check requests. When `load_shelf()` actually reaches a provider, it
+  calls `record_status()`, which stores `ok` or `error` in the cache for 1 h.
+  A shelf served from the search cache leaves the status alone.
+  `provider_statuses()` reads every provider's status for the context
+  processor, and a provider no shelf has used yet is `unknown`. Each loaded
+  shelf also sends its provider's status out of band (see FRONTEND.md).
+- **Credits:** each provider module has a `CREDIT` line and a `HOME_URL`,
+  which every shelf shows.
 
 ## Authentication
 
@@ -124,8 +151,21 @@ the API. All but `search_records()` are *(planned)*:
 
 Django's local-memory cache (`CACHES` in settings):
 
-- Searches are cached for 1 h per (provider, kind, normalized query).
-- Poly Haven info is cached for 12 h.
-- Failures are never cached.
+- **Searches** are cached for 1 h per (provider, kind, normalized query), in
+  `load_shelf()`. `search_cache_key()` builds the key from the
+  `clean_query()` text, case-folded and hashed, so searches that differ only
+  in case or spacing share an entry. The provider is sent the first search's
+  cleaned query.
+- **Poly Haven info** is cached for 12 h (`polyhaven.INFO_CACHE_SECONDS`).
+  `providers` is plain Python, so it never imports Django. Instead
+  `providers/cache.py` offers `use_cache()` and `remember()`, and
+  `CatalogConfig.ready()` installs Django's cache. The console script
+  installs none, so it caches nothing. Every Toolbox lookup goes through
+  `polyhaven._cached_info()`, while the console's `search()` and
+  `get_details()` keep calling `_info()` directly. *(Phase 3's
+  `fetch_record()` must use `_cached_info()` too.)*
+- **Provider status** is kept for 1 h (see Discover).
+- **Failures are never cached:** a `ProviderError` returns before anything
+  is stored, so Retry always reaches the provider again.
 
 Tests clear the cache around every test.

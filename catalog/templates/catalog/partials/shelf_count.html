@@ -1,0 +1,2 @@
+{# A loaded shelf's result count. Load more replaces it out of band as cards arrive. #}
+<span id="{{ shelf.count_id }}" class="micro text-fg-weak"{% if oob %} hx-swap-oob="true"{% endif %}>{{ shelf.shown_count }} result{{ shelf.shown_count|pluralize }}</span>

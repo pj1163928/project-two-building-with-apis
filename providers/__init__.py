@@ -10,7 +10,11 @@ and, for the Toolbox:
 - KEY: a short stable identifier used in URLs and stored records
 - KIND_FILTERS: {kind: the provider's filter value, or None}, one entry per
   kind the provider serves (the PRD's type-to-provider mapping)
+- CREDIT, HOME_URL: the credit line on its Discover shelf, and its link
 - search_records(query, kind, limit=12) -> list of AssetRecord
+
+providers.cache lets the Toolbox install Django's cache for lookups such as
+Poly Haven's /info. The console script installs none, so nothing is cached.
 """
 
 import logging

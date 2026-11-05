@@ -80,6 +80,20 @@
     search.select();
   });
 
+  // ---------- Broken thumbnails ----------
+  // A provider thumbnail that fails to load is removed, uncovering the type
+  // icon beneath it (catalog/partials/result_card.html). Image errors don't
+  // bubble, so this listens in the capture phase, which also covers every
+  // image a shelf swap brings in later.
+  document.addEventListener(
+    "error",
+    function (event) {
+      var image = event.target;
+      if (image.tagName === "IMG" && image.hasAttribute("data-thumb-fallback")) image.remove();
+    },
+    true
+  );
+
   // ---------- After every boosted swap ----------
   document.addEventListener("htmx:afterSwap", function (event) {
     if (event.detail.boosted) {

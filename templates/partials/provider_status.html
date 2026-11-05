@@ -1,0 +1,6 @@
+{# One provider in the status bar: its last known status, from shelf outcomes.     #}
+{# Monochrome: a solid dot for OK, an alert ring for an error, a muted dot for unknown. #}
+{# A loaded shelf sends this again with oob=True, so the bar updates without a reload. #}
+<span id="status-{{ status.key }}" data-status="{{ status.state }}" title="{{ status.title }}" class="status-item"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% if status.state == "error" %}{% include "partials/icon.html" with name="alert" size=11 %}{% else %}<span class="status-dot" aria-hidden="true"></span>{% endif %}{{ status.name }}<span class="sr-only">: {% if status.state == "ok" %}OK{% elif status.state == "error" %}error{% else %}status unknown{% endif %}</span>
+</span>

@@ -1,8 +1,8 @@
 """Template context shared by every page of the shell."""
 
-from providers import PROVIDERS
+from catalog.discover import provider_statuses
 
 
 def shell(request):
-    """Provider names for the status bar."""
-    return {"status_providers": [provider.NAME for provider in PROVIDERS]}
+    """Each provider's last known status, for the status bar."""
+    return {"status_providers": provider_statuses()}

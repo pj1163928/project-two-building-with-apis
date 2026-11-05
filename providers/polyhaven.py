@@ -3,6 +3,7 @@
 import re
 from collections import defaultdict
 
+from .cache import remember
 from .http import get_json
 from .records import CC0_LICENSE, CC0_URL, AssetRecord, items_in, tag_names, text
 
@@ -122,9 +123,20 @@ def get_details(asset_id):
 # New code for the Toolbox. The console's search() and get_details() above stay as they are.
 
 KEY = "polyhaven"
+# The credit line on its Discover shelf, and where it links.
+CREDIT = "Powered by Poly Haven"
+HOME_URL = "https://polyhaven.com"
 
 # The Toolbox's kinds mapped to Poly Haven's `t` filter (the PRD's mapping).
 KIND_FILTERS = {"texture": "textures", "hdri": "hdris", "model": "models"}
+
+# How long an asset's /info answer is reused (the PRD: 12 hours).
+INFO_CACHE_SECONDS = 12 * 60 * 60
+
+
+def _cached_info(slug):
+    """/info for one slug, reused for INFO_CACHE_SECONDS. Every Toolbox lookup uses this."""
+    return remember(f"polyhaven:info:{slug}", INFO_CACHE_SECONDS, lambda: _info(slug))
 
 
 def _authors(info):
@@ -152,26 +164,32 @@ def _record(slug, info, kind):
     )
 
 
-def search_records(query: str, kind: str, limit: int = 12) -> list[AssetRecord]:
-    """Return up to `limit` AssetRecords of `kind` matching `query`.
+def search_records(query: str, kind: str, limit: int = 12, page: int = 1) -> list[AssetRecord]:
+    """Return up to `limit` AssetRecords of `kind` matching `query`, from page `page`.
 
-    /search returns only slugs, so each hit costs one /info request. The hits
-    are cut to `limit` first, so no /info is fetched for a result that won't
-    be shown. Zero keyword matches means no results (the semantic search
-    never comes back empty). Any failure raises ProviderError.
+    /search has no offset, so page N asks for N * `limit` hits and keeps the
+    last `limit`. Each kept hit needs its /info, which is cached for
+    INFO_CACHE_SECONDS; no /info is fetched for a hit that won't be shown.
+    Zero keyword matches means no results (the semantic search never comes
+    back empty), and pages after the first stop at the keyword matches, so
+    Load more never wanders into unrelated guesses. Any failure raises
+    ProviderError.
     """
     if kind not in KIND_FILTERS:
         raise ValueError(f"{NAME} has no {kind!r} assets.")
-    params = {"q": query.strip().lower(), "t": KIND_FILTERS[kind], "limit": limit}
+    start = (page - 1) * limit
+    params = {"q": query.strip().lower(), "t": KIND_FILTERS[kind], "limit": start + limit}
     data = get_json(f"{API_URL}/search", params, provider=NAME)
     hits = items_in(data, "results", NAME)
-    if not data.get("keywordMatches"):
+    matches = data.get("keywordMatches")
+    if not matches or (page > 1 and not (isinstance(matches, int) and matches > start)):
         return []
 
-    slugs = [slug for slug in (text(hit.get("slug")) for hit in hits) if slug][:limit]
+    slugs = [slug for slug in (text(hit.get("slug")) for hit in hits) if slug]
+    slugs = slugs[start : start + limit]
     records = []
     for slug in slugs:
-        info = _info(slug)
+        info = _cached_info(slug)
         if isinstance(info, dict):
             records.append(_record(slug, info, kind))
     return records

@@ -21,6 +21,7 @@ from providers import (
     polyhaven,
     providers_for_kind,
 )
+from providers import cache as provider_cache
 
 # The PRD's type-to-provider mapping: for each kind, the providers in shelf
 # order, and the query parameter and value each one must be sent.
@@ -92,14 +93,19 @@ OV_ITEM = {
     "attribution": '"Footsteps, Stones, A.wav" by InspectorJ is licensed under CC BY 4.0.',
     "foreign_landing_url": "https://freesound.org/s/345560/",
     "thumbnail": "https://api.openverse.org/v1/audio/a8783d20/thumb/",
+    "url": "https://cdn.freesound.org/previews/345/345560_5121236-hq.mp3",
     "tags": [{"name": "footsteps"}, {"name": "stone"}],
 }
 CC0_URL = "https://creativecommons.org/publicdomain/zero/1.0/"
 
 
 def assert_every_field_filled(record):
+    """Every field is filled. Only sounds have a preview to play, so only they need one."""
     assert isinstance(record, AssetRecord)
     for field in dataclasses.fields(AssetRecord):
+        if field.name == "preview_url" and record.kind != "sound":
+            assert record.preview_url == "", "only sounds have a preview"
+            continue
         assert getattr(record, field.name), f"{field.name} is empty"
 
 
@@ -161,6 +167,7 @@ def test_openverse_search_records_fills_every_field(mocked_responses):
         attribution=OV_ITEM["attribution"],
         source_url=OV_ITEM["foreign_landing_url"],
         tags=("footsteps", "stone"),
+        preview_url=OV_ITEM["url"],
     )
 
 
@@ -292,3 +299,130 @@ def test_retry_after_is_echoed_only_when_it_is_a_number(mocked_responses):
         openverse.search_records("rain", "sound")
     assert SECRET not in str(excinfo.value)
     assert "HTTP 429" in str(excinfo.value)
+
+
+# ---------------------------------------------------------------- Poly Haven's /info cache
+
+PH_HIT = {"keywordMatches": 1, "results": [{"slug": "red_brick_03", "score": 0.9}]}
+PH_INFO_URL = f"{polyhaven.API_URL}/info/red_brick_03"
+
+
+def info_calls(rsps):
+    return [call for call in rsps.calls if "/info/" in call.request.url]
+
+
+def test_polyhaven_info_is_fetched_once_for_repeated_searches():
+    with responses.RequestsMock() as rsps:
+        rsps.get(f"{polyhaven.API_URL}/search", json=PH_HIT)
+        rsps.get(PH_INFO_URL, json=PH_INFO)
+        first = polyhaven.search_records("brick", "texture")
+        second = polyhaven.search_records("red brick", "texture")
+        assert len(info_calls(rsps)) == 1
+    assert first == second
+
+
+def test_polyhaven_info_is_cached_for_12_hours(monkeypatch):
+    stored = {}
+
+    class Recorder:
+        def get(self, key, default=None):
+            return stored.get(key, (default,))[0]
+
+        def set(self, key, value, timeout=None):
+            stored[key] = (value, timeout)
+
+    monkeypatch.setattr(provider_cache, "_backend", Recorder())
+    with responses.RequestsMock() as rsps:
+        rsps.get(f"{polyhaven.API_URL}/search", json=PH_HIT)
+        rsps.get(PH_INFO_URL, json=PH_INFO)
+        polyhaven.search_records("brick", "texture")
+    assert stored == {"polyhaven:info:red_brick_03": (PH_INFO, 12 * 60 * 60)}
+
+
+def test_a_failed_polyhaven_info_is_not_cached():
+    with responses.RequestsMock() as rsps:
+        rsps.get(f"{polyhaven.API_URL}/search", json=PH_HIT)
+        rsps.get(PH_INFO_URL, status=503)
+        with pytest.raises(ProviderError):
+            polyhaven.search_records("brick", "texture")
+        rsps.replace(responses.GET, PH_INFO_URL, json=PH_INFO)
+        [record] = polyhaven.search_records("brick", "texture")
+        assert len(info_calls(rsps)) == 2
+    assert record.title == "Red Brick 03"
+
+
+def test_without_an_installed_cache_nothing_is_cached(monkeypatch):
+    """The console script installs no cache, so every lookup goes to the provider."""
+    monkeypatch.setattr(provider_cache, "_backend", None)
+    with responses.RequestsMock() as rsps:
+        rsps.get(f"{polyhaven.API_URL}/search", json=PH_HIT)
+        rsps.get(PH_INFO_URL, json=PH_INFO)
+        polyhaven.search_records("brick", "texture")
+        polyhaven.search_records("brick", "texture")
+        assert len(info_calls(rsps)) == 2
+
+
+def test_the_console_search_never_uses_the_cache():
+    """The console's search() is unchanged: it fetches /info every time, cache or not."""
+    with responses.RequestsMock() as rsps:
+        rsps.get(f"{polyhaven.API_URL}/search", json=PH_HIT)
+        rsps.get(PH_INFO_URL, json=PH_INFO)
+        polyhaven.search("brick")
+        polyhaven.search("brick")
+        assert len(info_calls(rsps)) == 2
+
+
+# ---------------------------------------------------------------- paging (Load more)
+
+
+def query_of(call):
+    return parse_qs(urlparse(call.request.url).query)
+
+
+def test_ambientcg_pages_with_offset(mocked_responses):
+    mocked_responses.get(ambientcg.API_URL, json={"assets": [ACG_ASSET]})
+    mocked_responses.get(ambientcg.API_URL, json={"assets": [ACG_ASSET]})
+    ambientcg.search_records("brick", "texture")
+    ambientcg.search_records("brick", "texture", page=3)
+    first, third = (query_of(call) for call in mocked_responses.calls)
+    assert "offset" not in first and first["limit"] == ["12"]
+    assert third["offset"] == ["24"] and third["limit"] == ["12"]
+
+
+def test_openverse_pages_with_page(mocked_responses):
+    mocked_responses.get(openverse.API_URL, json={"results": [OV_ITEM]})
+    mocked_responses.get(openverse.API_URL, json={"results": [OV_ITEM]})
+    openverse.search_records("rain", "sound")
+    openverse.search_records("rain", "sound", page=2)
+    first, second = (query_of(call) for call in mocked_responses.calls)
+    assert "page" not in first
+    assert second["page"] == ["2"] and second["page_size"] == ["12"]
+
+
+def test_openverse_stops_at_its_anonymous_depth_without_asking():
+    with responses.RequestsMock() as rsps:  # any request would fail here
+        assert openverse.search_records("rain", "sound", page=21) == []
+        assert len(rsps.calls) == 0
+
+
+def test_polyhaven_page_two_asks_for_24_hits_and_fetches_info_for_the_last_12():
+    hits = [{"slug": f"brick_{n:02}", "score": 0.9} for n in range(24)]
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        rsps.get(f"{polyhaven.API_URL}/search", json={"keywordMatches": 30, "results": hits})
+        rsps.get(re.compile(rf"{re.escape(polyhaven.API_URL)}/info/.+"), json=PH_INFO)
+        records = polyhaven.search_records("brick", "texture", page=2)
+        search, *infos = rsps.calls
+    assert query_of(search)["limit"] == ["24"]
+    assert [record.external_id for record in records] == [f"brick_{n:02}" for n in range(12, 24)]
+    assert [call.request.url.rsplit("/", 1)[1] for call in infos] == [
+        f"brick_{n:02}" for n in range(12, 24)
+    ]
+
+
+def test_polyhaven_pages_stop_at_the_keyword_matches():
+    """Past the keyword matches, the semantic search only guesses: no more pages."""
+    hits = [{"slug": f"guess_{n:02}", "score": 0.3} for n in range(24)]
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        rsps.get(f"{polyhaven.API_URL}/search", json={"keywordMatches": 12, "results": hits})
+        assert polyhaven.search_records("brick", "texture", page=2) == []
+        assert len(rsps.calls) == 1  # no /info at all

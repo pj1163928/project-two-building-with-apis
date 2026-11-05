@@ -70,9 +70,15 @@ def get_details(asset_id):
 # New code for the Toolbox. The console's search() and get_details() above stay as they are.
 
 KEY = "openverse"
+# The credit line on its Discover shelf, and where it links.
+CREDIT = "Made with Openverse"
+HOME_URL = "https://openverse.org"
 
 # Openverse serves sounds only, with no type filter (the PRD's mapping).
 KIND_FILTERS = {"sound": None}
+
+# Anonymous clients may page no deeper than this many results.
+MAX_DEPTH = 240
 
 
 def _record(item):
@@ -92,16 +98,24 @@ def _record(item):
         attribution=text(item.get("attribution")),
         source_url=text(item.get("foreign_landing_url")),
         tags=tag_names(item.get("tags")),
+        preview_url=text(item.get("url")),
     )
 
 
-def search_records(query: str, kind: str, limit: int = 12) -> list[AssetRecord]:
-    """Return up to `limit` sound AssetRecords matching `query`.
+def search_records(query: str, kind: str, limit: int = 12, page: int = 1) -> list[AssetRecord]:
+    """Return up to `limit` sound AssetRecords matching `query`, from page `page`.
 
-    `kind` must be "sound". Any failure raises ProviderError.
+    Pages are 1-based. A page past MAX_DEPTH is empty, with no request, since
+    Openverse refuses it. `kind` must be "sound". Any failure raises
+    ProviderError.
     """
     if kind not in KIND_FILTERS:
         raise ValueError(f"{NAME} has no {kind!r} assets.")
-    data = get_json(API_URL, {"q": query.strip(), "page_size": limit}, provider=NAME)
+    if (page - 1) * limit >= MAX_DEPTH:
+        return []
+    params = {"q": query.strip(), "page_size": limit}
+    if page > 1:
+        params["page"] = page
+    data = get_json(API_URL, params, provider=NAME)
     records = (_record(item) for item in items_in(data, "results", NAME))
     return [record for record in records if record][:limit]

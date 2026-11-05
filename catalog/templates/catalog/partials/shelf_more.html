@@ -1,0 +1,11 @@
+{# The reply to Load more: the new slot (button, end note or alert) swaps in for the  #}
+{# old one, the page's cards are appended to the shelf's grid, and the count and the #}
+{# provider's status are updated, all out of band.                                   #}
+{% include "catalog/partials/load_more.html" %}
+{% if shelf.records %}
+<ul hx-swap-oob="beforeend:#{{ shelf.results_id }}">
+  {% for record in shelf.records %}{% include "catalog/partials/result_card.html" with tile=shelf.tile source_name=shelf.name %}{% endfor %}
+</ul>
+{% include "catalog/partials/shelf_count.html" with oob=True %}
+{% endif %}
+{% include "partials/provider_status.html" with status=shelf.status oob=True %}

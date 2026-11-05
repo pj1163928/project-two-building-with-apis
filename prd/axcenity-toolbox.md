@@ -282,7 +282,13 @@ asset catalog and pack creator for the engine.
   - Each provider shelf is its own HTMX request fired on page load.
   - A failed shelf shows a DaisyUI alert with the `ProviderError` message
     and a Retry button that re-requests only that shelf.
-  - 12 results per provider, with no paging.
+  - 12 results per provider. *(Changed 2026-11-04 at the user's request:
+    "Load more" appends the next 12, up to 240.)*
+  - *(Added 2026-11-04 at the user's request.)* With no query, the shelves
+    show a random featured search for the type, with Shuffle.
+  - *(Added 2026-11-04 at the user's request.)* Sound results play their
+    preview in the page, streamed from the provider. Hovering a result
+    shows its full title, author, license, source and tags.
   - "Save to library" swaps itself for an "In library" badge. Results
     already in the user's library render as "In library".
 - **Library**
@@ -547,8 +553,7 @@ so any change to the shape fails the tests.
 
 ## Out of Scope
 
-- **Tier 3 stretch items:** a "Popular assets" row, "Load more" on
-  Discover, a light theme, and a sample Rust or Lua manifest loader in the
+- **Tier 3 stretch items:** a "Popular assets" row, a light theme, and a sample Rust or Lua manifest loader in the
   docs. They're built only if Tier 1 and Tier 2 are finished.
 - Downloading, hosting or proxying asset files or thumbnails. The Toolbox
   stores and links to provider URLs only.
@@ -558,7 +563,6 @@ so any change to the shape fails the tests.
 - Providers beyond ambientCG, Poly Haven and Openverse (for example
   Freesound, Sketchfab or Wikimedia Commons), and any provider that needs
   an API key.
-- Paging inside Discover shelves.
 - Several people editing one pack, and comments, likes or following.
 - Password reset, email verification and social sign-in.
 - Production deployment and hosting.

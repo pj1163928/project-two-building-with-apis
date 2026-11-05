@@ -30,6 +30,7 @@ class AssetRecord:
     attribution: str
     source_url: str  # the asset's page on the provider's site
     tags: tuple[str, ...] = ()
+    preview_url: str = ""  # a sound's playable audio (the provider's URL, streamed, never copied)
 
 
 def items_in(data: object, key: str, provider: str) -> list[dict]:

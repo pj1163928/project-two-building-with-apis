@@ -62,6 +62,9 @@ def get_details(asset_id):
 # New code for the Toolbox. The console's search() and get_details() above stay as they are.
 
 KEY = "ambientcg"
+# The credit line on its Discover shelf, and where it links.
+CREDIT = "Assets from ambientCG · CC0"
+HOME_URL = "https://ambientcg.com"
 
 # The Toolbox's kinds mapped to ambientCG's `type` filter (the PRD's mapping).
 KIND_FILTERS = {"texture": "material", "hdri": "hdri", "model": "3d-model"}
@@ -101,10 +104,11 @@ def _record(asset, kind):
     )
 
 
-def search_records(query: str, kind: str, limit: int = 12) -> list[AssetRecord]:
-    """Return up to `limit` AssetRecords of `kind` matching `query`.
+def search_records(query: str, kind: str, limit: int = 12, page: int = 1) -> list[AssetRecord]:
+    """Return up to `limit` AssetRecords of `kind` matching `query`, from page `page`.
 
-    `kind` must be one of KIND_FILTERS. Any failure raises ProviderError.
+    Pages are 1-based and `limit` long (ambientCG's `offset`). `kind` must be
+    one of KIND_FILTERS. Any failure raises ProviderError.
     """
     if kind not in KIND_FILTERS:
         raise ValueError(f"{NAME} has no {kind!r} assets.")
@@ -114,6 +118,8 @@ def search_records(query: str, kind: str, limit: int = 12) -> list[AssetRecord]:
         "limit": limit,
         "include": _RECORD_INCLUDE,
     }
+    if page > 1:
+        params["offset"] = (page - 1) * limit
     data = get_json(API_URL, params, provider=NAME)
     records = (_record(asset, kind) for asset in items_in(data, "assets", NAME))
     return [record for record in records if record][:limit]

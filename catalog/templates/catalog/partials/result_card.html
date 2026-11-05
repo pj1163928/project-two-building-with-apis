@@ -1,13 +1,33 @@
-{# One search result: the provider's thumbnail (linked, never copied; the logo never #}
-{# sits on it), then title, author and license. It opens the provider's own page.   #}
-<li>
-  <a href="{{ record.source_url }}" target="_blank" rel="noopener noreferrer" class="result-card">
-    <div class="result-thumb">
-      {% if record.thumbnail_url %}<img src="{{ record.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
-    </div>
-    <div class="result-body">
-      <h3 class="result-title">{{ record.title }}</h3>
-      <p class="result-meta"><span class="truncate">{{ record.author }}</span><span class="micro text-fg-muted shrink-0">{{ record.license }}</span></p>
-    </div>
-  </a>
+{# One search result: the provider's thumbnail (linked, never copied; the logo never   #}
+{# sits on it), then title, author and license. The title's link is stretched over   #}
+{# the whole card, so the card opens the provider's page, while a sound's play       #}
+{# button sits above it. The type icon sits under the image: it shows when there is  #}
+{# no thumbnail URL, and shell.js removes an image that fails to load. Hovering or   #}
+{# focusing the card shows .result-details: the full title, author, license, source  #}
+{# and tags that the card itself cuts short.                                          #}
+<li class="result-card">
+  <div class="result-thumb">
+    <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=28 %}</span>
+    {% if record.thumbnail_url %}<img src="{{ record.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+    {% if record.preview_url %}
+      <button type="button" class="sound-play" data-sound-preview="{{ record.preview_url }}" aria-pressed="false" aria-label="Play a preview of {{ record.title }}">
+        <span class="sound-play-icon when-paused">{% include "partials/icon.html" with name="play" size=18 %}</span>
+        <span class="sound-play-icon when-playing">{% include "partials/icon.html" with name="pause" size=18 %}</span>
+      </button>
+      <span class="sound-progress" aria-hidden="true"></span>
+    {% endif %}
+  </div>
+  <div class="result-body">
+    <h3 class="result-title"><a href="{{ record.source_url }}" target="_blank" rel="noopener noreferrer" class="result-link">{{ record.title }}</a></h3>
+    <p class="result-meta"><span class="result-author">{{ record.author }}</span><span class="micro text-fg-muted shrink-0">{{ record.license }}</span></p>
+  </div>
+  <div class="result-details" aria-hidden="true">
+    <p class="result-details-title">{{ record.title }}</p>
+    <dl class="result-details-list">
+      <div><dt class="micro">By</dt><dd>{{ record.author }}</dd></div>
+      <div><dt class="micro">License</dt><dd>{{ record.license }}</dd></div>
+      <div><dt class="micro">From</dt><dd>{{ source_name }}</dd></div>
+      {% if record.tags %}<div><dt class="micro">Tags</dt><dd>{{ record.tags|slice:":6"|join:", " }}</dd></div>{% endif %}
+    </dl>
+  </div>
 </li>

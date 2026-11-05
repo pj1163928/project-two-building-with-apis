@@ -337,7 +337,7 @@ def test_current_page_is_marked_in_activity_bar(member_client, name, label):
     assert current == [label]
 
 
-def test_status_bar_lists_providers_as_placeholders(client):
+def test_status_bar_lists_every_provider_as_unknown_at_first(client):
     html = client.get(reverse("catalog:discover")).content.decode()
     status_bar = html.split('id="status-bar"', 1)[1]
     for provider in ("ambientCG", "Poly Haven", "Openverse Audio"):

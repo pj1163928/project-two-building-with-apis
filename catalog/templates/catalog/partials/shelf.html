@@ -1,12 +1,14 @@
 {# One provider's shelf. Pending, it fetches itself once (hx-trigger="load") and is   #}
 {# replaced whole by the loaded shelf: results, "no matches", or an alert with Retry. #}
-{# Retry re-requests this shelf's own URL into this shelf only.                       #}
+{# Retry re-requests this shelf's own URL into this shelf only. A full page of       #}
+{# results ends with Load more (catalog/partials/load_more.html). A loaded shelf     #}
+{# also sends its provider's status out of band, so the status bar updates at once. #}
 <section id="{{ shelf.dom_id }}" class="shelf" aria-labelledby="{{ shelf.dom_id }}-title"{% if not shelf.loaded %} aria-busy="true" hx-get="{{ shelf.url }}" hx-trigger="load" hx-swap="outerHTML"{% endif %}>
   <header class="shelf-head">
     <span class="micro text-fg-muted">{{ shelf.number|stringformat:"02d" }}</span>
     <h2 id="{{ shelf.dom_id }}-title" class="micro text-fg-strong">{{ shelf.name }}</h2>
     <span class="shelf-rule" aria-hidden="true"></span>
-    <span class="micro text-fg-weak">{% if not shelf.loaded %}Searching{% elif shelf.error %}Unavailable{% else %}{{ shelf.records|length }} result{{ shelf.records|length|pluralize }}{% endif %}</span>
+    {% if not shelf.loaded %}<span class="micro text-fg-weak">Searching</span>{% elif shelf.error %}<span class="micro text-fg-weak">Unavailable</span>{% else %}{% include "catalog/partials/shelf_count.html" %}{% endif %}
   </header>
   {% if not shelf.loaded %}
     <ul class="result-grid" aria-label="Loading {{ shelf.name }} results">
@@ -27,8 +29,11 @@
       <p class="text-sm text-fg-weak mt-1">Try a different or broader phrase.</p>
     </div>
   {% else %}
-    <ul class="result-grid">
-      {% for record in shelf.records %}{% include "catalog/partials/result_card.html" %}{% endfor %}
+    <ul id="{{ shelf.results_id }}" class="result-grid">
+      {% for record in shelf.records %}{% include "catalog/partials/result_card.html" with tile=shelf.tile source_name=shelf.name %}{% endfor %}
     </ul>
+    {% if shelf.has_more %}{% include "catalog/partials/load_more.html" %}{% endif %}
   {% endif %}
+  <p class="shelf-credit"><a href="{{ shelf.credit_url }}" target="_blank" rel="noopener noreferrer">{{ shelf.credit }}</a></p>
 </section>
+{% if shelf.loaded %}{% include "partials/provider_status.html" with status=shelf.status oob=True %}{% endif %}
