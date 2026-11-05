@@ -1,9 +1,10 @@
-"""The library page: its controls, its empty state and its card grid.
+"""The library page: its controls, its empty states, its card grid and its HTMX swaps.
 
-Phase 4 wires up search, filters and sorting. Until then (and whenever the
-library is empty) the controls render disabled, in the places they'll live.
-Phase 3's grid shows the member's own entries from the Toolbox's stored
-Assets, with every provider down if need be.
+The controls (search, sort, and the side panel's filter chips) render
+disabled while the library is empty. The grid shows the member's own entries
+from the Toolbox's stored Assets, with every provider down if need be.
+Search, filters, sorts and pages go through filter_library()
+(test_library_filter.py); these tests cover the page around it.
 """
 
 import re
@@ -37,25 +38,53 @@ def test_toolbar_sits_between_the_header_and_the_results(library_html):
     assert "Your library is empty." in content[results:]
 
 
-def test_toolbar_holds_search_sort_and_view_controls_all_disabled(library_html):
-    toolbar = _content(library_html).split('id="library-toolbar"', 1)[1].split("</div>\n\n", 1)[0]
-    assert 'role="toolbar" aria-label="Library controls" aria-disabled="true"' in toolbar
-    assert re.search(r'<input type="search" name="q" placeholder="[^"]+" disabled>', toolbar)
-    # The PRD's four sorts, newest saved first (the default).
-    sort = re.search(r'<select name="sort" disabled>(.*?)</select>', toolbar, re.S).group(1)
-    assert re.findall(r"<option>([^<]+)</option>", sort) == [
-        "Newest saved",
-        "Oldest",
-        "Title A–Z",
-        "Rating, high to low",
-    ]
-    views = re.findall(
-        r'<button type="button" disabled aria-pressed="(\w+)" aria-label="([^"]+)"', toolbar
+def _toolbar(html):
+    return _content(html).split('id="library-toolbar"', 1)[1].split("</form>", 1)[0]
+
+
+def test_toolbar_holds_search_and_sort_disabled_while_empty(library_html):
+    toolbar = _toolbar(library_html)
+    assert 'role="search" aria-label="Library controls"' in toolbar
+    assert 'aria-disabled="true"' in toolbar
+    assert re.search(
+        r'<input type="search" id="library-search" name="q" value=""[^>]* disabled>', toolbar
     )
-    assert views == [("true", "Grid view"), ("false", "List view")]
+    # The PRD's four sorts, newest saved first (the default).
+    sort = re.search(
+        r'<select name="sort" class="library-control" disabled>(.*?)</select>', toolbar, re.S
+    )
+    assert re.findall(r'<option value="(\w+)"[^>]*>([^<]+)</option>', sort.group(1)) == [
+        ("newest", "Newest saved"),
+        ("oldest", "Oldest"),
+        ("title", "Title A–Z"),
+        ("rating", "Rating, high to low"),
+    ]
+    # The grid/list toggle is gone: the PRD describes only a card grid.
+    assert "Grid view" not in library_html and "List view" not in library_html
 
 
-def test_filters_live_in_the_side_panel_disabled(library_html):
+def _chips(html):
+    """{group title: [(label, input type, value, checked)]} from the side panel's filters."""
+    filters = html.split('id="library-filters"', 1)[1].split("</section>", 1)[0]
+    groups = re.findall(
+        r'<div class="filter-group" role="group" aria-label="([^"]+)">(.*?)</div>\s*</div>',
+        filters,
+        re.S,
+    )
+    return {
+        title: [
+            (label, kind, value, bool(checked))
+            for kind, value, checked, label in re.findall(
+                r'<label class="filter-chip"><input type="(\w+)" class="library-control sr-only" '
+                r'form="library-toolbar" name="\w+" value="([^"]*)"( checked)?><span>([^<]+)</span>',
+                body,
+            )
+        ]
+        for title, body in groups
+    }
+
+
+def test_filters_live_in_the_side_panel_disabled_while_empty(library_html):
     panel = library_html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
     # The usual navigation rows stay on top.
     assert re.findall(r'<a class="panel-row"[^>]*>([^<]+)</a>', panel) == [
@@ -63,24 +92,26 @@ def test_filters_live_in_the_side_panel_disabled(library_html):
         "Library",
         "Packs",
     ]
-    filters = panel.split('id="library-filters"', 1)[1]
-    assert '<fieldset disabled class="' in filters
-    groups = dict(
-        re.findall(
-            r'<div class="filter-group"><p class="micro text-fg-muted">([^<]+)</p>\s*<div[^>]*>(.*?)</div>',
-            filters,
-            re.S,
-        )
-    )
-    chips = {
-        name: re.findall(r'class="filter-chip">([^<]+)<', body) for name, body in groups.items()
-    }
-    assert chips == {
+    assert '<fieldset disabled class="' in panel.split('id="library-filters"', 1)[1]
+    chips = _chips(library_html)
+    assert {title: [chip[0] for chip in group] for title, group in chips.items()} == {
         "Type": ["Textures", "HDRIs", "Models", "Sounds"],
-        "Provider": ["ambientCG", "Poly Haven", "Openverse"],
+        "Provider": ["ambientCG", "Poly Haven", "Openverse Audio"],
         "Status": ["To review", "Testing", "Approved", "Rejected"],
         "Minimum rating": ["Any", "1+", "2+", "3+", "4+", "5"],
     }
+    # Type, provider and status are checkboxes; minimum rating is one radio choice, Any by default.
+    assert {chip[1] for title in ("Type", "Provider", "Status") for chip in chips[title]} == {
+        "checkbox"
+    }
+    assert [(chip[1], chip[2], chip[3]) for chip in chips["Minimum rating"]] == [
+        ("radio", "", True),
+        ("radio", "1", False),
+        ("radio", "2", False),
+        ("radio", "3", False),
+        ("radio", "4", False),
+        ("radio", "5", False),
+    ]
 
 
 def test_other_pages_keep_the_plain_side_panel(member_client):
@@ -223,8 +254,179 @@ def test_a_member_sees_only_their_own_entries(entries, member_client, django_use
     assert len(_cards(mine)) == 3
 
 
-def test_controls_stay_disabled_until_phase_four(entries, member_client):
+def test_controls_switch_on_once_the_library_has_entries(entries, member_client):
     html = member_client.get(reverse("catalog:library")).content.decode()
-    toolbar = _content(html).split('id="library-toolbar"', 1)[1].split("</div>\n\n", 1)[0]
-    assert 'aria-disabled="true"' in toolbar
-    assert '<fieldset disabled class="' in html.split('id="library-filters"', 1)[1]
+    toolbar = _toolbar(html)
+    assert "aria-disabled" not in toolbar and " disabled" not in toolbar
+    assert '<fieldset class="' in html.split('id="library-filters"', 1)[1]
+
+
+# ---------------------------------------------------------------- browsing (Phase 4)
+
+HTMX = {"HX-Request": "true", "HX-Target": "library-results"}
+
+
+@pytest.fixture
+def many(make_asset, member):
+    """14 of the member's textures and 1 HDRI: two pages, newest saved first."""
+    from catalog.models import SavedAsset
+
+    for n in range(14):
+        SavedAsset.objects.create(
+            user=member,
+            asset=make_asset(external_id=f"brick_{n:02}", title=f"Brick {n:02}"),
+            status=SavedAsset.Status.APPROVED if n % 2 else SavedAsset.Status.TO_REVIEW,
+            rating=(n % 5) + 1,
+            saved_at=timezone.now() - timedelta(days=n),
+        )
+    SavedAsset.objects.create(
+        user=member,
+        asset=make_asset(external_id="sky", kind="hdri", title="Sky"),
+        saved_at=timezone.now() - timedelta(days=30),
+    )
+
+
+def _titles(html):
+    return [re.search(r'class="result-link">([^<]+)<', card).group(1) for card in _cards(html)]
+
+
+def test_an_htmx_request_returns_only_the_results_fragment(many, member_client):
+    response = member_client.get(reverse("catalog:library") + "?q=brick", headers=HTMX)
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert html.strip().startswith('<div id="library-results"')
+    assert "<html" not in html and 'id="side-panel"' not in html
+    assert 'id="library-toolbar"' not in html
+    assert len(_cards(html)) == 12
+
+
+def test_a_normal_request_for_the_same_query_string_is_the_full_page_in_the_same_state(
+    many, member_client
+):
+    query = "?q=brick&type=texture&status=approved&min_rating=2&sort=title&page=1"
+    fragment = member_client.get(reverse("catalog:library") + query, headers=HTMX)
+    page = member_client.get(reverse("catalog:library") + query)
+    html = page.content.decode()
+    assert "<html" in html
+    # The same cards, in the same order.
+    assert _titles(html) == _titles(fragment.content.decode())
+    assert _titles(html) == ["Brick 01", "Brick 03", "Brick 07", "Brick 09", "Brick 11", "Brick 13"]
+    # And the controls show the state the URL asked for.
+    toolbar = _toolbar(html)
+    assert 'name="q" value="brick"' in toolbar
+    assert '<option value="title" selected>' in toolbar
+    checked = {
+        title: [chip[0] for chip in group if chip[3]] for title, group in _chips(html).items()
+    }
+    assert checked == {
+        "Type": ["Textures"],
+        "Provider": [],
+        "Status": ["Approved"],
+        "Minimum rating": ["2+"],
+    }
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"HX-Request": "true", "HX-Boosted": "true"},  # a boosted link to the library
+        {"HX-Request": "true", "HX-History-Restore-Request": "true"},  # Back after a swap
+    ],
+)
+def test_boosted_and_history_restore_requests_get_the_full_page(many, member_client, headers):
+    response = member_client.get(reverse("catalog:library") + "?q=brick&page=2", headers=headers)
+    html = response.content.decode()
+    assert "<html" in html and 'id="library-toolbar"' in html
+    assert "HX-Push-Url" not in response.headers
+    assert _titles(html) == ["Brick 12", "Brick 13"]
+
+
+def test_the_pushed_url_holds_the_search_filters_sort_and_page(many, member_client):
+    # As the toolbar's form sends it: every field, blanks and defaults included.
+    query = (
+        "?q=+brick+&sort=rating&type=texture&status=approved&status=to_review"
+        "&provider=polyhaven&min_rating=&page=2"
+    )
+    response = member_client.get(reverse("catalog:library") + query, headers=HTMX)
+    assert response["HX-Push-Url"] == (
+        "/library/?q=brick&type=texture&provider=polyhaven&status=to_review&status=approved"
+        "&sort=rating&page=2"
+    )
+    # Defaults and junk are left out, so the plain library is plain /library/.
+    plain = member_client.get(
+        reverse("catalog:library") + "?q=&sort=newest&min_rating=&type=planet", headers=HTMX
+    )
+    assert plain["HX-Push-Url"] == "/library/"
+
+
+def test_the_toolbar_and_filters_swap_only_the_results_and_push_the_url(many, member_client):
+    html = member_client.get(reverse("catalog:library")).content.decode()
+    form = re.search(r'<form id="library-toolbar"[^>]*>', html, re.S).group(0)
+    assert 'hx-get="/library/"' in form
+    assert 'hx-target="#library-results"' in form and 'hx-swap="outerHTML"' in form
+    assert 'hx-push-url="true"' in form
+    # Typing searches after a pause; a chip or the sort select applies at once.
+    assert "input changed delay:300ms from:#library-search" in form
+    assert "change from:.library-control" in form
+    # Every side-panel chip belongs to that form.
+    filters = html.split('id="library-filters"', 1)[1].split("</section>", 1)[0]
+    assert filters.count('form="library-toolbar"') == filters.count("<input") == 17
+
+
+def test_the_pager_links_to_each_page_with_the_same_view(many, member_client):
+    first = member_client.get(reverse("catalog:library") + "?sort=oldest").content.decode()
+    assert "1–12 of 15 entries" in first
+    pager = first.split('id="library-pager"', 1)[1].split("</nav>", 1)[0]
+    assert "Page 1 of 2" in pager
+    assert (
+        '<span class="btn btn-quiet btn-sm btn-disabled" aria-disabled="true">Previous</span>'
+        in pager
+    )
+    next_link = re.search(
+        r'<a href="([^"]+)" hx-get="\1" hx-target="#library-results"[^>]*hx-push-url="true" rel="next"',
+        pager,
+    )
+    assert next_link.group(1) == "/library/?sort=oldest&amp;page=2"
+
+    second = member_client.get("/library/?sort=oldest&page=2", headers=HTMX).content.decode()
+    assert "13–15 of 15 entries" in second
+    assert _titles(second) == ["Brick 02", "Brick 01", "Brick 00"]
+    pager = second.split('id="library-pager"', 1)[1].split("</nav>", 1)[0]
+    assert re.search(r'<a href="/library/\?sort=oldest" [^>]*rel="prev"', pager)
+    assert "Next</span>" in pager
+
+
+def test_one_page_has_no_pager(entries, member_client):
+    html = member_client.get(reverse("catalog:library")).content.decode()
+    assert "1–3 of 3 entries" in html
+    assert 'id="library-pager"' not in html
+
+
+def test_an_empty_library_links_to_discover(member_client):
+    for headers in ({}, HTMX):
+        html = member_client.get(reverse("catalog:library") + "?q=brick", headers=headers)
+        results = html.content.decode().split('id="library-results"', 1)[1]
+        assert "Your library is empty." in results
+        assert (
+            '<a href="/discover/" class="btn btn-quiet btn-sm mt-5">Go to Discover</a>' in results
+        )
+
+
+def test_no_matches_offers_to_clear_the_search_and_filters(entries, member_client):
+    searched = member_client.get("/library/?q=granite", headers=HTMX).content.decode()
+    assert "Nothing in your library matches “granite”." in searched
+    assert '<a href="/library/" class="btn btn-quiet btn-sm mt-5">Clear filters</a>' in searched
+    assert "Your library is empty." not in searched
+
+    filtered = member_client.get("/library/?type=model&min_rating=5").content.decode()
+    results = filtered.split('id="library-results"', 1)[1]
+    assert "Nothing in your library matches these filters." in results
+    assert '<a href="/library/" class="btn btn-quiet btn-sm mt-5">Clear filters</a>' in results
+    # The controls stay on, so the member can loosen the filters instead.
+    assert '<fieldset class="' in filtered.split('id="library-filters"', 1)[1]
+
+
+def test_a_search_is_shown_escaped(entries, member_client):
+    html = member_client.get("/library/?q=<script>x</script>").content.decode()
+    assert "<script>x</script>" not in html
+    assert "&lt;script&gt;x&lt;/script&gt;" in html

@@ -26,7 +26,7 @@ phases add.
 | `packs:home` | `/` | Everyone |
 | `catalog:discover` | `/discover/?type=<kind>&q=<query>` | Everyone |
 | `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>&page=<n>` | Everyone (an HTMX fragment; `page` is optional, 1 to 20) |
-| `catalog:library` | `/library/` | Members |
+| `catalog:library` | `/library/?q=&type=&provider=&status=&min_rating=&sort=&page=` | Members (the controls' HTMX requests get the results fragment) |
 | `catalog:save` | `/library/save/` | Members; POST only, with CSRF (an HTMX fragment) |
 | `packs:list` | `/packs/` | Members |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
@@ -127,9 +127,41 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
 - **"In library" on Discover:** shelves are cached for everyone, so the
   shelf view looks up the member's saved IDs among the shelf's records on
   every request (`SavedAsset.objects.saved_external_ids()`).
-- **The library page** lists the member's entries, newest saved first,
-  from stored Assets only, so it works with every provider down. Search,
-  filters, sorts and pages arrive in Phase 4.
+- **The library page** lists the member's entries from stored Assets
+  only, so it works with every provider down. It's all one URL,
+  `/library/`, read through `filter_library()` (below).
+- **Browsing** (`catalog/library.py`):
+  - `filter_library(user, params)` returns a `LibraryPage`: one Django
+    `Page` of 12 and the tidied `LibraryParams` behind it. It starts from
+    `SavedAsset.objects.for_user(user)`, so no parameter can reach another
+    member's entries, and a visitor gets none. The API (Phase 6) calls it
+    with `request.query_params`; it takes a QueryDict or a plain dict.
+  - **Parameters:** `q`, `type`, `provider` and `status` (each may repeat),
+    `min_rating` (1 to 5), `sort` (`newest`, the default, `oldest`, `title`,
+    `rating`) and `page`.
+  - `clean_library_params()` tidies them and never fails: unknown filter
+    values are dropped, an unknown sort is `newest`, a page that isn't a
+    whole number from 1 is 1, and a page past the end is the last page.
+  - **Search** (`SavedAssetQuerySet.search()`): every word must match the
+    title, a tag or the member's notes, ignoring case. A word goes through
+    `normalize_tag()` before it's matched against tags, so "bricks" finds
+    "brick". Tags match through a subquery, so an entry is never listed
+    twice.
+  - **Sorts** (`LIBRARY_SORTS` in `catalog/models.py`, applied by
+    `sorted_by()`): title A–Z ignores case; rating puts unrated entries
+    last. Every sort ends on newest saved and then id, so pages never
+    shift.
+  - `LibraryParams.url(page=None)` builds the tidy URL, leaving out
+    defaults, so the whole library is plain `/library/`. `LibraryPage`
+    has `url`, `previous_url` and `next_url`. `filter_groups()` gives the
+    side panel's chips, checked to match.
+- **`LibraryView`** answers the controls' HTMX requests
+  (`request.htmx`, not boosted, not a history restore) with
+  `catalog/partials/library_results.html` and an `HX-Push-Url` header
+  holding the tidy URL. A boosted request and a history restore (Back
+  after a swap) get the whole page. A signed-out fragment request gets
+  `HX-Redirect` to sign-in with `next` set to the full library URL, so
+  the sign-in page never lands inside the results.
 - **Saved count:** `config.context_processors.shell` adds `saved_count`
   (the member's own entries) for signed-in members only.
 
@@ -161,12 +193,12 @@ Every rule has a test (see [TESTING.md](TESTING.md)).
 ## Shared functions
 
 Each of these has exactly one implementation, used by both the pages and
-the API. `normalize_tag()`, `search_records()` and `fetch_record()` are built; the rest are *(planned)*:
+the API. `normalize_tag()`, `filter_library()`, `search_records()` and `fetch_record()` are built; the rest are *(planned)*:
 
 | Function | Purpose |
 |---|---|
 | `normalize_tag()` | Built (Phase 3), `catalog/tags.py`. The one way to tidy tag names: lowercase, trimmed, single spaces; number-only tags dropped; a plural "s" stripped from the last word unless it ends in "ss". Returns `None` for a dropped tag |
-| `filter_library(user, params)` | Library search, filters, sorts, pages of 12 |
+| `filter_library(user, params)` | Built (Phase 4), `catalog/library.py`. Library search (title, tags, notes), filters (type, provider, status, minimum rating), sorts and pages of 12, for the caller's own entries only (see "Library and saving") |
 | `filter_public_packs(params)` | Gallery search, type filter, sorts, pages of 12 |
 | `add_to_pack(pack, saved_asset)` | Adds an item and enforces ownership |
 | Manifest builder | The Option A export shape, locked by a golden file |

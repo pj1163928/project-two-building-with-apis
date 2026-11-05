@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView
-from django_htmx.http import HttpResponseClientRedirect
+from django_htmx.http import HttpResponseClientRedirect, push_url
 
 from providers import PROVIDERS_BY_KEY, ProviderError
 
@@ -22,7 +22,7 @@ from .discover import (
     shelf_provider,
     shuffle_url,
 )
-from .library import save_to_library
+from .library import SORT_LABELS, filter_groups, filter_library, save_to_library
 from .models import SavedAsset
 
 
@@ -123,20 +123,57 @@ class SaveAssetView(LoginRequiredMixin, View):
         return render(request, "catalog/partials/in_library.html", {**slot, "count_oob": True})
 
 
-class LibraryView(LoginRequiredMixin, TemplateView):
-    """The member's private library: a card grid of their own entries, newest first.
+def _wants_results_only(request) -> bool:
+    """True for the library controls' own HTMX requests, which swap only the results.
 
-    Every card renders from the Toolbox's stored Asset, so the library works
-    with every provider down. Search, filters, sorts and pages arrive in
-    Phase 4.
+    A boosted link and a history restore (Back after a swap) are HTMX
+    requests too, but each needs the whole page.
+    """
+    htmx = request.htmx
+    return bool(htmx) and not htmx.boosted and not htmx.history_restore_request
+
+
+class LibraryView(LoginRequiredMixin, TemplateView):
+    """The member's private library: a card grid of their own entries.
+
+    Search, filters, sort and page come from the query string, through
+    filter_library(). The controls' HTMX requests get only the results
+    fragment, with the tidy URL pushed to the address bar. Any other request
+    for the same URL gets the whole page in the same state. Every card
+    renders from the Toolbox's stored Asset, so the library works with every
+    provider down.
     """
 
     template_name = "catalog/library.html"
+    results_template_name = "catalog/partials/library_results.html"
     extra_context = {"active_nav": "library"}
+
+    def handle_no_permission(self):
+        # The results fragment would land inside the old page, so a signed-out
+        # HTMX request redirects the whole window to sign-in instead.
+        if _wants_results_only(self.request):
+            return HttpResponseClientRedirect(redirect_to_login(self.request.get_full_path()).url)
+        return super().handle_no_permission()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["entries"] = list(
-            SavedAsset.objects.for_user(self.request.user).select_related("asset")
+        results = filter_library(self.request.user, self.request.GET)
+        context.update(
+            results=results,
+            params=results.params,
+            entries=results.page.object_list,
+            library_empty=not (
+                results.page.paginator.count
+                or SavedAsset.objects.for_user(self.request.user).exists()
+            ),
+            filter_groups=filter_groups(results.params),
+            sort_labels=SORT_LABELS,
         )
         return context
+
+    def get(self, request, *args, **kwargs):
+        context = self.get_context_data(**kwargs)
+        if _wants_results_only(request):
+            response = render(request, self.results_template_name, context)
+            return push_url(response, context["results"].url)
+        return self.render_to_response(context)

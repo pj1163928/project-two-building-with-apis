@@ -25,6 +25,15 @@ Phase 3 rules:
 - The status bar's saved count only ever counts the current member's
   entries. (/library/ itself is in MEMBERS_ONLY_PAGES; the grid's
   own-entries rule is in test_library_page.py.)
+
+Phase 4 rules:
+- A signed-out visitor's library URL with a search, filters, sort and page
+  is sent to sign-in and back to that same view. The results fragment (an
+  HTMX request) redirects the whole window there instead of swapping the
+  sign-in page into the results.
+- No search, filter, sort or page parameter on the page or its fragment
+  shows another member's entries. (filter_library()'s own rule is in
+  test_library_filter.py.)
 """
 
 import re
@@ -339,3 +348,55 @@ def test_the_saved_count_counts_only_the_current_members_entries(
     assert count(theirs) == "5"
     # A visitor's bar holds no count at all.
     assert 'id="saved-count"' not in Client().get(reverse("catalog:discover")).content.decode()
+
+
+# ---------------------------------------------------------------- library browsing (Phase 4)
+
+LIBRARY_VIEW = "/library/?q=brick&type=texture&status=approved&sort=rating&page=2"
+
+
+def test_a_visitors_library_view_is_sent_to_sign_in_and_back_to_it(client, member, password):
+    response = client.get(LIBRARY_VIEW)
+    assert response.status_code == 302
+    assert response.url == login_url_for(LIBRARY_VIEW)
+    signed_in = client.post(response.url, {"username": member.username, "password": password})
+    assert signed_in.url == LIBRARY_VIEW
+
+
+def test_a_visitors_results_fragment_redirects_the_whole_window_to_sign_in(client):
+    response = client.get(LIBRARY_VIEW, headers={"HX-Request": "true"})
+    assert response.status_code == 200
+    assert response["HX-Redirect"] == login_url_for(LIBRARY_VIEW)
+    assert 'id="library-results"' not in response.content.decode()
+
+
+@pytest.mark.parametrize("headers", [{}, {"HX-Request": "true", "HX-Boosted": "true"}])
+def test_a_visitors_boosted_library_request_is_an_ordinary_redirect(client, headers):
+    response = client.get(LIBRARY_VIEW, headers=headers)
+    assert response.status_code == 302
+    assert response.url == login_url_for(LIBRARY_VIEW)
+
+
+@pytest.mark.parametrize("htmx", [False, True])
+def test_library_parameters_never_show_another_members_entries(
+    member_client, member, make_asset, django_user_model, password, htmx
+):
+    from catalog.models import SavedAsset
+
+    other = django_user_model.objects.create_user("other_member", password=password)
+    SavedAsset.objects.create(user=member, asset=make_asset(external_id="mine", title="Mine Brick"))
+    their_asset = make_asset(external_id="theirs", title="Their Secret Brick")
+    SavedAsset.objects.create(
+        user=other, asset=their_asset, notes="secret note", rating=5, status="approved"
+    )
+    headers = {"HX-Request": "true"} if htmx else {}
+    for query in (
+        "",
+        "?q=secret",
+        "?q=brick&status=approved&min_rating=5",
+        f"?user={other.pk}&owner={other.username}",
+        "?sort=rating&page=2",
+    ):
+        html = member_client.get(reverse("catalog:library") + query, headers=headers)
+        html = html.content.decode()
+        assert "Their Secret Brick" not in html and "secret note" not in html, query

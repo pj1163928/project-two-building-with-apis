@@ -13,10 +13,11 @@ reads `DJANGO_SETTINGS_MODULE` from `pyproject.toml`. Name files by area:
 
 | File | Covers |
 |---|---|
-| `test_access_control.py` | The access rules, page by page: who gets 200, who is redirected to sign-in, POST-only sign-out, CSRF rejections, a visitor's status bar holding provider status only, saving (sign-in back to Discover, CSRF) and the saved count counting only the member's own entries |
+| `test_access_control.py` | The access rules, page by page: who gets 200, who is redirected to sign-in, POST-only sign-out, CSRF rejections, a visitor's status bar holding provider status only, saving (sign-in back to Discover, CSRF), the saved count counting only the member's own entries, a visitor's library view (and its fragment's `HX-Redirect`) going to sign-in and back, and library parameters never showing another member's entries |
 | `test_accounts.py` | Sign-up and sign-in flows and their validation errors |
 | `test_shell.py` | Every page renders in the shell; branding, fonts and static files; no type colour in the chrome, and in content only on Discover's tiles; showcase vs work surfaces; boosted navigation, the hover gate and the font gate |
-| `test_library_page.py` | The library's layout (the toolbar, the side-panel filters, the empty state) and its grid: newest first, each card's thumbnail, type, title, status and rating, provider URLs only, a member's own entries only, and rendering with every provider down |
+| `test_library_page.py` | The library's layout (the toolbar, the side-panel chips, disabled while empty) and its grid: newest first, each card's thumbnail, type, title, status and rating, provider URLs only, a member's own entries only, and rendering with every provider down. Browsing: the HTMX fragment versus the full page in the same state, boosted and history-restore requests, the pushed URL, the pager and both empty states |
+| `test_library_filter.py` | `filter_library()` called directly: never another member's entries, each search field, each filter, each sort (rating with unrated last), pages of 12, combinations, bad values falling back to the defaults, and the tidy URL |
 | `test_library_save.py` | Saving: the shared Asset reused across members, one entry per member, nothing saved on a `ProviderError`, new entries To review, the model constraints, the save view's replies and 400s, and "In library" on Discover's shelves |
 | `test_tags.py` | `normalize_tag()`, rule by rule |
 | `test_auth_pages.py` | Sign-in and sign-up: the layout, the top-bar actions, password toggles, the Forgot password link, focus and error styling |

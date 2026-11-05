@@ -28,6 +28,101 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-05 — Axcenity Toolbox: Phase 4/13, Library browsing
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 4`.
+2. Looks good go ahead and move onto testing
+3. Looks good move to next test
+4. Looks good move to next
+5. Looks good move on
+
+### Summary
+
+- **Outcome:** members can search, filter, sort and page through their
+  library.
+  - One shared `filter_library(user, params)` handles search (title,
+    tags, notes), filters (type, provider, status, minimum rating), the
+    four sorts and pages of 12. It only ever returns the caller's own
+    entries.
+  - The toolbar's search and sort, and the side panel's chips, switch on
+    once the library has entries. A change swaps only `#library-results`
+    and pushes a tidy URL. The same URL loaded directly, or reached with
+    Back, renders the whole page in the same state.
+  - An empty library links to Discover, and no matches offers Clear
+    filters. Pages over one get a Previous / "Page N of M" / Next pager.
+  - 497 tests pass (451 before the phase). `ruff check` and
+    `ruff format --check` are clean. A one-off `tailwind build` emits the
+    new chip rules.
+- **Changes:**
+  - `catalog/library.py`: `filter_library()`, `clean_library_params()`,
+    `LibraryParams` (with `is_filtered` and the tidy `url()`),
+    `LibraryPage` (with `url`, `previous_url` and `next_url`),
+    `filter_groups()` for the side panel's chips, and `SORT_LABELS`.
+  - `catalog/models.py`: `LIBRARY_SORTS`, and
+    `SavedAssetQuerySet.search()` and `sorted_by()`.
+  - `catalog/views.py`: `LibraryView` returns the results fragment, with
+    `HX-Push-Url`, for the controls' own HTMX requests. Boosted and
+    history-restore requests get the full page. A signed-out fragment
+    request gets `HX-Redirect` to sign-in.
+  - `catalog/templates/catalog/library.html`: the toolbar is now a GET
+    form with the HTMX swap. The chips are checkbox and radio labels tied
+    to it through `form="library-toolbar"`. The grid/list toggle is gone.
+  - `catalog/templates/catalog/partials/library_results.html` (new): the
+    count, the grid, the pager and both empty states.
+  - `styles/source.css`: chips that are on are inverted, with a focus
+    ring and gated hover. The toolbar fields get a focus edge, and there
+    are pager styles. The view-toggle styles are removed.
+  - `tests/test_library_filter.py` (new): `filter_library()` unit tests.
+  - `tests/test_library_page.py`: the layout tests now cover disabled
+    while empty, and new browsing tests cover the fragment, the full page,
+    the pushed URL, the pager and the empty states.
+  - `tests/test_access_control.py`: a visitor's library view and its
+    fragment go to sign-in and back, and no parameter shows another
+    member's entries.
+  - `docs/ARCHITECTURE.md`, `docs/FRONTEND.md`, `docs/TESTING.md`: the
+    browsing design, its parameters, the swap and the new test file.
+  - `plans/axcenity-toolbox.md`: Phase 4 ticked.
+- **TDD:** three behaviours, each red on an assertion before the code:
+  1. Never another member's entries, whatever the parameters (the
+     scaffold read every `SavedAsset`).
+  2. The rating sort is high to low with unrated entries last and ties
+     newest first (the scaffold ignored `sort`).
+  3. Unknown sort, filter and page values fall back to the defaults (the
+     simple filters returned nothing for `type=planet`).
+- **Decisions:**
+  - The URL parameters are `q`, `type`, `provider`, `status`,
+    `min_rating`, `sort` (`newest`, `oldest`, `title`, `rating`) and
+    `page`. The pushed URL leaves out defaults, so the whole library is
+    `/library/`.
+  - Type, provider and status chips allow several choices; minimum
+    rating is one choice, Any by default.
+  - Every search word must match the title, a tag or the notes. Words go
+    through `normalize_tag()` before matching tags, and tags match through
+    a subquery, so no entry is listed twice.
+  - Title A–Z ignores case, and every sort ends on newest saved and then
+    id.
+  - A page past the end shows the last page.
+  - History-restore requests get the full page, so Back works.
+  - Clear filters is a boosted link, so the controls reset too.
+  - The grid/list toggle was removed rather than building a list view.
+  - The provider chip reads "Openverse Audio", the provider's `NAME`,
+    like the shelf headers.
+- **Deviations:** none. The brief, all three TDD tests and the plan's
+  gaps were accepted as proposed.
+- **Sideways:**
+  - The scaffold's plain `params.getlist()` broke on the tests' plain
+    dicts. A small `_values()` helper reads either a dict or a QueryDict.
+  - `page=0` passed the digit check, and `Paginator.get_page(0)` served
+    the last page. Page numbers now have to be 1 or more.
+  - Three test mistakes were caught by their first runs and fixed in the
+    tests:
+    - a URL test whose titles didn't contain the searched word
+    - a hand-worked minimum-rating list (Brick 05 is rated 1)
+    - a fragment check that didn't allow for the blank lines template
+      comments leave
+
 ## 2026-11-04 — Axcenity Toolbox: Phase 3/13, Save to library
 
 ### Prompts

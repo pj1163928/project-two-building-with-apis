@@ -273,7 +273,9 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
   A view that returns a fragment for HTMX must check
   `request.htmx and not request.htmx.boosted`, otherwise boosted
   navigation would get a fragment instead of a page. Discover's shelves
-  are the first fragments (see "Discover" below).
+  are the first fragments (see "Discover" below). The library also skips
+  `request.htmx.history_restore_request`, because Back after a swap
+  refetches the URL and needs the whole page (see "Library layout").
 - **CSRF:** `<div id="app" hx-headers='{"X-CSRFToken": "…"}'>` sends the
   token with every HTMX request. It sits on `#app`, not `<body>`, because
   a swap replaces `#app` but keeps `<body>`. Django rotates the token at
@@ -360,19 +362,46 @@ Both extend `templates/registration/auth_base.html`, which fills the blocks
 ## Library layout
 
 `catalog/library.html` shows its controls even when the library is empty,
-so the layout is set before any assets arrive. They stay disabled until
-Phase 4 wires them up, and after that while the library is empty.
+so the layout is set before any assets arrive. They're disabled while the
+library is empty.
 
-- `#library-toolbar` (`.work-toolbar`, square and bordered) sits directly
-  under the header. It holds the search (`.toolbar-search`, `q`), the sort
-  (`.toolbar-field`, the PRD's four sorts) and a grid/list view toggle
-  (`.toolbar-seg`).
+- `#library-toolbar` is a GET `<form>` (`.work-toolbar`, square and
+  bordered, `role="search"`) directly under the header. It holds the
+  search (`#library-search`, `q`) and the sort select (the PRD's four
+  sorts). The grid/list toggle from the Phase 1 polish was removed in
+  Phase 4, because the PRD describes only a card grid.
 - `#library-filters` sits in the side panel, below the usual rows,
   because the PRD puts the filters there. It has `.filter-group`s of
-  square `.filter-chip`s: Type, Provider, Status and Minimum rating,
-  inside a `<fieldset disabled>`.
-- `#library-results` holds the empty state, or the grid: a `.result-grid`
-  of `catalog/partials/library_card.html` cards, newest saved first.
+  square `.filter-chip`s: Type, Provider and Status are checkboxes (any
+  number on), and Minimum rating is a radio group (Any, 1+ … 5). Each chip
+  is a `<label>` around a `sr-only` input, so it works with the keyboard
+  (a focus ring on the chip), and a chip that's on is inverted (ink). The
+  inputs carry `form="library-toolbar"`, so they belong to the toolbar's
+  form although they sit outside it.
+- `#library-results` (`catalog/partials/library_results.html`) holds the
+  count ("13–15 of 15 entries"), the grid of
+  `catalog/partials/library_card.html` cards, and the pager
+  (`#library-pager`: Previous, "Page N of M", Next). Or, instead, an empty
+  state: "Your library is empty." with Go to Discover, or "Nothing in your
+  library matches …" with Clear filters.
+
+**Swapping only the results:** the form `hx-get`s `/library/` into
+`#library-results` (`outerHTML`) with `hx-push-url="true"`.
+
+- **Triggers:** `submit`, typing in the search after 300 ms
+  (`input changed delay:300ms from:#library-search`), and any chip or the
+  sort at once (`change from:.library-control`). DOM events from the
+  side-panel inputs don't bubble to the form, hence `from:`.
+  `hx-sync="this:replace"` drops a stale request.
+- **The pushed URL:** the view replies with `HX-Push-Url`, the tidy URL
+  without defaults or junk, which overrides the raw form query.
+- **Pager links** are real URLs with the same `hx-get`, and
+  `show:#library-toolbar:top` scrolls back up.
+- **Back** restores through htmx's history-miss request, which the view
+  answers with the whole page, so the controls match the URL again.
+- **Clear filters** is a plain boosted link to `/library/`, so the search
+  box and chips reset too. A swap of only the results would leave them
+  set.
 
 **Library cards** (`<li class="result-card library-card" id="entry-<pk>">`)
 reuse the result card's frame, thumbnail and stretched title link:

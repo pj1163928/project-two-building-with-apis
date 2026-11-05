@@ -11,6 +11,8 @@ from collections.abc import Iterable
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
+from django.db.models import F, Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from providers import KINDS, PROVIDERS, AssetRecord
@@ -121,6 +123,16 @@ class Asset(models.Model):
         return TILES_BY_KIND[self.kind]
 
 
+# The library's sorts, by their URL value; "newest" is the default. Each ends
+# on a unique column, so the order never shifts between pages.
+LIBRARY_SORTS = {
+    "newest": ("-saved_at", "-id"),
+    "oldest": ("saved_at", "id"),
+    "title": (Lower("asset__title"), "-saved_at", "-id"),
+    "rating": (F("rating").desc(nulls_last=True), "-saved_at", "-id"),
+}
+
+
 class SavedAssetQuerySet(models.QuerySet):
     def for_user(self, user) -> "SavedAssetQuerySet":
         """Only `user`'s entries; none at all for a signed-out visitor."""
@@ -133,6 +145,24 @@ class SavedAssetQuerySet(models.QuerySet):
             .filter(asset__provider=provider_key, asset__external_id__in=list(external_ids))
             .values_list("asset__external_id", flat=True)
         )
+
+    def search(self, text: str) -> "SavedAssetQuerySet":
+        """Entries matching every word of `text` in the title, a tag or the notes.
+
+        Case is ignored. Each word is tidied like a tag before matching tags,
+        so "bricks" finds the tag "brick".
+        """
+        entries = self
+        for word in text.split():
+            tagged = Asset.objects.filter(tags__name__icontains=normalize_tag(word) or word)
+            entries = entries.filter(
+                Q(asset__title__icontains=word) | Q(notes__icontains=word) | Q(asset__in=tagged)
+            )
+        return entries
+
+    def sorted_by(self, sort: str) -> "SavedAssetQuerySet":
+        """Entries in one of LIBRARY_SORTS' orders. Unrated entries sort last by rating."""
+        return self.order_by(*LIBRARY_SORTS[sort])
 
 
 class SavedAsset(models.Model):

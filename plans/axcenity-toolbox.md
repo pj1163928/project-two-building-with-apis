@@ -406,21 +406,21 @@ library and an empty result each say what to do next.
 
 ### Acceptance criteria
 
-- [ ] Unit tests cover `filter_library()` for each search field, each
+- [x] Unit tests cover `filter_library()` for each search field, each
   filter, each sort, pagination and combinations of these.
-- [ ] `filter_library()` never returns another user's entries, whatever
+- [x] `filter_library()` never returns another user's entries, whatever
   the parameters.
-- [ ] Sorting by rating puts unrated entries last. Unknown sort or filter
+- [x] Sorting by rating puts unrated entries last. Unknown sort or filter
   values fall back to the defaults instead of failing.
-- [ ] An HTMX request returns only the results fragment. A normal request
+- [x] An HTMX request returns only the results fragment. A normal request
   for the same query string returns the full page in the same state.
-- [ ] The pushed URL holds the search, filters, sort and page.
-- [ ] An empty library links to Discover. No matches offers to clear the
+- [x] The pushed URL holds the search, filters, sort and page.
+- [x] An empty library links to Discover. No matches offers to clear the
   filters.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: the library and its fragment
+- [x] Standard gate (see top). Access rules: the library and its fragment
   URL send signed-out visitors to sign in. Filter parameters can't expose
   another member's entries.
 

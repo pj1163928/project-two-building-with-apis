@@ -1,0 +1,32 @@
+{# The library's results: the whole page includes it, and the controls' HTMX requests get  #}
+{# it alone, swapped over itself (outerHTML). It holds one page of cards with the count    #}
+{# and the pager, or an empty state that says what to do next.                             #}
+{% url 'catalog:discover' as discover_url %}{% url 'catalog:library' as library_url %}
+<div id="library-results" class="space-y-5">
+  {% if library_empty %}
+    {% include "partials/empty_state.html" with title="Your library is empty." body="Save assets from Discover to start collecting. Search, sorting and filters switch on once you have." link_url=discover_url link_text="Go to Discover" %}
+  {% elif not entries %}
+    {# Clear filters is a plain (boosted) link, so the search box and chips reset too. #}
+    {% if params.q %}
+      {% include "partials/empty_state.html" with title="Nothing in your library matches “"|add:params.q|add:"”." body="Try other words, or clear the search and filters to see everything you've saved." link_url=library_url link_text="Clear filters" %}
+    {% else %}
+      {% include "partials/empty_state.html" with title="Nothing in your library matches these filters." body="Turn some filters off, or clear them to see everything you've saved." link_url=library_url link_text="Clear filters" %}
+    {% endif %}
+  {% else %}
+    {% with page=results.page %}
+    <p id="library-count" class="micro text-fg-muted">{{ page.start_index }}–{{ page.end_index }} of {{ page.paginator.count }} {% if page.paginator.count == 1 %}entry{% else %}entries{% endif %}</p>
+    <ul class="result-grid" aria-label="Your saved assets">
+      {% for entry in entries %}{% include "catalog/partials/library_card.html" %}{% endfor %}
+    </ul>
+    {% if page.has_other_pages %}
+      {# Each link is a real URL (bookmarkable, and it works without JavaScript); HTMX swaps #}
+      {# just the results, pushes that URL and scrolls the toolbar back into view.           #}
+      <nav id="library-pager" class="library-pager" aria-label="Library pages">
+        {% if results.previous_url %}<a href="{{ results.previous_url }}" hx-get="{{ results.previous_url }}" hx-target="#library-results" hx-swap="outerHTML show:#library-toolbar:top" hx-push-url="true" rel="prev" class="btn btn-quiet btn-sm">Previous</a>{% else %}<span class="btn btn-quiet btn-sm btn-disabled" aria-disabled="true">Previous</span>{% endif %}
+        <span class="micro text-fg-secondary">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        {% if results.next_url %}<a href="{{ results.next_url }}" hx-get="{{ results.next_url }}" hx-target="#library-results" hx-swap="outerHTML show:#library-toolbar:top" hx-push-url="true" rel="next" class="btn btn-quiet btn-sm">Next</a>{% else %}<span class="btn btn-quiet btn-sm btn-disabled" aria-disabled="true">Next</span>{% endif %}
+      </nav>
+    {% endif %}
+    {% endwith %}
+  {% endif %}
+</div>
