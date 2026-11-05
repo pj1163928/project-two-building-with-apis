@@ -2,6 +2,10 @@
 
 Phase 1 rules:
 - Signed-out visitors can open Home and Discover.
+
+Phase 2a rules:
+- Signed-out visitors can search Discover and load its shelf fragments; a
+  shelf opened directly goes to its Discover page, never to sign-in.
 - Signed-out visitors who open Library, Packs, Profile or Settings are
   redirected to sign-in with `next` set to that page, and come back to it
   after signing in.
@@ -39,6 +43,39 @@ def test_anonymous_can_open_discover(client):
     response = client.get(reverse("catalog:discover"))
     assert response.status_code == 200
     assert b"Find assets for your next pack." in response.content
+
+
+@pytest.mark.parametrize(("kind", "provider"), [("texture", "ambientcg"), ("sound", "openverse")])
+def test_anonymous_can_search_discover_and_load_its_shelves(client, monkeypatch, kind, provider):
+    from providers import PROVIDERS_BY_KEY, AssetRecord
+
+    found = AssetRecord(
+        provider=provider,
+        external_id="item_01",
+        kind=kind,
+        title="Visible To Visitors",
+        author="Someone",
+        thumbnail_url="https://cdn.example/item_01.png",
+        license="CC0",
+        license_url="https://creativecommons.org/publicdomain/zero/1.0/",
+        attribution="Visible To Visitors by Someone",
+        source_url="https://example.com/item_01",
+    )
+    monkeypatch.setattr(
+        PROVIDERS_BY_KEY[provider], "search_records", lambda query, kind, limit=12: [found]
+    )
+    page = client.get(reverse("catalog:discover"), {"type": kind, "q": "brick"})
+    assert page.status_code == 200
+    shelf = client.get(
+        reverse("catalog:discover_shelf", args=[kind, provider]) + "?q=brick",
+        headers={"HX-Request": "true"},
+    )
+    assert shelf.status_code == 200
+    assert b"Visible To Visitors" in shelf.content
+    # Opened directly, a shelf goes to its Discover page, not to sign-in.
+    direct = client.get(reverse("catalog:discover_shelf", args=[kind, provider]) + "?q=brick")
+    assert direct.status_code == 302
+    assert direct.url == f"/discover/?type={kind}&q=brick"
 
 
 @pytest.mark.parametrize("name", MEMBERS_ONLY_PAGES)

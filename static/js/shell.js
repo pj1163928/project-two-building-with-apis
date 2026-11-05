@@ -61,6 +61,25 @@
   }
   armHoverGate();
 
+  // ---------- "/" focuses the page's search ----------
+  // A page marks its search input with data-search-shortcut (Discover's command
+  // bar). The key is left alone while the cursor is already in a text field,
+  // so typing "/" in a search or a note still types it.
+  function inTextField(element) {
+    if (!element || !element.tagName) return false;
+    return element.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName);
+  }
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.defaultPrevented || inTextField(event.target)) return;
+    var search = document.querySelector("[data-search-shortcut]");
+    if (!search) return;
+    event.preventDefault();
+    search.focus();
+    search.select();
+  });
+
   // ---------- After every boosted swap ----------
   document.addEventListener("htmx:afterSwap", function (event) {
     if (event.detail.boosted) {

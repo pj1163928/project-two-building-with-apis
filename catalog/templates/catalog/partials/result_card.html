@@ -1,0 +1,13 @@
+{# One search result: the provider's thumbnail (linked, never copied; the logo never #}
+{# sits on it), then title, author and license. It opens the provider's own page.   #}
+<li>
+  <a href="{{ record.source_url }}" target="_blank" rel="noopener noreferrer" class="result-card">
+    <div class="result-thumb">
+      {% if record.thumbnail_url %}<img src="{{ record.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
+    </div>
+    <div class="result-body">
+      <h3 class="result-title">{{ record.title }}</h3>
+      <p class="result-meta"><span class="truncate">{{ record.author }}</span><span class="micro text-fg-muted shrink-0">{{ record.license }}</span></p>
+    </div>
+  </a>
+</li>

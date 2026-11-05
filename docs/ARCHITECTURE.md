@@ -24,7 +24,8 @@ phases add.
 | Name | Path | Access |
 |---|---|---|
 | `packs:home` | `/` | Everyone |
-| `catalog:discover` | `/discover/` | Everyone |
+| `catalog:discover` | `/discover/?type=<kind>&q=<query>` | Everyone |
+| `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>` | Everyone (an HTMX fragment) |
 | `catalog:library` | `/library/` | Members |
 | `packs:list` | `/packs/` | Members |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
@@ -34,8 +35,34 @@ phases add.
 | `accounts:settings` | `/accounts/settings/` | Members |
 
 Planned additions: `/library/<id>/`, `/packs/<slug>/` (slugs are unique
-site-wide), Discover's per-shelf fragment URLs, and `/api/library/`,
-`/api/packs/` and `/api/packs/{id}/export/`.
+site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
+
+## Discover
+
+- **Kinds:** one vocabulary everywhere: `texture`, `hdri`, `model`, `sound`
+  (`providers.KINDS`). The same words go in `?type=`, in shelf URLs, and
+  later in `Asset.kind` and the manifest.
+- **The mapping** lives with the providers. Each module's `KIND_FILTERS`
+  maps the kinds it serves to its own filter value, and
+  `providers_for_kind(kind)` returns the matching modules in shelf order.
+- **The page** (`DiscoverView`) never calls a provider. An unknown `type`
+  falls back to textures. With no `q` it shows a hint and no shelves.
+  Otherwise it renders one pending shelf per provider, and each shelf
+  fetches itself (`hx-trigger="load"`).
+- **A shelf** (`DiscoverShelfView`) checks things in this order:
+  1. The kind and provider must be real, and the provider must serve that
+     kind. Otherwise **404**.
+  2. The query, after `clean_query()`, must not be blank. Otherwise
+     **400**.
+  3. Only then does it look at HTMX. A plain or boosted request redirects
+     to its Discover page. An HTMX request gets the fragment.
+
+  So a bad shelf URL never becomes a redirect, and never reaches a
+  provider.
+- `catalog/discover.py` holds this logic: `clean_query()`, `clean_kind()`,
+  `shelf_provider()`, `pending_shelves()` and `load_shelf()`. `load_shelf()`
+  catches only `ProviderError`, so any other exception still surfaces as a
+  bug.
 
 ## Authentication
 
@@ -62,10 +89,10 @@ site-wide), Discover's per-shelf fragment URLs, and `/api/library/`,
 The full table is in the PRD under "Acceptance criteria: access rules".
 Every rule has a test (see [TESTING.md](TESTING.md)).
 
-## Shared functions *(planned)*
+## Shared functions
 
 Each of these has exactly one implementation, used by both the pages and
-the API:
+the API. All but `search_records()` are *(planned)*:
 
 | Function | Purpose |
 |---|---|
@@ -74,7 +101,24 @@ the API:
 | `filter_public_packs(params)` | Gallery search, type filter, sorts, pages of 12 |
 | `add_to_pack(pack, saved_asset)` | Adds an item and enforces ownership |
 | Manifest builder | The Option A export shape, locked by a golden file |
-| `search_records()` / `fetch_record()` | Provider record functions, next to the console's `search()` / `get_details()` |
+| `search_records()` | Built (Phase 2a). Returns `AssetRecord`s (`providers/records.py`), next to the console's `search()` |
+| `fetch_record()` | Provider details for saving (Phase 3), next to the console's `get_details()` |
+
+## Provider errors
+
+- Every failure in `get_json()` is a `ProviderError` whose message is safe
+  to show users. It may name the provider and an HTTP status, but never
+  includes exception text, a response body or a header value.
+  `Retry-After` is repeated only when it's a plain number of seconds.
+- The details go to the `providers` logger as a warning: the exception, the
+  URL, the status and the first 300 characters of the body.
+  `config/settings.py` sends that logger to the server console. The
+  package adds a `NullHandler`, so the console script, which sets up no
+  logging, stays quiet.
+- A response of the wrong shape becomes "<provider> sent back results the
+  Toolbox couldn't read." A malformed item is skipped.
+- Poly Haven cuts its search hits to the limit before calling `/info`, so
+  a search makes at most 12 `/info` requests.
 
 ## Caching
 

@@ -56,7 +56,10 @@ It's a throwaway prototype, so take its look, not its code.
   - `info` is grey, so it can't be mistaken for the HDRI blue.
 - **Type colours** are `texture`, `hdri`, `model` and `sound` (for example
   `text-texture`). Use them only to show an asset's type. Tailwind emits
-  only the tokens that are used. Each has a dark and a light value.
+  only the tokens that are used. Each has a dark and a light value. So far
+  they appear only on Discover's type tiles (the icon and the bar under
+  the current tile). `test_shell.py` keeps them out of the chrome on every
+  page, and out of every other page's content.
 - **Page drop colours (the one exception):** each page's content area has
   a "water drop" glow in three vivid colours, behind the hero and in the
   footer. The colours are chosen by `#content[data-drop="<active_nav>"]` in
@@ -263,8 +266,8 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
 - **Fragments versus pages:** a boosted request also carries `HX-Request`.
   A view that returns a fragment for HTMX must check
   `request.htmx and not request.htmx.boosted`, otherwise boosted
-  navigation would get a fragment instead of a page. Today every view
-  returns a full page.
+  navigation would get a fragment instead of a page. Discover's shelves
+  are the first fragments (see "Discover" below).
 - **CSRF:** `<div id="app" hx-headers='{"X-CSRFToken": "…"}'>` sends the
   token with every HTMX request. It sits on `#app`, not `<body>`, because
   a swap replaces `#app` but keeps `<body>`. Django rotates the token at
@@ -372,3 +375,41 @@ whose search arrives in Phase 2a. Its Search button is the page's only
 `btn-primary`. Under it, Browse Discover and Open your library (members)
 or Sign up and Sign in (visitors) are secondary `.btn-quiet` buttons:
 outlined, square, and inverted on hover.
+
+## Discover
+
+`catalog/discover.html` is a showcase surface. From the top:
+
+- **Header:** the usual page header.
+- **Command bar:** `#discover-search`, a `.command-bar`. It's a GET form
+  with a hidden `type` and the `q` input (`#discover-search-input`). The
+  home hero search lands here, because both send `q`.
+  - The input carries `data-search-shortcut`, and `shell.js` focuses it
+    when `/` is pressed. Nothing happens if the cursor is already in an
+    input, textarea, select or editable element, or if Ctrl, Alt or Meta
+    is held.
+  - A `.command-key` shows the `/` hint.
+- **Type tiles:** `#type-tiles`, four `.type-tile` links. The current one
+  has `aria-current="true"`, never `"page"`, which belongs to the bars.
+  - Each link keeps the query, so switching type re-runs the same search.
+  - The icon and the 2 px `.type-tile-bar` take the type colour, and the
+    bar grows in under the current tile. The colour classes are written
+    out in full in `catalog/discover.py` (`KindTile`) so Tailwind finds
+    them.
+- **Shelves:** `#discover-shelves` holds one `catalog/partials/shelf.html`
+  per provider. With no query, it shows an empty state that names the
+  providers instead.
+
+**Shelf states** (`<section id="shelf-<provider>">`, replaced whole):
+
+| State | What shows |
+|---|---|
+| Pending | `aria-busy`, `hx-get` of its own URL, `hx-trigger="load"`, `hx-swap="outerHTML"`, and six pulsing `.result-skeleton`s |
+| Results | A `.result-grid` of `.result-card`s. Each has the thumbnail (the provider's URL, `referrerpolicy="no-referrer"`, never the logo), title, author and license, and opens the provider's page in a new tab |
+| No matches | `.shelf-empty`: "No <provider> matches for “q”." |
+| Failed | A DaisyUI `alert alert-error` (`.shelf-alert`, toned down and square, with the error colour only on the icon) holding the `ProviderError` message and a Retry button inside the alert. Retry `hx-get`s this shelf's own URL into `#shelf-<provider>` |
+
+The shelf header shows a number (`01`), the provider's name, a rule, and
+"Searching", "Unavailable" or the result count. Phase 2b adds the
+provider credit, the type-icon fallback for a missing or broken thumbnail
+(today the block is just left empty), and caching.

@@ -5,6 +5,7 @@ Used anonymously, which Openverse caps at 20 requests/minute and 200/day.
 
 from .formatting import duration
 from .http import get_json
+from .records import AssetRecord, items_in, tag_names, text
 
 NAME = "Openverse Audio"
 API_URL = "https://api.openverse.org/v1/audio/"
@@ -63,3 +64,44 @@ def get_details(asset_id):
         "license_url": item.get("license_url"),
         "attribution": item.get("attribution"),
     }
+
+
+# ---------------------------------------------------------------- Toolbox records
+# New code for the Toolbox. The console's search() and get_details() above stay as they are.
+
+KEY = "openverse"
+
+# Openverse serves sounds only, with no type filter (the PRD's mapping).
+KIND_FILTERS = {"sound": None}
+
+
+def _record(item):
+    external_id = text(item.get("id"))
+    if not external_id:
+        return None
+    title = text(item.get("title")) or external_id
+    return AssetRecord(
+        provider=KEY,
+        external_id=external_id,
+        kind="sound",
+        title=title,
+        author=text(item.get("creator")) or "unknown",
+        thumbnail_url=text(item.get("thumbnail")),
+        license=license_label(item.get("license"), item.get("license_version")),
+        license_url=text(item.get("license_url")),
+        attribution=text(item.get("attribution")),
+        source_url=text(item.get("foreign_landing_url")),
+        tags=tag_names(item.get("tags")),
+    )
+
+
+def search_records(query: str, kind: str, limit: int = 12) -> list[AssetRecord]:
+    """Return up to `limit` sound AssetRecords matching `query`.
+
+    `kind` must be "sound". Any failure raises ProviderError.
+    """
+    if kind not in KIND_FILTERS:
+        raise ValueError(f"{NAME} has no {kind!r} assets.")
+    data = get_json(API_URL, {"q": query.strip(), "page_size": limit}, provider=NAME)
+    records = (_record(item) for item in items_in(data, "results", NAME))
+    return [record for record in records if record][:limit]

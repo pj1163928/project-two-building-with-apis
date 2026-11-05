@@ -1,6 +1,7 @@
 """ambientCG: CC0 PBR materials, HDRIs and 3D models (https://docs.ambientcg.com/api/v3/)."""
 
 from .http import ProviderError, get_json
+from .records import CC0_LICENSE, CC0_URL, AssetRecord, items_in, tag_names, text
 
 NAME = "ambientCG"
 API_URL = "https://ambientcg.com/api/v3/assets"
@@ -55,3 +56,64 @@ def get_details(asset_id):
         "downloads": asset.get("downloads") or [],
         "license": LICENSE,
     }
+
+
+# ---------------------------------------------------------------- Toolbox records
+# New code for the Toolbox. The console's search() and get_details() above stay as they are.
+
+KEY = "ambientcg"
+
+# The Toolbox's kinds mapped to ambientCG's `type` filter (the PRD's mapping).
+KIND_FILTERS = {"texture": "material", "hdri": "hdri", "model": "3d-model"}
+
+_RECORD_INCLUDE = "title,url,tags,type,thumbnails"
+# Thumbnail sizes in order of preference: big enough for a card, small to load.
+_THUMBNAIL_SIZES = ("256-PNG", "256-JPG", "512-PNG", "512-JPG", "128-PNG", "128-JPG")
+
+
+def _thumbnail(thumbnails):
+    if not isinstance(thumbnails, dict):
+        return ""
+    for size in _THUMBNAIL_SIZES:
+        if url := text(thumbnails.get(size)):
+            return url
+    return next((url for url in map(text, thumbnails.values()) if url), "")
+
+
+def _record(asset, kind):
+    external_id = text(asset.get("id"))
+    if not external_id:
+        return None
+    title = text(asset.get("title")) or external_id
+    return AssetRecord(
+        provider=KEY,
+        external_id=external_id,
+        kind=kind,
+        title=title,
+        # ambientCG publishes its own work and names no per-asset author.
+        author=NAME,
+        thumbnail_url=_thumbnail(asset.get("thumbnails")),
+        license=CC0_LICENSE,
+        license_url=CC0_URL,
+        attribution=f'"{title}" from {NAME}, CC0 1.0',
+        source_url=text(asset.get("url")) or f"https://ambientcg.com/a/{external_id}",
+        tags=tag_names(asset.get("tags")),
+    )
+
+
+def search_records(query: str, kind: str, limit: int = 12) -> list[AssetRecord]:
+    """Return up to `limit` AssetRecords of `kind` matching `query`.
+
+    `kind` must be one of KIND_FILTERS. Any failure raises ProviderError.
+    """
+    if kind not in KIND_FILTERS:
+        raise ValueError(f"{NAME} has no {kind!r} assets.")
+    params = {
+        "q": query.strip(),
+        "type": KIND_FILTERS[kind],
+        "limit": limit,
+        "include": _RECORD_INCLUDE,
+    }
+    data = get_json(API_URL, params, provider=NAME)
+    records = (_record(asset, kind) for asset in items_in(data, "assets", NAME))
+    return [record for record in records if record][:limit]

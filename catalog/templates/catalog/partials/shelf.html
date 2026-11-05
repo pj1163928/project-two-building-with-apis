@@ -1,0 +1,34 @@
+{# One provider's shelf. Pending, it fetches itself once (hx-trigger="load") and is   #}
+{# replaced whole by the loaded shelf: results, "no matches", or an alert with Retry. #}
+{# Retry re-requests this shelf's own URL into this shelf only.                       #}
+<section id="{{ shelf.dom_id }}" class="shelf" aria-labelledby="{{ shelf.dom_id }}-title"{% if not shelf.loaded %} aria-busy="true" hx-get="{{ shelf.url }}" hx-trigger="load" hx-swap="outerHTML"{% endif %}>
+  <header class="shelf-head">
+    <span class="micro text-fg-muted">{{ shelf.number|stringformat:"02d" }}</span>
+    <h2 id="{{ shelf.dom_id }}-title" class="micro text-fg-strong">{{ shelf.name }}</h2>
+    <span class="shelf-rule" aria-hidden="true"></span>
+    <span class="micro text-fg-weak">{% if not shelf.loaded %}Searching{% elif shelf.error %}Unavailable{% else %}{{ shelf.records|length }} result{{ shelf.records|length|pluralize }}{% endif %}</span>
+  </header>
+  {% if not shelf.loaded %}
+    <ul class="result-grid" aria-label="Loading {{ shelf.name }} results">
+      {% for _ in "123456" %}<li class="result-skeleton" aria-hidden="true"></li>{% endfor %}
+    </ul>
+  {% elif shelf.error %}
+    <div role="alert" class="alert alert-error shelf-alert">
+      {% include "partials/icon.html" with name="alert" size=20 %}
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-fg-strong">{{ shelf.name }} is unavailable</p>
+        <p class="text-sm text-fg-secondary mt-0.5">{{ shelf.error }}</p>
+      </div>
+      <button type="button" class="btn btn-sm btn-quiet" hx-get="{{ shelf.url }}" hx-target="#{{ shelf.dom_id }}" hx-swap="outerHTML" hx-disabled-elt="this">Retry</button>
+    </div>
+  {% elif not shelf.records %}
+    <div class="shelf-empty">
+      <p class="text-fg-strong">No {{ shelf.name }} matches for <span class="font-mono">“{{ shelf.query }}”</span>.</p>
+      <p class="text-sm text-fg-weak mt-1">Try a different or broader phrase.</p>
+    </div>
+  {% else %}
+    <ul class="result-grid">
+      {% for record in shelf.records %}{% include "catalog/partials/result_card.html" %}{% endfor %}
+    </ul>
+  {% endif %}
+</section>

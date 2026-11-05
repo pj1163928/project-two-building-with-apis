@@ -4,5 +4,39 @@
 {% block breadcrumb %}{% url 'catalog:discover' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="discover" icon="search" current=True %}{% endblock %}
 {% block content %}
   {% include "partials/page_header.html" with label="Discover" heading="Find assets for your next pack." lead="Search free CC0 and Creative Commons libraries, save what fits, and build packs your Axcenity projects can import." %}
-  {% include "partials/empty_state.html" with title="Provider search is not connected yet." body="Textures, HDRIs, models and sounds from ambientCG, Poly Haven and Openverse will appear here." %}
+
+  {# The command bar. "/" focuses it (shell.js) unless the cursor is already in a text field. #}
+  <form id="discover-search" method="get" action="{% url 'catalog:discover' %}" role="search" class="command-bar">
+    <input type="hidden" name="type" value="{{ kind }}">
+    <label for="discover-search-input" class="sr-only">Search {{ tile.label|lower }}</label>
+    {% include "partials/icon.html" with name="search" size=20 %}
+    <input id="discover-search-input" type="search" name="q" value="{{ query }}" autocomplete="off"
+           maxlength="100" placeholder="Search {{ tile.label|lower }}…" data-search-shortcut>
+    <span class="micro text-fg-muted hidden md:inline">{{ tile.provider_names }}</span>
+    <kbd class="command-key" title="Press / to search">/</kbd>
+  </form>
+
+  {# The four type tiles. Colour here means asset type, and nothing else. #}
+  <nav id="type-tiles" aria-label="Asset types" class="type-tiles">
+    {% for choice, url in tiles %}
+      <a href="{{ url }}" class="type-tile"{% if choice.key == kind %} aria-current="true"{% endif %}>
+        <span class="flex items-center justify-between">
+          <span class="{{ choice.text_class }}">{% include "partials/icon.html" with name=choice.key size=22 %}</span>
+          <span class="micro text-fg-muted">{{ forloop.counter|stringformat:"02d" }}</span>
+        </span>
+        <span class="type-tile-label">{{ choice.label }}</span>
+        <span class="text-[12.5px] text-fg-weak">{{ choice.blurb }}</span>
+        <span class="micro text-fg-muted mt-2">{{ choice.provider_names }}</span>
+        <span class="type-tile-bar {{ choice.bar_class }}" aria-hidden="true"></span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  <div id="discover-shelves" class="space-y-10">
+    {% for shelf in shelves %}
+      {% include "catalog/partials/shelf.html" %}
+    {% empty %}
+      {% include "partials/empty_state.html" with title="Search to fill the shelves." body=tile.search_hint %}
+    {% endfor %}
+  </div>
 {% endblock %}

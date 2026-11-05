@@ -19,6 +19,7 @@ MEMBER_PAGES = ["packs:home", "catalog:discover", "catalog:library", "packs:list
 MEMBER_PAGES += ["accounts:profile", "accounts:settings"]
 
 TYPE_HEXES = ["#F2A15A", "#6C8CFF", "#4CC38A", "#A48AFF"]
+KIND_KEYS = ["texture", "hdri", "model", "sound"]
 TYPE_TOKEN = re.compile(r"\b[\w:-]*-(texture|hdri|model|sound)\b")
 
 
@@ -421,13 +422,38 @@ def test_plus_jakarta_source_is_pinned():
     assert "89b3fb38aa0d275d7a731d0d817a4f1622b316b4d7fbdedcf02ee9099ff68bc8" in sources
 
 
-def test_type_colour_appears_nowhere_yet(pages):
+def _classes(html):
+    return " ".join(re.findall(r'class="([^"]*)"', html))
+
+
+def test_type_colour_never_appears_in_the_chrome(pages):
     for name, response in pages:
         html = response.content.decode()
         for hex_value in TYPE_HEXES:
             assert hex_value.lower() not in html.lower(), f"{name} uses {hex_value}"
-        classes = " ".join(re.findall(r'class="([^"]*)"', html))
-        assert not TYPE_TOKEN.search(classes), f"{name} uses a type-colour class"
+        chrome = [
+            html.split('id="title-bar"', 1)[1].split("</header>", 1)[0],
+            html.split('id="activity-bar"', 1)[1].split("</nav>", 1)[0],
+            html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0],
+            html.split('id="status-bar"', 1)[1],
+        ]
+        for part in chrome:
+            assert not TYPE_TOKEN.search(_classes(part)), f"{name}'s chrome uses a type colour"
+
+
+def test_type_colour_means_type_only_on_the_discover_tiles(pages):
+    """Discover's type tiles are the only place type colour appears so far."""
+    for name, response in pages:
+        html = response.content.decode()
+        content = html.split('id="content"', 1)[1].split('id="page-footer"', 1)[0]
+        if name != "catalog:discover":
+            assert not TYPE_TOKEN.search(_classes(content)), f"{name} uses a type colour"
+            continue
+        tiles = content.split('id="type-tiles"', 1)[1].split("</nav>", 1)[0]
+        outside = content.replace(tiles, "")
+        assert not TYPE_TOKEN.search(_classes(outside)), "type colour outside the tiles"
+        used = {match.group(0) for match in TYPE_TOKEN.finditer(_classes(tiles))}
+        assert used == {f"{prefix}-{kind}" for prefix in ("text", "bg") for kind in KIND_KEYS}
 
 
 @pytest.mark.parametrize("signed_in", [False, True])

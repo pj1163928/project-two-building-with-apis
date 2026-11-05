@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 
 from .http import get_json
+from .records import CC0_LICENSE, CC0_URL, AssetRecord, items_in, tag_names, text
 
 NAME = "Poly Haven"
 API_URL = "https://api.polyhaven.com"
@@ -115,3 +116,62 @@ def get_details(asset_id):
         "bundles": bundles,
         "license": LICENSE,
     }
+
+
+# ---------------------------------------------------------------- Toolbox records
+# New code for the Toolbox. The console's search() and get_details() above stay as they are.
+
+KEY = "polyhaven"
+
+# The Toolbox's kinds mapped to Poly Haven's `t` filter (the PRD's mapping).
+KIND_FILTERS = {"texture": "textures", "hdri": "hdris", "model": "models"}
+
+
+def _authors(info):
+    authors = info.get("authors")
+    if not isinstance(authors, dict):
+        return ""
+    return ", ".join(name for name in map(text, authors) if name)
+
+
+def _record(slug, info, kind):
+    title = text(info.get("name")) or slug
+    author = _authors(info) or NAME
+    return AssetRecord(
+        provider=KEY,
+        external_id=slug,
+        kind=kind,
+        title=title,
+        author=author,
+        thumbnail_url=text(info.get("thumbnail_url")),
+        license=CC0_LICENSE,
+        license_url=CC0_URL,
+        attribution=f'"{title}" by {author}, from {NAME}, CC0 1.0',
+        source_url=f"https://polyhaven.com/a/{slug}",
+        tags=tag_names(info.get("tags")),
+    )
+
+
+def search_records(query: str, kind: str, limit: int = 12) -> list[AssetRecord]:
+    """Return up to `limit` AssetRecords of `kind` matching `query`.
+
+    /search returns only slugs, so each hit costs one /info request. The hits
+    are cut to `limit` first, so no /info is fetched for a result that won't
+    be shown. Zero keyword matches means no results (the semantic search
+    never comes back empty). Any failure raises ProviderError.
+    """
+    if kind not in KIND_FILTERS:
+        raise ValueError(f"{NAME} has no {kind!r} assets.")
+    params = {"q": query.strip().lower(), "t": KIND_FILTERS[kind], "limit": limit}
+    data = get_json(f"{API_URL}/search", params, provider=NAME)
+    hits = items_in(data, "results", NAME)
+    if not data.get("keywordMatches"):
+        return []
+
+    slugs = [slug for slug in (text(hit.get("slug")) for hit in hits) if slug][:limit]
+    records = []
+    for slug in slugs:
+        info = _info(slug)
+        if isinstance(info, dict):
+            records.append(_record(slug, info, kind))
+    return records

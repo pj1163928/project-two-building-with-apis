@@ -194,28 +194,37 @@ shelf keeps working.
 
 ### Acceptance criteria
 
-- [ ] Each type shows exactly the providers in the PRD mapping, and
+- [x] Each type shows exactly the providers in the PRD mapping, and
   passes each provider the right filter.
-- [ ] The Discover page renders without waiting for any provider. Each
+- [x] The Discover page renders without waiting for any provider. Each
   shelf loads through its own request.
-- [ ] Each result shows a thumbnail, title, author and license, with at
+- [x] Each result shows a thumbnail, title, author and license, with at
   most 12 per shelf. Uneven counts between providers display as returned.
-- [ ] A Poly Haven search with `keywordMatches == 0` shows an empty shelf
+- [x] A Poly Haven search with `keywordMatches == 0` shows an empty shelf
   with a "no matches" message, not an error.
-- [ ] A failed shelf shows the friendly `ProviderError` message, never a
+- [x] A failed shelf shows the friendly `ProviderError` message, never a
   raw response body or traceback, plus a Retry button. Retry re-requests
   only that shelf's URL.
-- [ ] Pressing `/` focuses the search unless the cursor is already in a
+- [x] Pressing `/` focuses the search unless the cursor is already in a
   text field.
-- [ ] An unknown type or provider in a shelf URL is rejected without
+- [x] An unknown type or provider in a shelf URL is rejected without
   calling any provider.
-- [ ] **Provider client tests:** `responses` tests cover each provider's
+- [x] A shelf URL is validated (kind, provider, the provider serving that
+  kind, and a non-blank query) before the view checks for HTMX, so a bad
+  shelf URL always gets a **404** or **400**, never a redirect.
+- [x] Poly Haven cuts its search hits to the limit before fetching
+  `/info`, so a search makes at most 12 `/info` requests.
+- [x] Every `ProviderError` message is safe to show: it never contains raw
+  exception text or response details. The details are written to the
+  server-side log instead. (Added to 2a from 2b, because the shelf shows
+  the message directly.)
+- [x] **Provider client tests:** `responses` tests cover each provider's
   `search_records()` on a normal response. They check that every
   `AssetRecord` field is filled in.
-- [ ] **Application tests:** tests replace `search_records` with
+- [x] **Application tests:** tests replace `search_records` with
   `monkeypatch` for a normal shelf, an empty shelf and a `ProviderError`
   shelf.
-- [ ] **HTMX mixed shelves:** a test makes one provider raise
+- [x] **HTMX mixed shelves:** a test makes one provider raise
   `ProviderError` and the other succeed for the same search. The failed
   shelf's fragment contains the alert and the Retry button, the other
   shelf's fragment contains its results, and neither request affects the
@@ -223,7 +232,7 @@ shelf keeps working.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: Discover and its shelf URLs
+- [x] Standard gate (see top). Access rules: Discover and its shelf URLs
   work for signed-out visitors. The console script's regression tests
   still pass after the provider modules gain the new functions.
 
@@ -264,7 +273,8 @@ shelf keeps working.
   provider's status. Providers not yet used show as unknown.
 - [ ] **Provider client tests (`responses`):** each of these gives its
   own friendly `ProviderError` message, and none leaks HTML or exception
-  text:
+  text (Phase 2a makes the messages safe; this phase proves it for each
+  failure):
   - a timeout
   - a connection error
   - a 429

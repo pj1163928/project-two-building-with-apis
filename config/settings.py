@@ -75,6 +75,15 @@ CACHES = {
     }
 }
 
+# Provider failures show users a safe ProviderError message; the details
+# (exception, status, the start of the body) are logged here instead.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"providers": {"handlers": ["console"], "level": "WARNING"}},
+}
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

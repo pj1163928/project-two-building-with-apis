@@ -28,6 +28,141 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-10-31 — Axcenity Toolbox: Phase 2a/13, Discover with provider shelves and error handling
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 2`.
+2. This looks good but lets change some things:
+   Enforce 12-result limit before fetching poly haven details as poly haven
+   makes one / info request per search result, limit hits before those
+   request rather than fetching everything and sorting through it avoiding
+   the uneccesary API call when possible.
+   Define shelf request validation order such as kind provider compatabiiy
+   and nonblank before checking whether it is an HTMX request this makes
+   sure that it is sending back a 404 or 400 rather than a redirect
+   Make the provider errors safe to display in 2a since the shelf siplays
+   providererror messages directly do not expose raw exception text or
+   respons details to users. Keep diagnostic details in server -side
+   logging. Move this section into 2a rather than 2b
+3. looks good just make sure that the test verifies the absence of type t
+   and category parameters for openverse not just eh absence of incorrect
+   values move to next.
+4. Looks good move on
+5. ensure the Retry button is inside the failed shelf's alert and that the
+   error message is HTML-escaped when rendered.other than that move on
+
+### Summary
+
+- **Outcome:** Discover works end to end for all four types.
+  - The page shows four type tiles and a command bar. `/` focuses the bar,
+    and the home search's `q` lands in it.
+  - Each matching provider gets a shelf that loads through its own HTMX
+    request.
+  - A shelf shows up to 12 results (thumbnail, title, author, license), a
+    "no matches" message, or an alert with Retry.
+  - 283 tests pass (227 before), and `ruff check` and
+    `ruff format --check` are clean.
+  - Checked live through headless Edge and curl:
+    - "brick" on textures filled both shelves with 12 results.
+    - Openverse returned 12 rain sounds.
+    - A mismatched shelf URL gave 404, and a direct visit redirected to
+      its Discover page.
+- **Changes:**
+  - `providers/records.py` (new): the shared `AssetRecord`, `KINDS`, and
+    parsing helpers (`items_in`, `text`, `tag_names`) that turn a bad
+    shape into a safe `ProviderError` and skip bad items.
+  - `providers/ambientcg.py`, `polyhaven.py`, `openverse.py`: `KEY`,
+    `KIND_FILTERS` (the PRD mapping) and `search_records()`, added below
+    the untouched console code.
+    - Poly Haven cuts its hits to the limit before any `/info` request.
+  - `providers/__init__.py`: `PROVIDERS_BY_KEY`, `providers_for_kind()`,
+    and a `NullHandler` so the console script stays quiet.
+  - `providers/http.py`: `get_json()` messages never carry exception text
+    or response content. The catch-all no longer includes `{exc}`, and
+    `Retry-After` is echoed only when it's a number. Every failure logs
+    its details to the `providers` logger.
+  - `config/settings.py`: `LOGGING` sends the `providers` logger to the
+    console.
+  - `catalog/discover.py` (new): `KindTile`, `Shelf`, `clean_query()`,
+    `clean_kind()`, `shelf_url()`, `discover_url()`, `shelf_provider()`,
+    `pending_shelves()` and `load_shelf()`.
+  - `catalog/views.py`, `catalog/urls.py`:
+    - `DiscoverView` reads `type` and `q`.
+    - `DiscoverShelfView` is new, at `catalog:discover_shelf`
+      (`/discover/<kind>/<provider>/?q=`). It validates the kind, the
+      provider, the match between them and the query before it checks for
+      HTMX.
+  - `catalog/templates/catalog/discover.html`, `partials/shelf.html`,
+    `partials/result_card.html`: the page, the four shelf states and the
+    result card.
+  - `templates/partials/icon.html`: texture, HDRI, model and sound icons.
+  - `static/js/shell.js`: the `/` shortcut, skipped while the cursor is in
+    a text field.
+  - `styles/source.css`: the command bar, type tiles, shelves, result
+    cards, skeletons, and the toned-down `.shelf-alert`. Reduced motion
+    stops the pulse and the tile bar.
+  - `tests/test_provider_records.py` and `tests/test_discover.py` (new).
+    `tests/test_access_control.py` gains signed-out Discover and shelf
+    access.
+  - `tests/test_shell.py`: "type colour nowhere yet" is now two tests: no
+    type colour in the chrome on any page, and in content only on
+    Discover's tiles.
+  - `docs/ARCHITECTURE.md`, `docs/FRONTEND.md`, `docs/TESTING.md`: the
+    shelf URL and its check order, the provider-error rules, the Discover
+    layout, and the new test files.
+  - `plans/axcenity-toolbox.md`: three 2a criteria added at the user's
+    request, and every 2a box ticked.
+- **TDD** (three behaviours, each red then green):
+  1. Each kind uses exactly the PRD's providers, and each provider sends
+     the PRD's filter. Openverse sends no `type`, `t` or `category`
+     parameter.
+  2. A bad shelf URL is refused before any provider is called: 404 for an
+     unknown kind, an unknown provider or a mismatch, and 400 for a blank
+     query, for HTMX and plain requests alike.
+  3. With one provider failing and the other working, the failed shelf
+     holds the escaped message and a Retry button aimed at its own URL,
+     inside its alert. The working shelf shows its results, and fetching
+     in either order gives the same fragments.
+- **Decisions:**
+  - "Phase 2" was read as 2a only; 2b stays separate.
+  - One kind vocabulary (`texture`, `hdri`, `model`, `sound`) in URLs and
+    code.
+  - The mapping lives in `providers/` (`KIND_FILTERS`).
+  - ambientCG's author is "ambientCG". CC0 attributions are composed.
+  - An unknown `type` on the page falls back to textures. With no `q`,
+    the page shows a hint and fires no shelves.
+  - A valid shelf opened directly redirects to its Discover page.
+  - Queries are trimmed, whitespace is collapsed, and they're cut to 100
+    characters.
+  - A card opens the provider's page in a new tab. There's no type badge
+    on cards: the PRD asks for thumbnail, title, author and license, and
+    the tile already shows the type.
+- **Deviations:** the user changed the brief in three ways, and each
+  became a 2a acceptance criterion:
+  - Cut Poly Haven's hits before `/info`.
+  - Validate the shelf URL before the HTMX check.
+  - Make `ProviderError` messages safe now, with details logged
+    server-side, rather than in 2b.
+
+  They also had test 1 check each Openverse parameter name explicitly,
+  and test 3 prove that the message is escaped and that Retry sits inside
+  the alert.
+  - **One behaviour change for the console script:** an unexpected
+    request error now prints the safe message instead of the raw
+    exception text. Its regression tests are unchanged and pass.
+- **Sideways:**
+  - A first draft of `load_shelf()` wrapped `dataclasses.replace` in a
+    pointless helper; it was caught on review and removed.
+  - Two Bash heredocs that appended tests failed on shell quoting, so the
+    tests were written with the file tools instead.
+  - The first headless capture of the sounds page caught Openverse
+    mid-load, so only the skeleton showed. Fetching the shelf with curl
+    confirmed it returns 12 results.
+  - `docs/code-walkthrough.md`'s line links into `providers/http.py` are
+    now out of date. The doc says to trust function names over line
+    numbers, so it was left alone.
+
 ## 2026-10-31 — Axcenity Toolbox: Phase 1 shell polish, round 6 (system light mode, page transitions)
 
 ### Prompts

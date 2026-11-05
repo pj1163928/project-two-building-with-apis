@@ -218,6 +218,57 @@
   .toolbar-seg button[aria-pressed="true"] { color: var(--color-fg-strong); background: var(--color-control); }
   .work-toolbar :disabled { cursor: not-allowed; }
 
+  /* ---------- Discover ---------- */
+  /* The command bar: square like the home hero search, with a "/" key hint. */
+  .command-bar { display: flex; align-items: center; gap: 0.75rem; height: 3.5rem; padding: 0 0.85rem 0 1.1rem;
+    color: var(--color-fg-weak); background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line-strong);
+    transition: box-shadow 0.15s, color 0.15s; }
+  .command-bar:focus-within { color: var(--color-fg-strong); box-shadow: inset 0 0 0 1px var(--color-ink); }
+  .command-bar input[type="search"] { flex: 1; min-width: 0; height: 100%; background: transparent; outline: none;
+    font-size: 17px; color: var(--color-fg-strong); }
+  .command-bar input::placeholder { color: var(--color-fg-muted); }
+  .command-key { display: grid; place-items: center; min-width: 1.6rem; height: 1.6rem; font-family: var(--font-mono);
+    font-size: 12px; color: var(--color-fg-secondary); background: var(--color-control);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+
+  /* Type tiles. The icon and the bottom bar take the tile's type colour; the
+     bar grows in under the current type. Everything else stays monochrome. */
+  .type-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+  @media (min-width: 48rem) { .type-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .type-tile { position: relative; display: flex; flex-direction: column; gap: 0.15rem; padding: 1rem 1rem 1.1rem;
+    overflow: hidden; background: var(--color-panel); box-shadow: inset 0 0 0 1px var(--color-line);
+    transition: box-shadow 0.15s, background-color 0.15s; }
+  html[data-pointer] .type-tile:hover, .type-tile:focus-visible { background: var(--color-surface);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+  .type-tile[aria-current="true"] { background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-fg-muted); }
+  .type-tile-label { margin-top: 0.85rem; font-family: var(--font-display); font-weight: 700; font-size: 1.125rem;
+    letter-spacing: -0.02em; color: var(--color-fg-strong); }
+  .type-tile-bar { position: absolute; inset: auto 0 0; height: 2px; transform: scaleX(0); transform-origin: left;
+    transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .type-tile[aria-current="true"] .type-tile-bar { transform: scaleX(1); }
+
+  /* Shelves: a numbered mono header with a rule, then a grid of result cards. */
+  .shelf { display: grid; gap: 1rem; }
+  .shelf-head { display: flex; align-items: center; gap: 1rem; }
+  .shelf-rule { flex: 1; height: 1px; background: var(--color-line); }
+  .result-grid { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 48rem) { .result-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 80rem) { .result-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (min-width: 96rem) { .result-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  .result-card { display: block; height: 100%; background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line);
+    transition: box-shadow 0.15s; }
+  html[data-pointer] .result-card:hover, .result-card:focus-visible { box-shadow: inset 0 0 0 1px var(--color-fg-secondary); }
+  .result-thumb { aspect-ratio: 4 / 3; overflow: hidden; background: var(--color-inset); }
+  .result-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .result-body { display: grid; gap: 0.15rem; padding: 0.6rem 0.75rem 0.7rem; }
+  .result-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 600;
+    color: var(--color-fg-strong); }
+  .result-meta { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 11.5px; color: var(--color-fg-weak); }
+  .result-skeleton { aspect-ratio: 4 / 3.9; background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line);
+    animation: shelf-pulse 1.4s ease-in-out infinite; }
+  .shelf-empty { padding: 2.5rem 1.5rem; text-align: center; background: var(--color-surface);
+    box-shadow: inset 0 0 0 1px var(--color-line); }
+
   /* Side-panel filter groups (Library): a mono label over a row of square chips. */
   .filter-group { display: grid; gap: 0.5rem; }
   .filter-chip { height: 1.75rem; padding: 0 0.6rem; font-size: 12.5px; color: var(--color-fg-secondary);
@@ -308,6 +359,16 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
 .input[aria-invalid="true"] { border-color: var(--color-error); }
 .input[aria-invalid="true"]:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 25%, transparent); }
 
+/* ---------- A failed Discover shelf ----------
+   DaisyUI's alert, toned to match the form alerts: square, a faint error
+   tint and edge, with the error colour kept to the icon. Unlayered, so it
+   replaces DaisyUI's solid fill. */
+.shelf-alert { display: flex; align-items: flex-start; gap: 0.9rem; padding: 1.1rem 1.25rem; border-radius: 0;
+  color: var(--color-fg); background: color-mix(in srgb, var(--color-error) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-error) 40%, transparent); }
+.shelf-alert > svg { flex: none; margin-top: 1px; color: var(--color-error); }
+@keyframes shelf-pulse { 50% { opacity: 0.45; } }
+
 /* ---------- "Water drop" glow: footer and hero ----------
    Three soft ink blobs, each drifting on its own path, with ripple rings
    pulsing over them. The footer glow rises from the bottom of each page,
@@ -395,6 +456,8 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .drop-blob, .drop-glow::after { animation: none; }
   .panel-row { transition: color 0.15s, background-color 0.15s !important; }
   .tip { transition: none; }
+  .result-skeleton { animation: none; }
+  .type-tile-bar { transition: none; }
 }
 
 /* ---------- Light mode ----------
