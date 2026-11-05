@@ -28,6 +28,96 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-05 — Axcenity Toolbox: Phase 6/13, Library API and token page
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 6`.
+2. Looks good just make sure that session-authenticated POST/PATCH/PUT/DELETE
+   uses CSRF while token-authenticated requests work without session CSRF.
+3. Looks good move to next (approving TDD 1's test).
+4. Looks good move to next (approving TDD 2's test, after TDD 1 went green).
+5. Looks good move to next (approving TDD 3's test, after TDD 2 went green).
+
+### Summary
+
+- **Outcome:** DRF is set up with token and session authentication. The
+  library API:
+  - `GET /api/library/` lists the caller's entries through
+    `filter_library()`, with the library page's parameters, order and pages
+    of 12
+  - `POST /api/library/` saves an asset from its provider and ID, plus an
+    optional review: a duplicate is a 400 "Already in your library.", and a
+    `ProviderError` is a 502 with its message
+  - `GET`, `PATCH`, `PUT` and `DELETE /api/library/<id>/` work on the
+    caller's own entries only (404 otherwise)
+
+  A token page at `/accounts/token/` shows the member's token, creating it
+  on the first visit. 650 tests pass (577 before). `ruff check` and
+  `ruff format --check` are clean.
+- **Changes:**
+  - `pyproject.toml`, `uv.lock`: `djangorestframework` 3.18.3.
+  - `config/settings.py`: `rest_framework` and `rest_framework.authtoken`,
+    and `REST_FRAMEWORK` (token first, then session; `IsAuthenticated`;
+    JSON only). The authtoken migrations come with DRF.
+  - `catalog/serializers.py` (new): `AssetSerializer` (Asset fields only,
+    read-only), `LibraryEntrySerializer` (the owner serializer: notes,
+    rating, status and the community rating, the same rules as
+    `ReviewForm`, saving only the fields sent) and
+    `NewLibraryEntrySerializer` (adds `provider` and `external_id`).
+  - `catalog/api.py` (new): `LibraryAPI` (list and create) and
+    `LibraryEntryAPI` (read, update, delete, scoped by `for_user()`). The
+    entry view's docstring, served as the `OPTIONS` description, says
+    DELETE also leaves the member's packs.
+  - `catalog/urls.py`: `catalog:api_library` and `catalog:api_entry`.
+  - `catalog/library.py`: `save_to_library()` takes the review for a new
+    entry as keyword arguments; `LibraryParams.query_string()` builds the
+    tidy query string for both the page's `url()` and the API's links.
+  - `accounts/views.py`, `accounts/urls.py`, `accounts/token.html`:
+    `TokenView` (`accounts:token`, members only, never cached), with a
+    `curl` example.
+  - `accounts/partials/account_pages.html` (new): the Account side panel
+    (Profile, Settings, API token), shared by the three pages; the profile
+    links to the token page.
+  - Tests: `tests/test_api_library.py` and `tests/test_token_page.py`
+    (new); the token page added to `test_access_control.py`'s members-only
+    pages and `test_shell.py`'s member pages.
+  - Docs: `ARCHITECTURE.md` (a Library API section, URLs,
+    authentication), `TESTING.md` (the new files, the API's CSRF and 401
+    rules), `FRONTEND.md` (the panel rows). Plan: Phase 6 ticked, plus a
+    note for Phase 8.
+- **TDD:** three behaviours, each red on an assertion first:
+  1. Another member's entry is a 404 for GET, PATCH, PUT and DELETE, and
+     nothing changes. It was red with 200/204, because the scaffold's
+     queryset read every entry.
+  2. A duplicate save is a 400 "Already in your library.", with no
+     provider call and the entry untouched. It was red with 201.
+  3. A `ProviderError` on create is a 502 with its message, and nothing is
+     stored. It was red with 500.
+- **Decisions:**
+  - The URL names are `catalog:api_library` and `catalog:api_entry`, using
+    generic views rather than a router.
+  - Token authentication comes first, so signed out is a 401.
+  - The duplicate error uses the 502's `{"detail": …}` shape.
+  - Asset fields in PATCH or PUT are ignored, not rejected.
+  - The list's reply is `{count, page, num_pages, next, previous,
+    results}`.
+  - The browsable API is off, because its Bootstrap colours sit outside
+    the palette.
+  - The token page has no regenerate button, since the PRD doesn't ask for
+    one.
+- **Deviations:** none. At the user's request, the CSRF tests cover all
+  four writes (POST, PATCH, PUT, DELETE) three ways: a session without
+  CSRF is refused, a session with the token succeeds, and a token without
+  CSRF succeeds.
+- **Sideways:** the first run of the new tests had two mistakes, both in
+  the tests:
+  - tags come back A–Z (`Tag.Meta.ordering`), not in the order given
+  - the test helper sent GETs a JSON body
+
+  Both were fixed in the tests; the code didn't change. The 502 test needed
+  `Client(raise_request_exception=False)` to see the 500 as a client would.
+
 ## 2026-11-05 — Axcenity Toolbox: Phase 5/13, Library drawer (plus polish)
 
 ### Prompts

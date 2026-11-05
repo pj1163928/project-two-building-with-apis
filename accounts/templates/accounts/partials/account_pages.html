@@ -1,0 +1,6 @@
+{# The Account pages' side panel. Pass current="profile", "settings" or "token". #}
+<ul class="flex flex-col gap-1 mt-3 pt-1 border-t border-line" aria-label="Account pages">
+  <li><a class="panel-row" href="{% url 'accounts:profile' %}"{% if current == "profile" %} aria-current="page"{% endif %}>Profile</a></li>
+  <li><a class="panel-row" href="{% url 'accounts:settings' %}"{% if current == "settings" %} aria-current="page"{% endif %}>Settings</a></li>
+  <li><a class="panel-row" href="{% url 'accounts:token' %}"{% if current == "token" %} aria-current="page"{% endif %}>API token</a></li>
+</ul>

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import api, views
 
 app_name = "catalog"
 
@@ -21,4 +21,7 @@ urlpatterns = [
     path("library/<int:pk>/update/", views.UpdateEntryView.as_view(), name="update"),
     # POST only: removes one of the member's own entries (the shared Asset stays).
     path("library/<int:pk>/remove/", views.RemoveFromLibraryView.as_view(), name="remove"),
+    # The library API (DRF): list and create, then read, update and delete one entry.
+    path("api/library/", api.LibraryAPI.as_view(), name="api_library"),
+    path("api/library/<int:pk>/", api.LibraryEntryAPI.as_view(), name="api_entry"),
 ]

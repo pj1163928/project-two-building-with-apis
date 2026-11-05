@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_htmx",
     "django_tailwind_cli",
+    "rest_framework",
+    "rest_framework.authtoken",
     "accounts",
     "catalog",
     "packs",
@@ -94,6 +96,19 @@ AUTH_PASSWORD_VALIDATORS = [
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "packs:home"
 LOGOUT_REDIRECT_URL = "packs:home"
+
+# The API (/api/...): a token (`Authorization: Token <key>`, no CSRF) or the
+# browser session (CSRF still applies to writes). Token comes first, so a
+# signed-out request is a 401 with `WWW-Authenticate: Token`. Replies are JSON
+# only: the browsable API's Bootstrap colours sit outside the axcenity palette.
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+}
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

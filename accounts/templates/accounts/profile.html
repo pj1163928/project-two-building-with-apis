@@ -3,10 +3,7 @@
 {% block breadcrumb %}{% url 'accounts:profile' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="account" icon="user" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'accounts:profile' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label=user.username icon="user" current=True %}{% endblock %}
 {% block panel_title %}Account{% endblock %}
 {% block side_panel %}
-  <ul class="flex flex-col gap-1 mt-3 pt-1 border-t border-line" aria-label="Account pages">
-    <li><a class="panel-row" href="{% url 'accounts:profile' %}" aria-current="page">Profile</a></li>
-    <li><a class="panel-row" href="{% url 'accounts:settings' %}">Settings</a></li>
-  </ul>
+  {% include "accounts/partials/account_pages.html" with current="profile" %}
 {% endblock %}
 {% block content %}
 <div class="max-w-xl space-y-8">
@@ -14,6 +11,7 @@
   <dl class="bg-surface border border-line rounded-xl divide-y divide-line">
     <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Username</dt><dd class="text-fg-strong">{{ user.username }}</dd></div>
     <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Member since</dt><dd>{{ user.date_joined|date:"j M Y" }}</dd></div>
+    <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">API</dt><dd><a class="link text-fg-strong" href="{% url 'accounts:token' %}">Your API token</a></dd></div>
   </dl>
   <form method="post" action="{% url 'accounts:logout' %}">
     {% csrf_token %}

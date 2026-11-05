@@ -16,7 +16,7 @@ pytestmark = pytest.mark.django_db
 
 PUBLIC_PAGES = ["packs:home", "catalog:discover", "accounts:login", "accounts:signup"]
 MEMBER_PAGES = ["packs:home", "catalog:discover", "catalog:library", "packs:list"]
-MEMBER_PAGES += ["accounts:profile", "accounts:settings"]
+MEMBER_PAGES += ["accounts:profile", "accounts:settings", "accounts:token"]
 
 TYPE_HEXES = ["#F2A15A", "#6C8CFF", "#4CC38A", "#A48AFF"]
 KIND_KEYS = ["texture", "hdri", "model", "sound"]

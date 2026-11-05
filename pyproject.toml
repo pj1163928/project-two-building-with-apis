@@ -7,6 +7,7 @@ dependencies = [
     "django>=6.1.2",
     "django-htmx>=1.29.0",
     "django-tailwind-cli>=4.8.2",
+    "djangorestframework>=3.18.3",
     "requests>=2.34.2",
 ]
 

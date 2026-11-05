@@ -13,7 +13,7 @@ reads `DJANGO_SETTINGS_MODULE` from `pyproject.toml`. Name files by area:
 
 | File | Covers |
 |---|---|
-| `test_access_control.py` | The access rules, page by page: who gets 200, who is redirected to sign-in, POST-only sign-out, CSRF rejections, a visitor's status bar holding provider status only, saving (sign-in back to Discover, CSRF), the saved count counting only the member's own entries, a visitor's library view (and its fragment's `HX-Redirect`) going to sign-in and back, library parameters never showing another member's entries, and Remove (sign-in, another member's entry is a 404, CSRF) and tags never showing another member's entries or tags. The drawer: another member's entry is a 404 to view and to every update, a visitor is sent to sign in and back (an HTMX save gets a 401 that keeps the text), and updates need CSRF |
+| `test_access_control.py` | The access rules, page by page: who gets 200, who is redirected to sign-in, POST-only sign-out, CSRF rejections, a visitor's status bar holding provider status only, saving (sign-in back to Discover, CSRF), the saved count counting only the member's own entries, a visitor's library view (and its fragment's `HX-Redirect`) going to sign-in and back, library parameters never showing another member's entries, and Remove (sign-in, another member's entry is a 404, CSRF) and tags never showing another member's entries or tags. The drawer: another member's entry is a 404 to view and to every update, a visitor is sent to sign in and back (an HTMX save gets a 401 that keeps the text), and updates need CSRF. The API token page sends a visitor to sign in (the API's own rules are in `test_api_library.py`) |
 | `test_accounts.py` | Sign-up and sign-in flows and their validation errors |
 | `test_shell.py` | Every page renders in the shell; the one-column sidebar (each icon beside its label, the strip when collapsed); branding, fonts and static files; no type colour in the chrome, and in content only on Discover's tiles; showcase vs work surfaces; boosted navigation, the hover gate and the font gate |
 | `test_library_page.py` | The library's layout (the toolbar, the side-panel chips, disabled while empty) and its grid: newest first, each card's thumbnail, type, title, status and rating, provider URLs only, a member's own entries only, and rendering with every provider down. Browsing: the HTMX fragment versus the full page in the same state, boosted and history-restore requests, the pushed URL, the pager and both empty states. Tags, corner actions and Remove: the Tags chips with their counts, each card's corner actions, details and pickers, the stars clear of DaisyUI's `.rating`, and Remove (the asset stays, the same view comes back, a page that empties falls back) |
@@ -21,6 +21,8 @@ reads `DJANGO_SETTINGS_MODULE` from `pyproject.toml`. Name files by area:
 | `test_library_drawer.py` | The drawer and the entry page: the fragment versus the full page, the details, license, source and files, the stored review, one field per form with no Save button, rendering with every provider down, saving only the posted field, the rating 1 to 5 or cleared, 400s that save nothing, the card out of band (status and rating from the library only), notes surviving a reload as typed, and Remove from the drawer or the page |
 | `test_community_rating.py` | The community rating: every member's rating averaged, unrated entries skipped, one row per entry, the Discover lookup by ID, the `community` sort, and the cards, drawer and Discover results showing the average and count, never who rated or their notes |
 | `test_library_save.py` | Saving: the shared Asset reused across members, one entry per member, nothing saved on a `ProviderError`, new entries To review, the model constraints, the save view's replies and 400s, and "In library" (a corner check, never the logo mark) on Discover's shelves |
+| `test_api_library.py` | The library API: another member's entry is a 404 for every method, a duplicate save is a 400 "Already in your library.", a `ProviderError` is a 502 with its message; create (reuse vs fetch, the review, bad values before any provider call), the list matching the library page's entries and order for each parameter, its pages and links, read, PATCH and PUT (only notes, rating and status; asset fields ignored), DELETE (the Asset stays, the documentation names packs), 401 signed out, and session writes refused without CSRF while the same writes signed with a token succeed |
+| `test_token_page.py` | The API token page: created on the first visit and the same after, only the member's own, never cached, the example header, the shown token signing API requests, and the Account pages' panel rows |
 | `test_tags.py` | `normalize_tag()`, rule by rule |
 | `test_auth_pages.py` | Sign-in and sign-up: the layout, the top-bar actions, password toggles, the Forgot password link, focus and error styling |
 | `test_theme.py` | `styles/source.css` holds only `axcenity` palette colours, and every block in it is closed once |
@@ -76,8 +78,11 @@ UI that appears only once a URL exists.
 - Objects the caller doesn't own: check **404**.
 - CSRF: use `Client(enforce_csrf_checks=True)` and check that a POST
   without a token gets **403**. The normal test client skips CSRF checks.
-- *(planned)* API: a session write without CSRF is refused, and the same
-  request with `Authorization: Token <key>` succeeds.
+- API: a session write without CSRF is refused (**403**), and the same
+  request with `Authorization: Token <key>` succeeds. Use
+  `Client(enforce_csrf_checks=True)` for both; a session write that sends
+  the `csrftoken` cookie's value as `X-CSRFToken` succeeds too.
+- API: a signed-out request is a **401** (`WWW-Authenticate: Token`).
 
 ## Manual testing account
 

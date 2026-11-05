@@ -12,8 +12,8 @@ phases add.
 |---|---|---|
 | `config` | Settings, root URLs, the shell's context processor | — |
 | `providers` | API clients for ambientCG, Poly Haven and Openverse (plain Python, not a Django app) | — |
-| `accounts` | Sign-up, sign-in, sign-out, profile, settings, and the API token page *(planned)* | `accounts:` |
-| `catalog` | Discover and the library; Asset, Tag and SavedAsset; saving; the library API *(planned)* | `catalog:` |
+| `accounts` | Sign-up, sign-in, sign-out, profile, settings, and the API token page | `accounts:` |
+| `catalog` | Discover and the library; Asset, Tag and SavedAsset; saving; the library API | `catalog:` |
 | `packs` | Home and the public gallery; Pack and PackItem, the builder, export and the pack API *(planned)* | `packs:` |
 
 `config/urls.py` mounts `accounts.urls` at `/accounts/`, and mounts
@@ -31,15 +31,18 @@ phases add.
 | `catalog:entry` | `/library/<id>/` | Members, own entries only (anything else is **404**). The library's HTMX request gets the drawer; any other request gets the full page |
 | `catalog:update` | `/library/<id>/update/` | Members, own entries only (**404** otherwise); POST only, with CSRF. Saves whichever of `status`, `rating`, `notes` is posted |
 | `catalog:remove` | `/library/<id>/remove/` | Members, own entries only (anything else is **404**); POST only, with CSRF (HTMX gets the results fragment) |
+| `catalog:api_library` | `/api/library/` | API: signed in by token or session (401 otherwise). GET lists the caller's entries; POST saves one |
+| `catalog:api_entry` | `/api/library/<id>/` | API: the caller's own entries only (**404** otherwise). GET, PATCH, PUT, DELETE |
 | `packs:list` | `/packs/` | Members |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
 | `accounts:login` | `/accounts/login/` | Everyone |
 | `accounts:logout` | `/accounts/logout/` | POST only, with CSRF |
 | `accounts:profile` | `/accounts/profile/` | Members |
 | `accounts:settings` | `/accounts/settings/` | Members |
+| `accounts:token` | `/accounts/token/` | Members; creates the member's API token on the first visit, never cached |
 
 Planned additions: `/packs/<slug>/` (slugs are unique
-site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
+site-wide), and `/api/packs/` and `/api/packs/{id}/export/`.
 
 ## Discover
 
@@ -119,8 +122,9 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
     is stored.
   - `save_to_library(user, provider_key, external_id)` returns
     `(entry, created)`. Saving an asset the member already has returns
-    their entry with `created=False`. The API (Phase 6) uses the same
-    functions.
+    their entry untouched with `created=False`. Keyword arguments (`notes`,
+    `rating`, `status`) set a new entry's review; the API's create passes
+    them.
 - **The save URL** (`SaveAssetView`) checks the provider and a non-blank ID
   of at most 200 characters (**400** otherwise) before any provider call.
   It replies with the "In library" badge, or with the `ProviderError`
@@ -241,6 +245,45 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
 - **Saved count:** `config.context_processors.shell` adds `saved_count`
   (the member's own entries) for signed-in members only.
 
+## Library API
+
+`catalog/api.py` (DRF generic views) and `catalog/serializers.py`. The
+views are thin: they call the same `filter_library()` and
+`save_to_library()` as the pages.
+
+- **List** (`GET /api/library/`): `filter_library(request.user,
+  request.query_params)`, so the parameters, the fallbacks and the order are
+  exactly the library page's, `tag` and `sort=community` included. The
+  reply is `{count, page, num_pages, next, previous, results}`; `next` and
+  `previous` are absolute API URLs built from the tidy parameters
+  (`LibraryParams.query_string()`, which the page's `url()` also uses). A
+  page past the end is the last page, as on the website.
+- **Create** (`POST /api/library/`): `NewLibraryEntrySerializer` checks
+  `provider` (one of the three), `external_id` (1 to 200 characters) and the
+  optional `notes`, `rating` and `status` before any provider is called
+  (a **400** with the field's error otherwise). Then `save_to_library()`:
+  - the member already has it: **400** `{"detail": "Already in your library."}`,
+    and the entry is untouched
+  - a `ProviderError`: **502** `{"detail": <its message>}`, nothing stored
+  - otherwise **201** with the new entry
+- **One entry** (`/api/library/<id>/`): the queryset is
+  `SavedAsset.objects.for_user(request.user)`, so another member's entry is
+  a **404** for every method. PATCH and PUT change only `notes`, `rating`
+  and `status`, writing just the fields sent (`update_fields`, like
+  `ReviewForm`, so a script and the drawer's notes autosave never overwrite
+  each other). Anything else in the body (the asset, `id`, `saved_at`,
+  `community`) is ignored. DELETE is a **204**; it removes the entry from
+  the member's packs too (the PackItems cascade, Phase 7), and the shared
+  Asset stays. The view's docstring says so, and DRF serves it as the
+  `OPTIONS` description.
+- **The owner serializer** (`LibraryEntrySerializer`): `id`, the nested
+  read-only `asset` (`AssetSerializer`: Asset fields only, tags as names),
+  `notes`, `rating`, `status`, `saved_at` and `community`
+  (`{average, count}` or null). Its rules match `ReviewForm`: notes up to
+  10,000 characters, kept as typed with line breaks stored as LF; rating 1
+  to 5 or null; one of the four statuses. Phase 8's public pack serializer
+  can reuse `AssetSerializer`, which holds no member's fields.
+
 ## Authentication
 
 - Django's `LoginView` and `LogoutView`. `LogoutView` accepts only POST,
@@ -250,8 +293,19 @@ site-wide), and `/api/library/`, `/api/packs/` and `/api/packs/{id}/export/`.
 - `LOGIN_URL = "accounts:login"`. `LoginRequiredMixin` adds `?next=` so the
   member comes back after signing in.
 - `LOGIN_REDIRECT_URL` and `LOGOUT_REDIRECT_URL` both point to `packs:home`.
-- *(planned)* The API uses DRF `SessionAuthentication` (CSRF still applies)
-  and `TokenAuthentication` (`Authorization: Token <key>`, no CSRF).
+- The API uses DRF's `TokenAuthentication` (`Authorization: Token <key>`,
+  no CSRF) and then `SessionAuthentication` (the browser session; writes
+  must pass CSRF). Token comes first, so a signed-out API request is a
+  **401** with `WWW-Authenticate: Token`. Every API view needs sign-in
+  (`IsAuthenticated`), and replies are JSON only: DRF's browsable API is
+  off, since its Bootstrap colours sit outside the `axcenity` palette.
+- **The token page** (`accounts.views.TokenView`, `/accounts/token/`):
+  `Token.objects.get_or_create()` on each visit, so the first visit creates
+  the token. It's sent `Cache-Control: no-store` (`never_cache`). The
+  Account pages share one side panel
+  (`accounts/partials/account_pages.html`): Profile, Settings and API
+  token. There's no way to regenerate a token yet; the PRD doesn't ask
+  for one.
 
 ## Access rules (apply to site and API)
 

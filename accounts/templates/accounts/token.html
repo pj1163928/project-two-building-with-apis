@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}API token{% endblock %}
+{% block breadcrumb %}{% url 'accounts:profile' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="account" icon="user" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'accounts:token' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="api token" icon="user" current=True %}{% endblock %}
+{% block panel_title %}Account{% endblock %}
+{% block side_panel %}
+  {% include "accounts/partials/account_pages.html" with current="token" %}
+{% endblock %}
+{% block content %}
+<div class="max-w-2xl space-y-8">
+  {% include "partials/page_header.html" with label="API token" heading="Your API token." lead="Use it to call the Toolbox API from your own scripts. Anyone holding it can read and change your library, so keep it private." compact=True %}
+  <div class="bg-surface border border-line rounded-xl px-5 py-4 space-y-2">
+    <label class="micro text-fg-secondary block" for="api-token">Token</label>
+    <input id="api-token" class="input w-full font-mono text-sm" type="text" value="{{ token.key }}" readonly spellcheck="false" autocomplete="off">
+    <p class="text-xs text-fg-muted">Created {{ token.created|date:"j M Y" }}.</p>
+  </div>
+  <section class="space-y-3" aria-labelledby="token-usage">
+    <h2 id="token-usage" class="micro text-fg-secondary">Signing requests</h2>
+    <p class="text-sm text-fg-secondary leading-relaxed">Send the token in the <code class="font-mono">Authorization</code> header. Requests signed with a token don't need a CSRF token.</p>
+    <pre class="bg-surface border border-line rounded-xl px-5 py-4 text-xs font-mono overflow-x-auto"><code>curl -H "Authorization: Token {{ token.key }}" \
+     "{{ api_url }}?sort=rating"
+
+curl -X POST -H "Authorization: Token {{ token.key }}" \
+     -H "Content-Type: application/json" \
+     -d '{"provider": "polyhaven", "external_id": "red_brick_03", "status": "testing"}' \
+     "{{ api_url }}"</code></pre>
+    <p class="text-sm text-fg-secondary leading-relaxed">The list takes the library page's search, filters, sort and page. Each entry is at <code class="font-mono">/api/library/&lt;id&gt;/</code>, where GET reads it, PATCH or PUT changes its notes, rating and status, and DELETE removes it from your library and from your packs.</p>
+  </section>
+</div>
+{% endblock %}

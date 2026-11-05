@@ -45,17 +45,21 @@ def get_or_fetch_asset(provider_key: str, external_id: str) -> Asset:
     return asset
 
 
-def save_to_library(user, provider_key: str, external_id: str) -> tuple[SavedAsset, bool]:
+def save_to_library(
+    user, provider_key: str, external_id: str, **review: Any
+) -> tuple[SavedAsset, bool]:
     """Save one provider asset to `user`'s library; return (entry, created).
 
     The shared Asset comes from get_or_fetch_asset(). A member who already
-    has the asset gets their existing entry back with created=False, never a
-    second one. A new entry starts as To review with no rating. Raises
-    UnknownProviderError or ProviderError, and then saves nothing.
+    has the asset gets their existing entry back untouched with
+    created=False, never a second one. A new entry starts as To review with
+    no rating, unless `review` gives its notes, rating or status (the API's
+    create). Raises UnknownProviderError or ProviderError, and then saves
+    nothing.
     """
     asset = get_or_fetch_asset(provider_key, external_id)
     with transaction.atomic():
-        return SavedAsset.objects.get_or_create(user=user, asset=asset)
+        return SavedAsset.objects.get_or_create(user=user, asset=asset, defaults=review)
 
 
 # ---------------------------------------------------------------- browsing (Phase 4)
@@ -103,6 +107,13 @@ class LibraryParams:
 
         Defaults are left out, so the whole library is plain /library/.
         """
+        query = self.query_string(page)
+        path = reverse("catalog:library")
+        return f"{path}?{query}" if query else path
+
+    def query_string(self, page: int | None = None) -> str:
+        """These parameters (or another `page` of them) as a tidy query string,
+        defaults left out. The library page and the API share it."""
         page = self.page if page is None else page
         pairs = [("q", self.q)] if self.q else []
         pairs += [("type", value) for value in self.types]
@@ -115,8 +126,7 @@ class LibraryParams:
             pairs.append(("sort", self.sort))
         if page > 1:
             pairs.append(("page", page))
-        path = reverse("catalog:library")
-        return f"{path}?{urlencode(pairs)}" if pairs else path
+        return urlencode(pairs)
 
 
 @dataclass(frozen=True)

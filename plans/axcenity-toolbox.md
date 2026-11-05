@@ -573,24 +573,24 @@ The owner serializer includes notes, rating and status.
 
 ### Acceptance criteria
 
-- [ ] The list returns the same entries in the same order as the website
+- [x] The list returns the same entries in the same order as the website
   for the same parameters.
-- [ ] Create with a known Asset doesn't call `fetch_record()`. Create with
+- [x] Create with a known Asset doesn't call `fetch_record()`. Create with
   a new Asset calls it once.
-- [ ] Create returns these errors:
+- [x] Create returns these errors:
   - a duplicate: **400** with "Already in your library."
   - a `ProviderError`: **502** with `{"detail": <friendly message>}`
   - an unknown provider: **400**
-- [ ] PATCH and PUT change only notes, rating and status. Asset fields in
+- [x] PATCH and PUT change only notes, rating and status. Asset fields in
   the request are ignored or rejected.
-- [ ] DELETE removes the entry and leaves the shared Asset. The endpoint's
+- [x] DELETE removes the entry and leaves the shared Asset. The endpoint's
   documentation says the entry also leaves the member's packs.
-- [ ] The token page shows the member's token. The token signs requests
+- [x] The token page shows the member's token. The token signs requests
   through `Authorization: Token <key>`.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules:
+- [x] Standard gate (see top). Access rules:
   - Unauthenticated requests are refused with 401 or 403.
   - Another user's entry returns **404** for GET, PATCH, PUT and DELETE.
   - The list only ever holds the caller's entries.
@@ -598,6 +598,12 @@ The owner serializer includes notes, rating and status.
     test client enforces CSRF checks for this test.
   - The same request signed with a token succeeds without a CSRF token.
   - The token page sends signed-out visitors to sign in.
+
+> **For Phase 8:** the pack API can reuse `catalog.serializers.AssetSerializer`
+> (Asset fields only) in its public serializer. The API is JSON only and
+> needs sign-in by default (`REST_FRAMEWORK` in settings), so the public
+> pack views must set `permission_classes` to allow signed-out reads, and a
+> signed-out `?mine=1` will get the 401 that token authentication gives.
 
 ---
 

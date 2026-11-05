@@ -2,8 +2,12 @@ from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, resolve_url
+from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.cache import never_cache
 from django.views.generic import CreateView, TemplateView
+from rest_framework.authtoken.models import Token
 
 from .forms import SignUpForm
 
@@ -49,3 +53,21 @@ class ProfileView(LoginRequiredMixin, TemplateView):
 class SettingsView(LoginRequiredMixin, TemplateView):
     template_name = "accounts/settings.html"
     extra_context = {"active_nav": "settings"}
+
+
+@method_decorator(never_cache, name="dispatch")
+class TokenView(LoginRequiredMixin, TemplateView):
+    """The member's API token, created on their first visit.
+
+    The token signs API requests (`Authorization: Token <key>`) without a
+    CSRF token. The page is never cached, so the key isn't kept by the browser.
+    """
+
+    template_name = "accounts/token.html"
+    extra_context = {"active_nav": "account"}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["token"], _created = Token.objects.get_or_create(user=self.request.user)
+        context["api_url"] = self.request.build_absolute_uri(reverse("catalog:api_library"))
+        return context

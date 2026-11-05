@@ -53,6 +53,12 @@ Phase 5 rules (the drawer):
   status line with a sign-in link, so the notes being typed stay on the page.
 - Every update needs a valid CSRF token; the header base.html sends is
   enough.
+
+Phase 6 rules:
+- The API token page sends signed-out visitors to sign-in and back (it's in
+  MEMBERS_ONLY_PAGES). The library API's own rules (401 signed out, 404 for
+  another member's entry, session writes need CSRF, token writes don't) are
+  in test_api_library.py.
 """
 
 import re
@@ -66,7 +72,13 @@ from django.urls import reverse
 pytestmark = pytest.mark.django_db
 
 PUBLIC_PAGES = ["packs:home", "catalog:discover"]
-MEMBERS_ONLY_PAGES = ["catalog:library", "packs:list", "accounts:profile", "accounts:settings"]
+MEMBERS_ONLY_PAGES = [
+    "catalog:library",
+    "packs:list",
+    "accounts:profile",
+    "accounts:settings",
+    "accounts:token",
+]
 
 
 def login_url_for(path):
