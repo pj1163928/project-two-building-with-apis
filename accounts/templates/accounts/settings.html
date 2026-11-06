@@ -5,12 +5,48 @@
 {% block side_panel %}
   {% include "accounts/partials/account_pages.html" with current="settings" %}
 {% endblock %}
+{# Download defaults: one form per group of chips, each posting only its own field to    #}
+{# accounts:download_preferences on change, so there's no Save button. The maps group   #}
+{# sends maps_posted too, so unticking every map is still a change (and refused).       #}
 {% block content %}
-<div class="max-w-xl space-y-8">
+<div class="account-page max-w-3xl mx-auto w-full space-y-8">
   {% include "partials/page_header.html" with label="Settings" heading="Settings." compact=True %}
-  <dl class="bg-surface border border-line rounded-xl divide-y divide-line">
-    <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Theme</dt><dd class="text-fg-strong">Axcenity, following your system (dark or light)</dd></div>
-    <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Side panel</dt><dd>Toggle it with the panel button at the top of the sidebar</dd></div>
-  </dl>
+  {# Appearance: System follows the computer's setting; Light and Dark override it. The   #}
+  {# chips switch at once (shell.js) and save the ax-theme cookie; without JavaScript the #}
+  {# form posts to accounts:theme. The title bar's switch steps through the same three.  #}
+  <section id="appearance" class="settings-panel" aria-labelledby="appearance-title">
+    <header class="settings-panel-head">
+      <h2 id="appearance-title" class="settings-panel-title">Appearance</h2>
+      <p class="text-sm text-fg-weak">The Axcenity theme, light or dark. System follows your computer's setting. The sun and moon in the title bar switch it too.</p>
+    </header>
+    <form class="settings-group" method="post" action="{% url 'accounts:theme' %}" hx-boost="false" data-theme-form>{% csrf_token %}
+      <fieldset>
+        <legend class="micro text-fg-secondary">Theme</legend>
+        <div class="flex flex-wrap gap-1.5">{% for value, label in theme_choices %}<label class="filter-chip"><input type="radio" class="sr-only" name="choice" value="{{ value }}" data-theme-choice{% if value == theme_choice %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div>
+      </fieldset>
+      <noscript><button type="submit" class="btn btn-quiet btn-sm rounded-none">Save theme</button></noscript>
+    </form>
+    <p class="settings-hint">Side panel: toggle it with the panel button at the top of the sidebar.</p>
+  </section>
+
+  <section id="download-defaults" class="settings-panel" aria-labelledby="download-defaults-title">
+    <header class="settings-panel-head">
+      <h2 id="download-defaults-title" class="settings-panel-title">Download defaults</h2>
+      <p class="text-sm text-fg-weak">What "Download bundle" in your library takes, and which files it marks as your default. Each file still has its own link.</p>
+    </header>
+    {% url 'accounts:download_preferences' as save_url %}
+    {% for group in preference_groups %}
+      <form class="settings-group" method="post" action="{{ save_url }}" hx-post="{{ save_url }}" hx-trigger="change" hx-sync="this:replace" hx-target="#settings-save-status" hx-swap="outerHTML transition:false">{% csrf_token %}
+        {% if group.multiple %}<input type="hidden" name="maps_posted" value="1">{% endif %}
+        <fieldset>
+          <legend class="micro text-fg-secondary">{{ group.title }}</legend>
+          <div class="flex flex-wrap gap-1.5">{% for value, label, checked in group.chips %}<label class="filter-chip"><input type="{% if group.multiple %}checkbox{% else %}radio{% endif %}" class="sr-only" name="{{ group.name }}" value="{{ value }}"{% if checked %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div>
+          <p class="settings-hint">{{ group.hint }}</p>
+        </fieldset>
+        <noscript><button type="submit" class="btn btn-quiet btn-sm rounded-none">Save {{ group.title|lower }}</button></noscript>
+      </form>
+    {% endfor %}
+    {% include "accounts/partials/settings_save_status.html" with state="idle" %}
+  </section>
 </div>
 {% endblock %}

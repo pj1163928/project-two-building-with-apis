@@ -1,0 +1,10 @@
+{# Why the entry has its status (#entry-status-reason): one line, saved when it's left or #}
+{# Enter is pressed, posting only status_reason to catalog:update. It annotates the       #}
+{# latest status change. A status change sends this box again, empty, out of band; a     #}
+{# reason's own save doesn't, so the box being typed in is never replaced.               #}
+{% url 'catalog:update' entry.pk as update_url %}{% with latest=entry.latest_status_change %}
+<form id="entry-status-reason" class="entry-form entry-reason" method="post" action="{{ update_url }}" hx-post="{{ update_url }}" hx-trigger="change, submit" hx-sync="this:replace" hx-target="#entry-save-status" hx-swap="outerHTML transition:false" data-autosave="reason"{% if oob %} hx-swap-oob="true"{% endif %}>{% csrf_token %}
+  <label for="entry-reason-input" class="sr-only">Why is it {{ entry.get_status_display }}?</label>
+  <input id="entry-reason-input" type="text" name="status_reason" value="{{ latest.reason|default:'' }}" maxlength="{{ reason_max_length }}" autocomplete="off" placeholder="Why is it {{ entry.get_status_display|lower }}? Add a reason (optional)">
+</form>
+{% endwith %}

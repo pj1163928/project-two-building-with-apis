@@ -47,6 +47,8 @@ phases add.
 | `accounts:logout` | `/accounts/logout/` | POST only, with CSRF |
 | `accounts:profile` | `/accounts/profile/` | Members |
 | `accounts:settings` | `/accounts/settings/` | Members |
+| `accounts:theme` | `/accounts/theme/` | Everyone; POST only, with CSRF. Sets the colour scheme (`choice`: `system`, `light` or `dark`, a **400** otherwise) in the `ax-theme` cookie for a year. HTMX gets a 204; any other request goes back to the Referer when it's this site, otherwise home |
+| `accounts:download_preferences` | `/accounts/settings/downloads/` | Members; POST only, with CSRF. Saves whichever download defaults are posted (HTMX gets the status line, a plain POST goes back to Settings) |
 | `accounts:token` | `/accounts/token/` | Members; creates the member's API token on the first visit, never cached |
 
 Planned additions: `/packs/<slug>/` (Phase 8, the public page; slugs are
@@ -163,8 +165,11 @@ unique site-wide, which is why the owner's pages use the pk), and
     (a hand-typed "Bricks" finds "brick"); only the first 10 are read, and
     they're kept A–Z. `Tag.objects.in_library(user)` lists the member's own
     tags with `uses` (how many of their entries carry each), most used
-    first; `filter_groups()` turns the first 24, plus any chosen beyond
-    those, into the side panel's Tags chips.
+    first; `filter_groups()` turns the first 48 (`TAG_CHIP_LIMIT`), plus any
+    chosen beyond those, into the side panel's Tags chips. The group has a
+    `fold` of 8 (`TAG_CHIPS_SHOWN`): `lead_chips` always show, `more_chips`
+    fold away, and `more_open` is true when a chosen chip is behind the
+    fold (user request, 2026-11-05).
   - `clean_library_params()` tidies them and never fails: unknown filter
     values are dropped, an unknown sort is `newest`, a page that isn't a
     whole number from 1 is 1, and a page past the end is the last page.
@@ -258,7 +263,76 @@ unique site-wide, which is why the owner's pages use the pk), and
     test (no rating ever shows through a pack) should keep community
     ratings off the public pack pages, or allow for them.
 - **Saved count:** `config.context_processors.shell` adds `saved_count`
-  (the member's own entries) for signed-in members only.
+  (the member's own entries) for signed-in members only. It also adds the
+  colour scheme for every page: `theme_choice` (from the `ax-theme`
+  cookie, through `accounts.theme.theme_choice()`; anything unknown is
+  `system`), its label, and the next choice for the title bar's switch.
+- **Status history** *(user request, 2026-11-05)*: who set a review status,
+  when, where and why. The Toolbox has no teams yet, so today it's always
+  the entry's owner (or their API token), but each change names the person,
+  ready for when members share work.
+  - `StatusChange` (`catalog/models.py`): `entry` (CASCADE), `status`,
+    `changed_by` (SET_NULL, "a former member" once deleted), `reason` (up
+    to 300 characters), `via` (`site` or `api`) and `changed_at`, newest
+    first.
+  - `SavedAsset.save_review(fields, by=, via=, reason=)` saves only `fields`
+    and, when the status really changes, records it, in one transaction.
+    `ReviewForm.save(by=)` and the API's serializer both use it.
+    `SavedAsset.explain_status(reason, by=, via=)` puts a reason on the
+    latest change when that set the current status (the explainer becomes
+    its author), or records the current status with it.
+    `latest_status_change` is the record behind the current status, or
+    None.
+  - `save_to_library()` records a new entry's first status, by the saver,
+    with `via` and an optional `status_reason` (the API's create).
+  - `status_history()` is the prefetch (changes with `changed_by`) that
+    `filter_library()`, `_own_entry()` and the API use.
+  - `UpdateEntryView` takes `status_reason` as its own posted field
+    (`clean_status_reason()`: spaces collapsed, up to 300 characters, a
+    **400** otherwise). It's members only, CSRF, and another member's entry
+    is a **404**, like every update.
+- **Files and bundles** *(user request, 2026-11-05)*: `catalog/files.py`
+  tells an asset's stored variants apart. It has no models and makes no
+  requests.
+  - `describe_variant()` gives a `VariantInfo`: the resolution ("2K") and
+    format ("JPG", "glTF", from the label, or the first file's extension
+    when the label has none), the package (`maps`, `bundle`, `archive`,
+    `audio`, `files`) and each file's `FileInfo` with its `map_key` and
+    role. `map_type(filename, external_id)` reads only the part between the
+    asset's ID and the resolution, so "rusty_metal_02_rough_2k.jpg" is
+    Roughness, not Metalness. `Asset.file_variants` and
+    `Asset.file_filters` (the resolutions and formats, once each) wrap
+    them.
+  - `pick_bundle(kind, variants, prefs)`: the format first (the member's,
+    then `FORMAT_FALLBACKS` for the kind), then the resolution (the
+    member's, else the nearest below, else the nearest above). From loose
+    maps only the member's map types are kept; a bundle or archive is taken
+    whole. `Bundle.notes` says where it had to differ. `Bundle.manifest()`
+    puts every file under one folder named for the asset, through
+    `safe_path()` (no `..`, no leading `/`, duplicates numbered).
+  - `bundle_manifest(entry, bundle)` (`catalog/library.py`) is the JSON the
+    drawer's Download bundle reads: the zip's name, the provider, each
+    file's URL, path and size, and the credits. None over `BUNDLE_MAX_BYTES`
+    (2 GB) or with nothing to bundle. **The member's browser** fetches and
+    zips the files; the Toolbox never downloads, hosts or proxies them, so
+    the PRD's Out of Scope still holds.
+  - `DownloadPreferences` (`accounts/models.py`, one per member): the
+    `resolution` (1K–8K, 2K by default), `texture_format` (JPG), `hdri_format`
+    (HDR), `model_format` (glTF), `sound_format` (MP3) and `maps` (every
+    map type by default). `DownloadPreferences.objects.for_user(user)`
+    returns the saved row or the unsaved defaults, so reading never writes.
+    `DownloadPreferencesForm` binds and saves only the posted fields, like
+    `ReviewForm`; at least one map must stay.
+- **Around an entry** *(user request, 2026-11-05)*: `entry_related(user,
+  entry)` gives an `EntryRelated`: `similar` (`SavedAssetQuerySet.similar_to()`
+  on the member's own entries: most shared tags, then the same kind, then
+  newest, up to 6, each with `shared_tags`), `public_packs`
+  (`Pack.objects.public_featuring(asset, exclude_owner=user)`: other
+  members' public packs holding the asset through anyone's entry, never a
+  private one) and `find_more_url` (Discover for the kind and the asset's two
+  most widely used tags, or its title). `EntryView` adds it, with the
+  member's `preferences`, `bundle` and `bundle_manifest`, to the drawer and
+  the page alike.
 
 ## Packs
 
@@ -362,7 +436,12 @@ views are thin: they call the same `filter_library()` and
 - **The owner serializer** (`LibraryEntrySerializer`): `id`, the nested
   read-only `asset` (`AssetSerializer`: Asset fields only, tags as names),
   `notes`, `rating`, `status`, `saved_at` and `community`
-  (`{average, count}` or null). Its rules match `ReviewForm`: notes up to
+  (`{average, count}` or null), plus `status_change` (`{status, by, via,
+  reason, changed_at}` for the record behind the current status, or null)
+  and the write-only `status_reason`. A PATCH or PUT that changes the status
+  records it with the caller and `via: "api"`, the reason on that change; a
+  `status_reason` alone explains the current status. Create passes it to
+  `save_to_library()` for the first record. Its rules match `ReviewForm`: notes up to
   10,000 characters, kept as typed with line breaks stored as LF; rating 1
   to 5 or null; one of the four statuses. Phase 8's public pack serializer
   can reuse `AssetSerializer`, which holds no member's fields.

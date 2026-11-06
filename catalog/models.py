@@ -12,13 +12,15 @@ from dataclasses import dataclass
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
-from django.db.models import Avg, Count, F, IntegerField, OuterRef, Q, Subquery
+from django.db.models import Avg, Case, Count, F, IntegerField, OuterRef, Q, Subquery, When
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
+from django.utils.functional import cached_property
 
 from providers import KINDS, PROVIDERS, AssetRecord
 
 from .discover import TILES_BY_KIND, KindTile
+from .files import FileFilters, VariantInfo, describe_variants, file_filters
 from .tags import MAX_TAG_LENGTH, normalize_tag
 
 PROVIDER_CHOICES = [(provider.KEY, provider.NAME) for provider in PROVIDERS]
@@ -137,6 +139,16 @@ class Asset(models.Model):
         """The asset's type tile: its label, icon and type colour."""
         return TILES_BY_KIND[self.kind]
 
+    @cached_property
+    def file_variants(self) -> list[VariantInfo]:
+        """The stored variants told apart by resolution, format, package and map type."""
+        return describe_variants(self.variants or [], self.external_id)
+
+    @property
+    def file_filters(self) -> FileFilters:
+        """The resolutions and formats its files come in, for the drawer's filters."""
+        return file_filters(self.file_variants)
+
 
 # The library's sorts, by their URL value; "newest" is the default. Each ends
 # on a unique column, so the order never shifts between pages. "community"
@@ -245,6 +257,28 @@ class SavedAssetQuerySet(models.QuerySet):
             entries = entries.filter(asset__in=Asset.objects.filter(tags__name=name))
         return entries
 
+    def similar_to(self, entry: "SavedAsset", limit: int = 6) -> list["SavedAsset"]:
+        """Up to `limit` other entries most like `entry`: most shared tags first,
+        then the same kind, then newest saved. Entries sharing neither are left out.
+
+        Each carries `shared_tags`. Call it on one member's entries
+        (for_user()), so it never reaches anyone else's library.
+        """
+        asset = entry.asset
+        tag_ids = list(asset.tags.values_list("id", flat=True))
+        same_kind = Case(When(asset__kind=asset.kind, then=1), default=0)
+        similar = (
+            self.exclude(pk=entry.pk)
+            .annotate(
+                shared_tags=Count("asset__tags", filter=Q(asset__tags__in=tag_ids), distinct=True),
+                same_kind=same_kind,
+            )
+            .filter(Q(shared_tags__gt=0) | Q(same_kind=1))
+            .select_related("asset")
+            .order_by("-shared_tags", "-same_kind", "-saved_at", "-id")
+        )
+        return list(similar[:limit])
+
     def sorted_by(self, sort: str) -> "SavedAssetQuerySet":
         """Entries in one of LIBRARY_SORTS' orders. Unrated entries sort last by
         rating, and assets no one has rated sort last by community rating (which
@@ -300,3 +334,78 @@ class SavedAsset(models.Model):
     def stars(self) -> list[bool]:
         """Five flags, one per star, True for each the rating fills (all False if unrated)."""
         return [star <= (self.rating or 0) for star in range(1, 6)]
+
+    def save_review(
+        self, fields: Iterable[str], *, by, via: str = "site", reason: str = ""
+    ) -> "StatusChange | None":
+        """Save `fields` of this entry's review (status, rating, notes) and nothing else.
+
+        When the status really changes, the change is recorded with who made
+        it, where (the website or the API) and the optional `reason`, in the
+        same transaction. Returns that record, or None.
+        """
+        fields = list(fields)
+        with transaction.atomic():
+            stored = type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            self.save(update_fields=fields)
+            if "status" in fields and self.status != stored:
+                return self.status_changes.create(
+                    status=self.status, changed_by=by, via=via, reason=reason
+                )
+        return None
+
+    def explain_status(self, reason: str, *, by, via: str = "site") -> "StatusChange":
+        """Give the current status a reason (or clear it, with "").
+
+        The reason goes on the latest change when that set the current
+        status, and the explainer becomes its author. Otherwise (an entry
+        whose status has no record yet) a record of the current status is
+        made.
+        """
+        with transaction.atomic():
+            latest = self.status_changes.select_for_update().first()
+            if latest and latest.status == self.status:
+                latest.reason, latest.changed_by, latest.via = reason, by, via
+                latest.save(update_fields=["reason", "changed_by", "via"])
+                return latest
+            return self.status_changes.create(
+                status=self.status, changed_by=by, via=via, reason=reason
+            )
+
+    @property
+    def latest_status_change(self) -> "StatusChange | None":
+        """The record behind the current status, when it has one."""
+        latest = next(iter(self.status_changes.all()), None)
+        return latest if latest and latest.status == self.status else None
+
+
+# A status reason is one short line for the drawer.
+STATUS_REASON_MAX_LENGTH = 300
+
+
+class StatusChange(models.Model):
+    """Who set one entry's review status, when, where and why.
+
+    Entries are private, so today it's always the entry's owner (or their
+    API token); recording the person keeps the history right once members
+    work in teams.
+    """
+
+    class Via(models.TextChoices):
+        SITE = "site", "the website"
+        API = "api", "the API"
+
+    entry = models.ForeignKey(SavedAsset, on_delete=models.CASCADE, related_name="status_changes")
+    status = models.CharField(max_length=10, choices=SavedAsset.Status.choices)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    reason = models.CharField(max_length=STATUS_REASON_MAX_LENGTH, blank=True)
+    via = models.CharField(max_length=4, choices=Via.choices, default=Via.SITE)
+    changed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-changed_at", "-id"]
+
+    def __str__(self):
+        return f"{self.entry} → {self.get_status_display()}"

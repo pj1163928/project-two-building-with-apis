@@ -781,7 +781,7 @@ def test_only_cards_with_a_preview_get_a_play_button(client, monkeypatch):
 
 def test_the_sound_script_loads_on_every_page_and_plays_one_preview_at_a_time(client):
     html = client.get(reverse("packs:home")).content.decode()
-    assert '<script src="/static/js/sound-preview.js" defer></script>' in html
+    assert re.search(r'<script src="/static/js/sound-preview\.js\?v=\d+" defer></script>', html)
     script = (settings.BASE_DIR / "static" / "js" / "sound-preview.js").read_text(encoding="utf-8")
     # Delegated, so cards that arrive later (shelves, Load more) work too.
     assert 'document.addEventListener("click"' in script

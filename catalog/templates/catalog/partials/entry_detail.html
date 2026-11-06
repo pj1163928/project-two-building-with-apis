@@ -10,6 +10,8 @@
 {# #entry-save-status only, never the notes, so a failed save keeps the text (and        #}
 {# static/js/entry-drawer.js keeps a draft in this browser until it saves).              #}
 {# After "License and credit": the packs the entry is in, each opening its builder.     #}
+{# Under the status chips: who set it, when and why, with a reason box and the history. #}
+{# Files: catalog/partials/entry_files.html (the member's bundle, filters, map types).  #}
 {% with asset=entry.asset %}{% with tile=asset.tile %}{% url 'catalog:update' entry.pk as update_url %}
 <article class="entry" data-kind="{{ asset.kind }}" aria-labelledby="entry-title">
   <div class="entry-thumb">
@@ -30,6 +32,10 @@
         <div class="flex flex-wrap gap-1.5">{% for value, label in status_choices %}<label class="filter-chip"><input type="radio" class="sr-only" name="status" value="{{ value }}"{% if value == entry.status %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div>
       </fieldset>
     </form>
+    <div class="entry-status-detail">
+      {% include "catalog/partials/entry_status_note.html" %}
+      {% include "catalog/partials/entry_status_reason.html" %}
+    </div>
     <form class="entry-form" method="post" action="{{ update_url }}" hx-post="{{ update_url }}" hx-trigger="change" hx-target="#entry-save-status" hx-swap="outerHTML transition:false" data-autosave="rating">{% csrf_token %}
       <fieldset class="entry-field"><legend class="micro text-fg-muted">Rating</legend>
         <div class="flex items-center gap-3">
@@ -60,7 +66,7 @@
   </section>
 
   <section class="entry-section" aria-labelledby="entry-packs-title">
-    <h3 id="entry-packs-title" class="micro text-fg-secondary">Packs</h3>
+    <h3 id="entry-packs-title" class="micro text-fg-secondary">Your packs</h3>
     {% with pack_items=entry.pack_items.all %}{% if pack_items %}
       <ul id="entry-packs" class="entry-packs">
         {% for item in pack_items %}<li><a href="{% url 'packs:builder' item.pack_id %}" class="entry-link">{{ item.pack.title }}</a>{% if item.preferred_variant %}<span>{{ item.preferred_variant }}</span>{% endif %}</li>{% endfor %}
@@ -70,25 +76,7 @@
     {% endif %}{% endwith %}
   </section>
 
-  <section class="entry-section" aria-labelledby="entry-files-title">
-    <h3 id="entry-files-title" class="micro text-fg-secondary">Files</h3>
-    {% if asset.variants %}
-      <ul class="entry-variants">
-        {% for variant in asset.variants %}
-          <li>
-            <details class="entry-variant">
-              <summary><span class="entry-variant-label">{{ variant.label }}</span><span class="entry-variant-meta">{{ variant.files|length }} file{{ variant.files|length|pluralize }}{% if variant.total_size is not None %} · {{ variant.total_size|filesizeformat }}{% endif %}</span></summary>
-              <ul class="entry-files">
-                {% for file in variant.files %}<li><a href="{{ file.url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ file.filename }}</a>{% if file.size is not None %}<span>{{ file.size|filesizeformat }}</span>{% endif %}</li>{% endfor %}
-              </ul>
-            </details>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="text-sm text-fg-weak">{{ asset.get_provider_display }} listed no downloadable files for this asset.</p>
-    {% endif %}
-  </section>
+  {% include "catalog/partials/entry_files.html" %}
 
   <footer class="entry-foot">{% include "catalog/partials/entry_remove.html" %}</footer>
 </article>

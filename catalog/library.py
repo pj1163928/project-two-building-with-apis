@@ -14,12 +14,14 @@ from urllib.parse import urlencode
 
 from django.core.paginator import Page, Paginator
 from django.db import transaction
+from django.db.models import Count, Prefetch
 from django.urls import reverse
 
 from providers import KINDS, PROVIDERS_BY_KEY
 
-from .discover import KIND_TILES, clean_query
-from .models import LIBRARY_SORTS, PROVIDER_CHOICES, Asset, SavedAsset, Tag
+from .discover import KIND_TILES, clean_query, discover_url
+from .files import Bundle
+from .models import LIBRARY_SORTS, PROVIDER_CHOICES, Asset, SavedAsset, StatusChange, Tag
 from .tags import normalize_tag
 
 
@@ -46,7 +48,13 @@ def get_or_fetch_asset(provider_key: str, external_id: str) -> Asset:
 
 
 def save_to_library(
-    user, provider_key: str, external_id: str, **review: Any
+    user,
+    provider_key: str,
+    external_id: str,
+    *,
+    via: str = StatusChange.Via.SITE,
+    status_reason: str = "",
+    **review: Any,
 ) -> tuple[SavedAsset, bool]:
     """Save one provider asset to `user`'s library; return (entry, created).
 
@@ -54,12 +62,98 @@ def save_to_library(
     has the asset gets their existing entry back untouched with
     created=False, never a second one. A new entry starts as To review with
     no rating, unless `review` gives its notes, rating or status (the API's
-    create). Raises UnknownProviderError or ProviderError, and then saves
-    nothing.
+    create). Its first status is recorded as set by `user`, from `via`, with
+    the optional `status_reason`. Raises UnknownProviderError or
+    ProviderError, and then saves nothing.
     """
     asset = get_or_fetch_asset(provider_key, external_id)
     with transaction.atomic():
-        return SavedAsset.objects.get_or_create(user=user, asset=asset, defaults=review)
+        entry, created = SavedAsset.objects.get_or_create(user=user, asset=asset, defaults=review)
+        if created:
+            entry.status_changes.create(
+                status=entry.status, changed_by=user, via=via, reason=status_reason
+            )
+        return entry, created
+
+
+def status_history() -> Prefetch:
+    """Entries' status changes, newest first, with who made each: the prefetch behind
+    SavedAsset.latest_status_change and the drawer's history."""
+    return Prefetch("status_changes", StatusChange.objects.select_related("changed_by"))
+
+
+def bundle_manifest(entry: SavedAsset, bundle: Bundle) -> dict[str, Any] | None:
+    """What the drawer's "Download bundle" needs, as JSON for the browser, or None
+    when there's nothing to bundle.
+
+    The browser fetches each file from the provider's URL and zips them with
+    a CREDITS.txt (static/js/bundle-download.js); the Toolbox never touches
+    the files. `credits` holds the license and attribution, so a CC BY
+    asset's credit travels with it.
+    """
+    if not bundle.files or bundle.too_large:
+        return None
+    asset = entry.asset
+    facts = [
+        asset.title,
+        f"By {asset.author}" if asset.author else "",
+        f"From {asset.get_provider_display()}: {asset.source_url}" if asset.source_url else "",
+        f"License: {asset.license}" + (f" ({asset.license_url})" if asset.license_url else ""),
+        f"Attribution: {asset.attribution}" if asset.attribution else "",
+        f"Files: {bundle.variant.label}" if bundle.variant else "",
+    ]
+    footer = "Bundled by Axcenity Toolbox. The files come straight from the provider."
+    credits = "\n".join([*(fact for fact in facts if fact), "", footer, ""])
+    return {
+        "zip_name": bundle.zip_name(asset.external_id),
+        "provider": asset.get_provider_display(),
+        "files": bundle.manifest(asset.external_id),
+        "credits": credits,
+    }
+
+
+# ------------------------------------------------- one entry's related assets and packs
+
+# How many similar entries the entry's page and drawer list.
+SIMILAR_LIMIT = 6
+# How many of the asset's tags go into its "Find more on Discover" search.
+FIND_MORE_TAGS = 2
+
+
+@dataclass(frozen=True)
+class EntryRelated:
+    """What sits around one library entry: the member's own similar entries,
+    the public packs featuring its asset, and a Discover search for more."""
+
+    similar: list[SavedAsset]
+    public_packs: list[Any]
+    find_more_url: str
+
+
+def entry_related(user, entry: SavedAsset) -> EntryRelated:
+    """The entry's similar entries, the public packs featuring it, and a Discover link.
+
+    Similar entries come from `user`'s own library only (most shared tags,
+    then the same kind). Public packs are other members' packs that hold the
+    same asset; private packs never show. The Discover search uses the
+    asset's most widely used tags (or its title, when it has none).
+    """
+    from packs.models import Pack  # packs depends on catalog, so import it late
+
+    asset = entry.asset
+    # Counted over every asset, not through asset.tags (whose join would count only this one).
+    tags = (
+        Tag.objects.filter(pk__in=asset.tags.values("pk"))
+        .annotate(assets_using=Count("assets"))
+        .order_by("-assets_using", "name")
+        .values_list("name", flat=True)[:FIND_MORE_TAGS]
+    )
+    query = " ".join(tags) or asset.title
+    return EntryRelated(
+        similar=SavedAsset.objects.for_user(user).similar_to(entry, SIMILAR_LIMIT),
+        public_packs=list(Pack.objects.public_featuring(asset, exclude_owner=user)),
+        find_more_url=discover_url(asset.kind, query),
+    )
 
 
 # ---------------------------------------------------------------- browsing (Phase 4)
@@ -68,8 +162,10 @@ PAGE_SIZE = 12
 DEFAULT_SORT = "newest"
 # The minimum-rating filter's values, as they arrive in the query string.
 MIN_RATINGS = ("1", "2", "3", "4", "5")
-# The side panel shows this many of the member's most used tags (plus any chosen).
-TAG_CHIP_LIMIT = 24
+# The side panel lists this many of the member's most used tags (plus any chosen),
+# showing the first TAG_CHIPS_SHOWN and folding the rest behind "Show N more".
+TAG_CHIP_LIMIT = 48
+TAG_CHIPS_SHOWN = 8
 # Only this many tag filters are read from one query string.
 MAX_TAG_FILTERS = 10
 # The sort select's options, in the PRD's order; the keys are LIBRARY_SORTS'.
@@ -160,20 +256,41 @@ class FilterChip:
 @dataclass(frozen=True)
 class FilterGroup:
     """One group of the side panel's filter chips. `multiple` groups are
-    checkboxes (any number on); the others are radios (exactly one)."""
+    checkboxes (any number on); the others are radios (exactly one).
+
+    A group with a `fold` shows its first `fold` chips and folds the rest
+    behind "Show N more" (the Tags group).
+    """
 
     name: str
     title: str
     multiple: bool
     chips: list[FilterChip]
+    fold: int = 0
+
+    @property
+    def lead_chips(self) -> list[FilterChip]:
+        """The chips always shown."""
+        return self.chips[: self.fold] if self.fold else self.chips
+
+    @property
+    def more_chips(self) -> list[FilterChip]:
+        """The chips folded away until "Show N more" is opened."""
+        return self.chips[self.fold :] if self.fold else []
+
+    @property
+    def more_open(self) -> bool:
+        """Whether the fold starts open: a chosen chip is never hidden."""
+        return any(chip.checked for chip in self.more_chips)
 
 
 def filter_groups(params: LibraryParams, tags: Iterable[Tag] = ()) -> list[FilterGroup]:
     """The side panel's filter chips, each checked to match `params`.
 
     `tags` are the member's own tags, most used first, each with its `uses`
-    (Tag.objects.in_library). The Tags group shows the first TAG_CHIP_LIMIT,
-    plus any chosen tag beyond those, so a chosen chip never disappears.
+    (Tag.objects.in_library). The Tags group lists the first TAG_CHIP_LIMIT,
+    plus any chosen tag beyond those, so a chosen chip never disappears. It
+    shows the first TAG_CHIPS_SHOWN and folds the rest away.
     """
 
     def chips(options, chosen):
@@ -190,7 +307,7 @@ def filter_groups(params: LibraryParams, tags: Iterable[Tag] = ()) -> list[Filte
         FilterGroup("provider", "Provider", True, chips(PROVIDER_CHOICES, params.providers)),
         FilterGroup("status", "Status", True, chips(SavedAsset.Status.choices, params.statuses)),
         FilterGroup("min_rating", "Minimum rating", False, chips(ratings, (rating,))),
-        FilterGroup("tag", "Tags", True, _tag_chips(tags, params.tags)),
+        FilterGroup("tag", "Tags", True, _tag_chips(tags, params.tags), fold=TAG_CHIPS_SHOWN),
     ]
 
 
@@ -269,7 +386,7 @@ def filter_library(user, params: Mapping[str, Any]) -> LibraryPage:
         SavedAsset.objects.for_user(user)
         .with_community_rating()
         .select_related("asset")
-        .prefetch_related("asset__tags")
+        .prefetch_related("asset__tags", status_history())
     )
     if cleaned.q:
         entries = entries.search(cleaned.q)

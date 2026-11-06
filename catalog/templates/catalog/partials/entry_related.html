@@ -1,0 +1,35 @@
+{# Around one entry (catalog.library.entry_related): similar entries from the member's   #}
+{# own library (most shared tags, then the same kind), the public packs featuring the   #}
+{# asset, and a Discover search for more like it. On the full page it's the side column; #}
+{# in the drawer it follows the entry, and a similar entry opens in the same drawer.     #}
+<div class="entry-related">
+  <section class="entry-section" aria-labelledby="entry-similar-title">
+    <h3 id="entry-similar-title" class="micro text-fg-secondary">Similar in your library</h3>
+    {% if related.similar %}
+      <ul id="entry-similar" class="entry-similar">
+        {% for other in related.similar %}{% with asset=other.asset %}{% with tile=asset.tile %}{% url 'catalog:entry' other.pk as other_url %}
+          <li data-kind="{{ asset.kind }}">
+            <a href="{{ other_url }}"{% if not as_page %} hx-get="{{ other_url }}" hx-target="#library-drawer" hx-swap="innerHTML transition:false"{% endif %} class="entry-similar-link">
+              <span class="entry-similar-thumb"><span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=16 %}</span>{% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}</span>
+              <span class="entry-similar-text"><span class="entry-similar-title">{{ asset.title }}</span><span class="micro text-fg-muted">{{ asset.get_kind_display }} · {% if other.shared_tags %}{{ other.shared_tags }} shared tag{{ other.shared_tags|pluralize }}{% else %}same type{% endif %}</span></span>
+            </a>
+          </li>
+        {% endwith %}{% endwith %}{% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-fg-weak">Nothing else in your library shares its tags or type yet.</p>
+    {% endif %}
+    <a href="{{ related.find_more_url }}" class="btn btn-quiet btn-sm rounded-none entry-find-more">{% include "partials/icon.html" with name="search" size=14 %}<span>Find more like this on Discover</span></a>
+  </section>
+
+  <section class="entry-section" aria-labelledby="entry-featured-title">
+    <h3 id="entry-featured-title" class="micro text-fg-secondary">Featured in public packs</h3>
+    {% if related.public_packs %}
+      <ul id="entry-featured" class="entry-packs">
+        {% for pack in related.public_packs %}<li><span class="entry-featured-title">{{ pack.title }}</span><span>{{ pack.owner.get_username }} · {{ pack.item_count }} item{{ pack.item_count|pluralize }}</span></li>{% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-fg-weak">No other member's public pack features it yet.</p>
+    {% endif %}
+  </section>
+</div>

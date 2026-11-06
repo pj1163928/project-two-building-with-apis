@@ -712,6 +712,62 @@ from.
 >   card's Save corner still says Save until the next search; the saved
 >   count does update.
 
+### Phase 7 polish (2026-11-05, at the user's request)
+
+Added after the phase, out of plan order, because the user asked for it.
+The PRD records it as stories 95–104. Built and tested; see
+docs/ARCHITECTURE.md ("Status history", "Files and bundles", "Around an
+entry") and docs/FRONTEND.md.
+
+- [x] **Files told apart:** `catalog/files.py` gives each variant its
+  resolution, format and package, and each file its map type. The drawer
+  badges them and filters by resolution and format in the page.
+- [x] **Download defaults:** `DownloadPreferences` (resolution, a format per
+  kind, the texture maps) on the Settings page, each group saving on change.
+- [x] **Download bundle:** `pick_bundle()` chooses the files. One file is a
+  plain link; several are fetched and zipped by the browser with a
+  CREDITS.txt. The Toolbox never touches a file, so the PRD's Out of Scope
+  holds. Checked by hand against real Poly Haven files (CORS `*`): the zip's
+  CRCs verify.
+- [x] **Centred full page** with Similar in your library, Featured in public
+  packs and Find more on Discover (also after the entry in the drawer).
+- [x] **Status history:** `StatusChange` records who set each status, when,
+  via the website or the API, and an optional reason, shown under the
+  status chips with the history. The API reads and writes it too.
+- [x] **Folding Tags:** the first 8 show, the rest fold behind "Show N more",
+  remembered in the browser and opened by a chosen tag.
+- [x] **The mark on every page**, above the glow, and in the drawer.
+- [x] **Ambient glow:** random organic blobs through the whole page in place
+  of the symmetrical hero and footer glows.
+- [x] **Fixed on the way:** the page could scroll past the shell into empty
+  space. Side-panel chips now hold their hidden inputs.
+- [x] **Water drops** (second request the same day): the glow's blobs are
+  460–980 px drops that sink and rise slowly and wobble like water, with two
+  shells following a beat behind.
+- [x] **No giant watermark:** the footer's full-width wordmark is removed.
+  Pinned in view, it was cut off behind the content, so the user's fallback
+  (remove it) applied.
+- [x] **Lava lamp** (third request): bigger (620–1300 px), looser and
+  faster drops that rise and fall a long way, stretching tall as they travel
+  and squashing wide as they turn.
+- [x] **Fixed:** the Appearance chips seemed to do nothing because the
+  browser ran a cached `shell.js`. The stylesheet and scripts now carry
+  `?v=<last change>`. The Account pages are centred.
+- [x] **Light and dark by hand:** System, Light or Dark from the title bar's
+  switch or Settings, kept in the `ax-theme` cookie (`accounts:theme` without
+  JavaScript). Tested: CSRF, POST only, unknown choices refused, and the
+  return address kept on this site.
+- [x] Standard gate (see top). Access rules: the download defaults need
+  sign-in and CSRF and never touch another member's; a status reason is a
+  404 on another member's entry and needs CSRF; similar entries never come
+  from another library, and featuring packs are never private.
+
+> **For Phase 8:** "Featured in public packs" lists pack titles without
+> links, because `/packs/<slug>/` doesn't exist yet. Link each one to its
+> public page. The pack export could also offer the member's default
+> variant (`pick_bundle()`), but the PRD's manifest uses each item's
+> `preferred_variant`, so leave that as it is unless the user asks.
+
 ---
 
 ## Phase 8: Public pack page, export and pack API

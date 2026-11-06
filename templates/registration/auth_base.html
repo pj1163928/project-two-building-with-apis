@@ -2,8 +2,7 @@
 {# Shared layout for sign-in and sign-up: one bordered container, the form on the left #}
 {# and the branding panel on the right. Both columns stretch to the same height, and  #}
 {# their contents are centred vertically. They're work surfaces, like the other       #}
-{# working pages, with no footer watermark, so nothing competes with the form.        #}
-{% block watermark %}{% endblock %}
+{# working pages, so nothing competes with the form.                                   #}
 {% block content %}
 <div id="auth-card" class="auth-card grid lg:grid-cols-2 max-w-6xl mx-auto">
   <div class="flex flex-col justify-center px-8 py-16 sm:px-14">

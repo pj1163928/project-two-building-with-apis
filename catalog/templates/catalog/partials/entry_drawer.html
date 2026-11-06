@@ -1,6 +1,7 @@
 {# The library drawer's contents, swapped into library.html's <dialog id="library-drawer"> #}
 {# by a card's title (static/js/entry-drawer.js opens it). "Open as page" is the entry's   #}
-{# own URL, the same page a direct visit gets.                                             #}
+{# own URL, the same page a direct visit gets. The entry's similar assets and featuring   #}
+{# packs follow it. A faint cropped mark sits in the panel's lower corner, behind it all.  #}
 {% url 'catalog:entry' entry.pk as entry_url %}
 <div class="drawer-panel">
   <header class="drawer-head">
@@ -10,5 +11,6 @@
       <button type="button" class="picker-close" data-drawer-close aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button>
     </div>
   </header>
-  <div class="drawer-body">{% include "catalog/partials/entry_detail.html" %}</div>
+  <div class="drawer-body">{% include "catalog/partials/entry_detail.html" %}{% include "catalog/partials/entry_related.html" %}</div>
+  <i class="mark drawer-mark" aria-hidden="true"></i>
 </div>

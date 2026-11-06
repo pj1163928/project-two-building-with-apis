@@ -12,8 +12,8 @@ from rest_framework.response import Response
 
 from providers import ProviderError
 
-from .library import LibraryParams, filter_library, save_to_library
-from .models import SavedAsset
+from .library import LibraryParams, filter_library, save_to_library, status_history
+from .models import SavedAsset, StatusChange
 from .serializers import LibraryEntrySerializer, NewLibraryEntrySerializer
 
 ALREADY_SAVED_MESSAGE = "Already in your library."
@@ -70,8 +70,11 @@ class LibraryAPI(generics.ListCreateAPIView):
         review = dict(serializer.validated_data)
         provider = review.pop("provider")
         external_id = review.pop("external_id")
+        review["status_reason"] = review.pop("status_reason", "")
         try:
-            entry, created = save_to_library(request.user, provider, external_id, **review)
+            entry, created = save_to_library(
+                request.user, provider, external_id, via=StatusChange.Via.API, **review
+            )
         except ProviderError as error:
             # The provider is at fault, not the request: a bad gateway, with
             # the message that's safe to show.
@@ -79,15 +82,21 @@ class LibraryAPI(generics.ListCreateAPIView):
         if not created:
             return Response({"detail": ALREADY_SAVED_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
         # Read it again with its community rating, which may include the new rating.
-        entry = SavedAsset.objects.with_community_rating().select_related("asset").get(pk=entry.pk)
+        entry = (
+            SavedAsset.objects.with_community_rating()
+            .select_related("asset")
+            .prefetch_related(status_history())
+            .get(pk=entry.pk)
+        )
         return Response(LibraryEntrySerializer(entry).data, status=status.HTTP_201_CREATED)
 
 
 class LibraryEntryAPI(generics.RetrieveUpdateDestroyAPIView):
     """One of your library entries.
 
-    GET reads it. PATCH or PUT changes its notes, rating and status; the
-    asset's fields are read-only and ignored. DELETE removes the entry from
+    GET reads it. PATCH or PUT changes its notes, rating and status, and
+    status_reason says why; status_change shows who set the status, when and
+    why. The asset's fields are read-only and ignored. DELETE removes the entry from
     your library and from every one of your packs it's in. The shared asset
     stays for everyone else.
     """
@@ -100,7 +109,7 @@ class LibraryEntryAPI(generics.RetrieveUpdateDestroyAPIView):
             SavedAsset.objects.for_user(self.request.user)
             .with_community_rating()
             .select_related("asset")
-            .prefetch_related("asset__tags")
+            .prefetch_related("asset__tags", status_history())
         )
 
     def perform_update(self, serializer):

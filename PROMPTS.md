@@ -28,6 +28,194 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-05 — Lava-lamp drops, versioned static files, centred Account pages
+
+### Prompts
+
+1. Ok it is getting better I kind of want the animations to be a little
+   faster the bubbles a little looser and bigger almost looking like a lava
+   lamp. Also I clicked the light dark and auto in the appearance settings
+   and it did not change anything. Also the settings menus are not centered
+   so the do not look skewed to the left instead of centered.
+
+### Summary
+
+- **Outcome:** all three are done. 820 tests pass (815 before). `ruff check`
+  and `ruff format --check` are clean.
+  - **Lava lamp:** the drops are 620–1300 px across (were 460–980), with
+    looser shapes and a deeper wobble. They're about three times faster:
+    18–34 s to rise or fall (were 50–95 s) and a 5–9 s wobble (were 9–16 s).
+    They travel 180–480 px up or down, stretching tall and thin as they move
+    and squashing wide as they turn, like wax in a lava lamp.
+  - **Appearance chips:** a fresh page in headless Edge switched Light,
+    Dark and System correctly, so the code wasn't at fault. The likely cause
+    was the browser still running the cached `shell.js` from before the
+    switch existed: the static URLs never changed, so a normal reload kept
+    the old copy. The title bar's switch still worked because, without the
+    new script, it falls back to a plain form post. Now the stylesheet and
+    every script load through a new `{% versioned_static %}` tag that adds
+    `?v=<last change>`, so every change is a new URL. Rechecked in Edge after
+    the change.
+  - **Centring:** Profile, Settings and API token now share one centred
+    column (`max-w-3xl mx-auto`). Before, each had its own width and sat to
+    the left.
+  - Docs: FRONTEND (the drops, versioned URLs, the Account pages), TESTING
+    and the plan.
+- **Deviations:** none. The chip fix addresses the cause found (stale
+  cached files) rather than changing the switch, which already worked.
+- **Sideways:** the regex that swapped the script tags left stray
+  backslashes in `base.html` (the shell's escaping again); caught on
+  inspection before any test ran.
+
+## 2026-11-05 — Water-drop glow, the giant watermark removed, a manual light/dark switch
+
+### Prompts
+
+1. Ok the gradient blobs are nicer but I would like them to be bigger and
+   move more like water drops. Also I would like the axcenity logo large
+   watermark to be in the foreground not at the bottom of the page if it
+   does not look clean please jyust remove it. Additionally there is
+   currently no manual way to set the light and dark settings I wouldlike
+   there to be a way to do this.
+
+### Summary
+
+- **Outcome:** all three are done. 815 tests pass (802 before). `ruff check`
+  and `ruff format --check` are clean.
+  - **Water drops:** each blob is now a drop 460 to 980 px across. It sinks
+    and rises slowly, mostly up and down, and wobbles: as it stretches one
+    way it squashes the other, keeping its volume like water. Its light sits
+    off-centre, and two thin shells follow its wobble 0.6 s and 1.2 s behind,
+    like the layered edges in the reference image. There are fewer of them
+    (one per 600 px of page), so the bigger drops don't crowd.
+  - **Watermark:** tried first as asked, pinned to the bottom of the view
+    behind the content. On the library it filled the empty space well, but
+    on a scrolled entry page only "nity" showed between the panels. That
+    isn't clean, so it was removed, as the user allowed. The top-right mark
+    and the small footer wordmark stay.
+  - **Light and dark:** System, Light or Dark. A sun, moon or monitor switch
+    in the title bar steps through them (visitors too), and Settings has
+    Appearance chips. The choice is the `ax-theme` cookie, so pages render in
+    it from the first paint; System follows the computer live. Without
+    JavaScript, both are forms posting to the new `accounts:theme` (CSRF).
+    The light palette moved from a media query to `html[data-scheme="light"]`.
+  - Docs: FRONTEND (light and dark, the drops, branding, Settings),
+    ARCHITECTURE (`accounts:theme`, the context), TESTING
+    (`test_theme_switch.py`), CLAUDE.md's colour rule, the PRD (stories 103
+    and 104) and the plan's Phase 7 polish.
+- **Decisions:** the theme lives in a cookie, not the database, so it works
+  for signed-out visitors and the server can render it before first paint.
+  It's per browser, not per account. The switch was click-tested in headless
+  Edge: System → Light → Dark → System, the background and label changing
+  each time.
+- **Sideways:**
+  - The first test run found the sign-in and sign-up pages listing their own
+    URL in the title bar: the theme form's hidden `next` field. The field
+    was dropped; without JavaScript the view returns to the Referer instead,
+    when that's on this site.
+  - The giant watermark's foreground version was built and screenshotted
+    before it was removed, so the removal rests on how it actually looked.
+
+## 2026-11-05 — Files, download defaults and bundles, status history, centred entry page, ambient glow
+
+### Prompts
+
+1. Alright some changes I would like to make to my toolbox the library entry
+   has a large assortment of files to choose from. I feel like it woud be
+   nice to differentiate between different resolutions file formats and
+   image types as well as give the user the option to choose which types
+   they would like to default to in the settings, as well as an option to
+   download the files as a bundle according to those selected settings. Also
+   when the item is fullscreened in the window it looks off center I also
+   feel like some other things that can be included in the fullscreen menu
+   are items similar to this or collections the item has been featured in.
+   Also considering this tool can be used within an optional team
+   environment I feel like it would be nice to know who set the review
+   status and why. Another thing that I noticed is the tags menu can be
+   quite extensive Can we make it expandable and collapsible and show the
+   highest tags like it is currently. Next the Axcenity logo is being
+   shrouded on some of the menus. can you make sure it is in some way being
+   place in the foreground of all menus and pages similar to the front page.
+   Also the animations looks a little too consistent and symmetrical thee
+   were some of the gradient designs I was looking at I would like them to
+   be fluid random and suble going through all of the page regardless of
+   size. Also when completed please append this section to PROMPTS.md
+   (with a reference image of soft, layered gradient blobs)
+2. (Sent while the work was under way.) Ok another thing I noticed
+   occasionally when I scroll down it just loads empty space can this be
+   fixed as well. (with a screenshot of the library page scrolled past the
+   status bar into blank space)
+
+### Summary
+
+- **Outcome:** all nine requests and the scrolling bug are built and tested.
+  802 tests pass (725 before). `ruff check` and `ruff format --check` are
+  clean.
+  - **Files told apart:** `catalog/files.py` reads each variant's
+    resolution, format and package (loose maps, bundle, archive, audio) and
+    each file's map type (Color, Normal GL, Roughness…). The drawer badges
+    them, filters by resolution and format, and marks "Your default".
+  - **Download defaults:** a `DownloadPreferences` model (resolution, a
+    format per kind, texture maps), edited on the Settings page with chips
+    that save on change.
+  - **Download bundle:** `pick_bundle()` chooses the files from the defaults
+    (nearest resolution below, then above; format fallbacks; only the chosen
+    maps). One file is a plain link. Several are fetched and zipped by the
+    member's browser (`static/js/bundle-download.js`, a small stored-zip
+    writer) with a CREDITS.txt.
+  - **Full page:** centred two-column layout, with "Similar in your
+    library", "Featured in public packs" and "Find more like this on
+    Discover". The drawer shows them too.
+  - **Status history:** a `StatusChange` model records who set each status,
+    when, via the website or the API, and an optional reason. It's shown
+    under the status chips with a folded history, and the API reads and
+    writes it (`status_change`, `status_reason`).
+  - **Tags:** the first 8 show and the rest fold behind "Show N more",
+    remembered in the browser.
+  - **Logo:** the mark is on every page, layered above the glow, and in the
+    drawer.
+  - **Glow:** one ambient layer runs through the whole page. `ambient.js`
+    scatters organic blobs with random shapes, gradients, paths and speeds,
+    replacing the symmetrical hero and footer glows with ripple rings.
+  - **Empty space:** the side panel's hidden chip inputs were positioned
+    against the sidebar (which doesn't clip), so a long tag list made the
+    whole document taller than the window. `.filter-chip` is now
+    `position: relative`. Measured in headless Edge: the document went from
+    1514 px to the window's 761 px.
+  - Docs: ARCHITECTURE, FRONTEND, TESTING, CLAUDE.md (the colour rule now
+    says the glow drifts behind the whole page), the PRD (stories 95–102)
+    and the plan (a Phase 7 polish section, with notes for Phase 8).
+- **Deviations and decisions:**
+  - The PRD rules out downloading or proxying files, so the bundle is built
+    in the browser from the provider's URLs instead of on the server. Only
+    Poly Haven has multi-file variants, and its CDN sends
+    `Access-Control-Allow-Origin: *`. Checked against two real Poly Haven
+    files in headless Edge with web security on: Python's `zipfile`
+    verified every CRC.
+  - There are no teams in the Toolbox, so "who set it" is always the
+    entry's owner (or their API token) for now; the record names the person
+    so it stays right if teams arrive.
+  - "Collections" were dropped earlier in favour of packs, so "featured in"
+    lists other members' public packs. They aren't links yet: the public
+    pack page is Phase 8 (noted in the plan).
+  - This work sits outside the plan's phase order because the user asked
+    for it. It's recorded as Phase 7 polish.
+- **Sideways:**
+  - The first screenshots showed no footer wordmark. That was CSS masks
+    refusing a `file://` page, not the site; rerendering with web security
+    off showed the real page.
+  - Shell heredocs turned `\n` escapes into real newlines and broke
+    `catalog/library.py` once. Later edits went through files written with
+    the Write tool.
+  - The first measurement after the scrolling fix still showed the overflow
+    because Edge served the cached stylesheet; a fresh profile confirmed
+    the fix.
+  - A new test caught a real bug: counting tag use through `asset.tags`
+    counted only that asset, so "Find more" fell back to A–Z tags. It now
+    counts over every asset.
+  - The local `db.sqlite3` needed `migrate` for the two new migrations
+    (`accounts.0001_initial`, `catalog.0002_statuschange`).
+
 ## 2026-11-05 — Axcenity Toolbox: Phase 7/13, Pack builder
 
 ### Prompts

@@ -55,7 +55,7 @@ LIGHT_TYPE_COLOURS = {
     "model": "#1C7547",
     "sound": "#6741D9",
 }
-# Decorative vivid colours for the footer "water drop" glow, one trio per
+# Decorative vivid colours for the ambient glow behind each page, one trio per
 # page. They're the only colour besides type, and may be used nowhere else.
 # (Named "pastels" from their first version; the user asked for brighter.)
 PAGE_PASTELS = {
@@ -145,13 +145,18 @@ def test_pastels_are_never_type_colours():
 
 @pytest.fixture(scope="module")
 def light_block(css):
-    block = css.split("@media (prefers-color-scheme: light) {", 1)[1]
+    block = css.split('html[data-scheme="light"] {', 1)[1]
     return block.split("\n}", 1)[0]
 
 
-def test_light_mode_follows_the_system(light_block):
-    assert ':root, [data-theme="axcenity"] {' in light_block
+def test_light_mode_is_chosen_on_html(css, light_block):
+    """<html data-scheme="light"> turns the site light: the member's choice, or the
+    system's when they chose System (base.html resolves it before first paint)."""
+    assert '&, & [data-theme="axcenity"] {' in light_block
     assert "color-scheme: light;" in light_block
+    # No media query of its own: System is resolved in base.html, so Light and Dark
+    # can override the computer's setting.
+    assert "@media (prefers-color-scheme" not in css
 
 
 @pytest.mark.parametrize(("token", "hex_value"), LIGHT_PALETTE.items())
@@ -184,7 +189,7 @@ def test_light_mode_inverts_the_logo_and_tints_the_glow(light_block):
     assert "--logo-filter: invert(1);" in light_block
     assert "--logo-filter-hover: none;" in light_block
     # Screen blending would wash the glow out on white.
-    assert ".drop-blob { mix-blend-mode: multiply;" in light_block
+    assert "& .ambient-drop { mix-blend-mode: multiply; }" in light_block
 
 
 def test_every_block_in_the_stylesheet_is_closed_once(css):

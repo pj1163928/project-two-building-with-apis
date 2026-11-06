@@ -12,6 +12,7 @@ from typing import Any
 
 from django.conf import settings
 from django.db import models, transaction
+from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils.text import slugify
 
@@ -60,6 +61,15 @@ class PackQuerySet(models.QuerySet):
 
     def with_item_count(self) -> "PackQuerySet":
         return self.annotate(item_count=models.Count("items", distinct=True))
+
+    def public_featuring(self, asset, *, exclude_owner=None) -> "PackQuerySet":
+        """Public packs holding `asset` (through anyone's entry), A–Z, with their
+        owners and item counts. Private packs are never included."""
+        holding = PackItem.objects.filter(saved_asset__asset=asset).values("pack")
+        packs = self.filter(is_public=True, pk__in=holding)
+        if exclude_owner is not None and exclude_owner.is_authenticated:
+            packs = packs.exclude(owner=exclude_owner)
+        return packs.select_related("owner").with_item_count().order_by(Lower("title"), "id")
 
 
 class PackManager(models.Manager.from_queryset(PackQuerySet)):

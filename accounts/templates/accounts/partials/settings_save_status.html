@@ -1,0 +1,6 @@
+{# The download defaults' status line (#settings-save-status): every save replaces it. #}
+<p id="settings-save-status" class="entry-save-status" data-save-status="{{ state|default:'idle' }}" role="{% if state == 'error' %}alert{% else %}status{% endif %}">
+  {% if state == "saved" %}{% include "partials/icon.html" with name="check" size=14 %}<span>Saved. Your library's bundles follow it now.</span>
+  {% elif state == "error" %}{% include "partials/icon.html" with name="alert" size=14 %}<span>{{ message }}</span>
+  {% else %}<span>Changes save as you make them.</span>{% endif %}
+</p>

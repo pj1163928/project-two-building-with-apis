@@ -1,5 +1,5 @@
-{% load static tailwind_cli django_htmx %}<!doctype html>
-<html lang="en" data-theme="axcenity"
+{% load static django_htmx shell_tags %}<!doctype html>
+<html lang="en" data-theme="axcenity" data-scheme-choice="{{ theme_choice }}"{% if theme_choice != "system" %} data-scheme="{{ theme_choice }}"{% endif %}
       style="--mark-url: url('{% static 'brand/mark-white.png' %}'); --word-url: url('{% static 'brand/wordmark-white.png' %}');">
 <head>
   <meta charset="utf-8">
@@ -12,8 +12,23 @@
   <link rel="preload" href="{% static 'fonts/Inter-Regular.ttf' %}" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="{% static 'fonts/Inter-Medium.ttf' %}" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="{% static 'fonts/PlusJakartaSans-Variable.ttf' %}" as="font" type="font/ttf" crossorigin>
-  {% tailwind_css %}
+  {# Versioned URLs (?v=<last change>), so a browser never keeps running an old copy. #}
+  <link rel="stylesheet" href="{% versioned_static 'css/tailwind.css' %}">
   <script>
+    // The colour scheme, before first paint so it never flashes: the member's
+    // choice (data-scheme-choice, from the ax-theme cookie), or for "system" the
+    // system's own setting, followed live. CSS reads <html data-scheme="light">;
+    // anything else is dark. shell.js's switch calls axScheme.apply() after a change.
+    (function () {
+      var root = document.documentElement, query = matchMedia("(prefers-color-scheme: light)");
+      function apply() {
+        var choice = root.dataset.schemeChoice || "system";
+        root.dataset.scheme = choice === "system" ? (query.matches ? "light" : "dark") : choice;
+      }
+      apply();
+      if (query.addEventListener) query.addEventListener("change", apply);
+      window.axScheme = { apply: apply };
+    })();
     // Apply the saved side-panel state before first paint so it never flashes.
     (function () {
       var state = localStorage.getItem("ax-panel");
@@ -47,11 +62,14 @@
   <meta name="htmx-config" content='{"globalViewTransitions": true, "historyCacheSize": 0, "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "[45]..", "swap": true, "error": true}]}'>
   {% htmx_script %}
   {# Scripts load once, here, for every page: a boosted swap doesn't run a new page's <head>. #}
-  <script src="{% static 'js/shell.js' %}" defer></script>
-  <script src="{% static 'js/password-toggle.js' %}" defer></script>
-  <script src="{% static 'js/sound-preview.js' %}" defer></script>
-  <script src="{% static 'js/card-actions.js' %}" defer></script>
-  <script src="{% static 'js/entry-drawer.js' %}" defer></script>
+  <script src="{% versioned_static 'js/shell.js' %}" defer></script>
+  <script src="{% versioned_static 'js/password-toggle.js' %}" defer></script>
+  <script src="{% versioned_static 'js/sound-preview.js' %}" defer></script>
+  <script src="{% versioned_static 'js/card-actions.js' %}" defer></script>
+  <script src="{% versioned_static 'js/entry-drawer.js' %}" defer></script>
+  <script src="{% versioned_static 'js/entry-files.js' %}" defer></script>
+  <script src="{% versioned_static 'js/bundle-download.js' %}" defer></script>
+  <script src="{% versioned_static 'js/ambient.js' %}" defer></script>
 </head>
 <body class="bg-app text-fg" hx-boost="true">
 {# The CSRF header lives on #app, not <body>: a boosted swap replaces #app but keeps <body>, #}
@@ -77,6 +95,17 @@
     {% endblock %}
 
     <div class="ml-auto flex items-center gap-1">
+      {# The colour scheme switch: System, Light, Dark in turn. shell.js switches at once #}
+      {# and saves the ax-theme cookie; without JavaScript the form posts the next choice. #}
+      <form method="post" action="{% url 'accounts:theme' %}" class="flex" hx-boost="false" data-theme-form>
+        {% csrf_token %}
+        <button type="submit" id="theme-toggle" class="bar-item bar-item-icon" name="choice" value="{{ theme_next }}"
+                aria-label="Theme: {{ theme_label }}. Switch to {{ theme_next_label }}" title="Theme: {{ theme_label }}">
+          <span class="scheme-icon" data-scheme-icon="system">{% include "partials/icon.html" with name="monitor" size=16 %}</span>
+          <span class="scheme-icon" data-scheme-icon="light">{% include "partials/icon.html" with name="sun" size=16 %}</span>
+          <span class="scheme-icon" data-scheme-icon="dark">{% include "partials/icon.html" with name="moon" size=16 %}</span>
+        </button>
+      </form>
       {% if user.is_authenticated %}
         <a href="{% url 'accounts:profile' %}" class="bar-item bar-item-user" title="Your account">
           {% include "partials/icon.html" with name="user" size=16 %}<span>{{ user.username }}</span>
@@ -147,26 +176,27 @@
       </nav>
     </aside>
     {# ---------- Content ---------- #}
-    {# data-drop picks this page's glow colours, shared by the hero glow and the footer glow. #}
-    {# data-surface sets the mood: "showcase" pages (Home, Discover) get the expressive       #}
-    {# hero glow and oversized mark; "work" pages (the default) stay restrained.             #}
+    {# data-drop picks this page's glow colours. data-surface sets the mood: "showcase"      #}
+    {# pages (Home, Discover) get a stronger glow and the full-size mark; "work" pages (the   #}
+    {# default) a subtler glow and a smaller mark.                                           #}
+    {# .content-stage grows with the page, so the ambient glow (blobs placed at random by     #}
+    {# static/js/ambient.js, user request 2026-11-05) runs through all of it, however long.  #}
+    {# Layers, back to front: the glow, the mark (every page, never covered by the glow),    #}
+    {# then the content.                                                                     #}
     <main id="content" class="relative flex-1 min-w-0 overflow-auto bg-panel grid-bg flex flex-col" data-drop="{{ active_nav|default:'home' }}" data-surface="{% block surface %}work{% endblock %}">
-      <div class="drop-glow page-glow" aria-hidden="true">
-        <span class="drop-blob drop-blob-a"></span><span class="drop-blob drop-blob-b"></span><span class="drop-blob drop-blob-c"></span>
-      </div>
+      <div class="content-stage">
+      <div class="ambient" aria-hidden="true" data-ambient></div>
       <div class="hero-atmosphere" aria-hidden="true"><i class="mark hero-mark"></i></div>
       <div class="relative w-full max-w-[1500px] mx-auto px-8 lg:px-12 pt-14 pb-12 space-y-8">
         {% block content %}{% endblock %}
       </div>
 
-      {# Footer: the "water drop" glow over the dot grid, the giant faint watermark #}
-      {# filling the empty space, and a small brand signature below it.          #}
+      {# Footer: the small brand signature. The giant faint watermark that used to sit   #}
+      {# above it was removed at the user's request (2026-11-05): pinned in view it was  #}
+      {# cut off behind content, and at the bottom it was rarely seen. The mark at the   #}
+      {# top right carries the logo on every page. The ambient glow runs behind it all. #}
       <footer id="page-footer" class="relative mt-auto overflow-hidden">
-        <div class="drop-glow" aria-hidden="true">
-          <span class="drop-blob drop-blob-a"></span><span class="drop-blob drop-blob-b"></span><span class="drop-blob drop-blob-c"></span>
-        </div>
-        <div class="relative w-full max-w-[1500px] mx-auto px-8 lg:px-12 pt-24 pb-6">
-          {% block watermark %}<i class="word watermark w-full text-ink block" aria-hidden="true"></i>{% endblock %}
+        <div class="relative w-full max-w-[1500px] mx-auto px-8 lg:px-12 pt-12 pb-6">
           <div class="brand-signature grid grid-cols-[1fr_auto_1fr] items-center gap-4 micro text-fg-secondary mt-6">
             <span>Built for Axcenity Engine</span>
             <i class="word w-20 text-fg-strong" aria-hidden="true"></i>
@@ -174,6 +204,7 @@
           </div>
         </div>
       </footer>
+      </div>
     </main>
   </div>
 

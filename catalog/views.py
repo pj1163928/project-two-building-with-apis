@@ -11,6 +11,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from django_htmx.http import HttpResponseClientRedirect, push_url, replace_url
 
+from accounts.models import DownloadPreferences
 from packs.models import PackItem
 from providers import PROVIDERS_BY_KEY, ProviderError
 
@@ -27,9 +28,18 @@ from .discover import (
     shelf_provider,
     shuffle_url,
 )
-from .forms import NOTES_MAX_LENGTH, ReviewForm
-from .library import SORT_LABELS, filter_groups, filter_library, save_to_library
-from .models import SavedAsset, Tag
+from .files import pick_bundle
+from .forms import NOTES_MAX_LENGTH, ReviewForm, clean_status_reason
+from .library import (
+    SORT_LABELS,
+    bundle_manifest,
+    entry_related,
+    filter_groups,
+    filter_library,
+    save_to_library,
+    status_history,
+)
+from .models import STATUS_REASON_MAX_LENGTH, SavedAsset, Tag
 
 # The drawer's stars, lowest first.
 RATING_VALUES = (1, 2, 3, 4, 5)
@@ -268,11 +278,21 @@ class EntryView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        user = self.request.user
+        entry = _own_entry(user, self.kwargs["pk"])
+        preferences = DownloadPreferences.objects.for_user(user)
+        asset = entry.asset
+        bundle = pick_bundle(asset.kind, asset.file_variants, preferences)
         context.update(
-            entry=_own_entry(self.request.user, self.kwargs["pk"]),
+            entry=entry,
             status_choices=SavedAsset.Status.choices,
             star_values=RATING_VALUES,
             notes_max_length=NOTES_MAX_LENGTH,
+            reason_max_length=STATUS_REASON_MAX_LENGTH,
+            preferences=preferences,
+            bundle=bundle,
+            bundle_manifest=bundle_manifest(entry, bundle),
+            related=entry_related(user, entry),
         )
         return context
 
@@ -316,12 +336,14 @@ class UpdateEntryView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         entry = _own_entry(request.user, pk)
+        if "status_reason" in request.POST:
+            return self.explain(entry, request.POST["status_reason"])
         form = ReviewForm(request.POST, instance=entry)
         if not form.changed_fields:
             return self.reply(entry, status=400, message="There was nothing to save.")
         if not form.is_valid():
             return self.reply(entry, status=400, message=form.first_error)
-        form.save()
+        form.save(by=request.user)
         if not _wants_fragment(request):
             return redirect("catalog:entry", pk=entry.pk)
         changed = set(form.changed_fields)
@@ -329,26 +351,57 @@ class UpdateEntryView(LoginRequiredMixin, View):
         entry = _own_entry(request.user, pk)
         # The card behind the drawer shows the status and the ratings, not the notes.
         card_oob = bool({"status", "rating"} & changed) and _from_library(request)
-        return self.reply(entry, card_oob=card_oob, community_oob="rating" in changed)
+        return self.reply(
+            entry,
+            card_oob=card_oob,
+            community_oob="rating" in changed,
+            status_oob="status" in changed,
+        )
 
-    def reply(self, entry, status=200, message="", card_oob=False, community_oob=False):
+    def explain(self, entry, posted: str):
+        """Save the reason for the entry's current status (its own form in the drawer)."""
+        reason, error = clean_status_reason(posted)
+        if error:
+            return self.reply(entry, status=400, message=error)
+        entry.explain_status(reason, by=self.request.user)
+        if not _wants_fragment(self.request):
+            return redirect("catalog:entry", pk=entry.pk)
+        return self.reply(_own_entry(self.request.user, entry.pk), note_oob=True)
+
+    def reply(
+        self,
+        entry,
+        status=200,
+        message="",
+        card_oob=False,
+        community_oob=False,
+        status_oob=False,
+        note_oob=False,
+    ):
         context = {
             "entry": entry,
             "state": "error" if message else "saved",
             "message": message,
             "card_oob": card_oob,
             "community_oob": community_oob,
+            # A status change brings the who-and-why note and an empty reason box;
+            # a reason only the note, so the box being typed in is left alone.
+            "status_oob": status_oob,
+            "note_oob": note_oob,
+            "reason_max_length": STATUS_REASON_MAX_LENGTH,
         }
         return render(self.request, self.template_name, context, status=status)
 
 
 def _own_entry(user, pk) -> SavedAsset:
-    """The member's own entry `pk` with its Asset, or a 404."""
+    """The member's own entry `pk` with its Asset, packs and status history, or a 404."""
     entries = SavedAsset.objects.for_user(user).with_community_rating().select_related("asset")
     pack_items = Prefetch(
         "pack_items", PackItem.objects.select_related("pack").order_by(Lower("pack__title"))
     )
-    return get_object_or_404(entries.prefetch_related("asset__tags", pack_items), pk=pk)
+    return get_object_or_404(
+        entries.prefetch_related("asset__tags", pack_items, status_history()), pk=pk
+    )
 
 
 def _current_library_params(request) -> QueryDict:

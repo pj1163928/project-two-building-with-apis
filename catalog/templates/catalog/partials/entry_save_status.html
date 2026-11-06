@@ -3,7 +3,8 @@
 {# (static/js/entry-drawer.js resends the form that failed). A signed-out save also links #}
 {# to sign in in a new tab, so the text isn't lost. A status or rating change from the   #}
 {# library also brings the card behind the drawer up to date, out of band, and a rating  #}
-{# change the drawer's community rating.                                                  #}
+{# change the drawer's community rating. A status change brings who set it and an empty #}
+{# reason box; a saved reason brings the who-and-why note only.                          #}
 <p id="entry-save-status" class="entry-save-status" data-save-status="{{ state|default:'idle' }}" role="{% if state == 'error' %}alert{% else %}status{% endif %}">
   {% if state == "saved" %}{% include "partials/icon.html" with name="check" size=14 %}<span>Saved</span>
   {% elif state == "error" %}{% include "partials/icon.html" with name="alert" size=14 %}<span>{{ message }}</span>{% if sign_in_url %}<a href="{{ sign_in_url }}" target="_blank" rel="noopener" class="entry-save-link">Sign in</a>{% endif %}<button type="button" class="entry-save-link" data-save-retry>Try again</button>
@@ -11,3 +12,4 @@
 </p>
 {% if card_oob %}{% include "catalog/partials/library_card.html" with oob=True %}{% endif %}
 {% if community_oob %}{% include "catalog/partials/entry_community.html" with oob=True %}{% endif %}
+{% if status_oob %}{% include "catalog/partials/entry_status_note.html" with oob=True %}{% include "catalog/partials/entry_status_reason.html" with oob=True %}{% elif note_oob %}{% include "catalog/partials/entry_status_note.html" with oob=True %}{% endif %}

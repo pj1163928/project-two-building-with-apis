@@ -140,23 +140,21 @@ def test_each_sidebar_icon_sits_beside_its_label_in_one_column(client):
     assert 'html:not([data-panel="collapsed"]) .act-row > .tip { display: none; }' in source
 
 
-def test_footer_text_sits_below_the_watermark(client):
+def test_the_giant_watermark_is_gone(client):
+    """Pinned in view it was cut off behind the content, and at the foot of the page it
+    was rarely seen, so the user had it removed (2026-11-05). The top-right mark
+    carries the logo on every page instead."""
     html = client.get(reverse("packs:home")).content.decode()
-    footer = html.split('id="page-footer"', 1)[1].split("</footer>", 1)[0]
-    assert footer.index('class="word ') < footer.index("Built for Axcenity Engine")
-    assert "Axcenity Studios · 2026" in footer
+    assert "watermark" not in html
+    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    assert ".watermark" not in source
     assert "CIDM 3312" not in html
 
 
-def test_footer_has_a_faint_watermark_and_a_small_brand_signature(client):
+def test_footer_has_a_small_brand_signature(client):
     html = client.get(reverse("packs:home")).content.decode()
     footer = html.split('id="page-footer"', 1)[1].split("</footer>", 1)[0]
-    # The giant watermark fills the empty space, full width and faint.
-    watermark = re.search(r'<i class="word watermark ([^"]*)"', footer).group(1).split()
-    assert "w-full" in watermark
-    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
-    assert ".watermark { opacity: 0.06; }" in source  # 25% under the first 0.08
-    # Below it, a small signature: credits either side of a small wordmark.
+    # A small signature: credits either side of a small wordmark.
     signature = footer.split('class="brand-signature', 1)[1]
     assert signature.index("Built for Axcenity Engine") < signature.index('<i class="word w-20 ')
     assert signature.index('<i class="word w-20 ') < signature.index("Axcenity Studios · 2026")
@@ -262,37 +260,86 @@ def test_hover_inverts_to_black_on_white_and_back():
     )
 
 
-def test_drop_glow_layer_stays_put_while_its_blobs_move():
-    """The old glow slid the whole layer up, baring a grey strip along the bottom."""
-    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
-    glow = re.search(r"\.drop-glow \{([^}]*)\}", source).group(1)
-    assert "animation" not in glow and "transform" not in glow
-    blob = re.search(r"\.drop-blob \{([^}]*)\}", source).group(1)
-    assert "bottom: -45%;" in blob  # anchored well below the footer's bottom edge
-    for name in ("a", "b", "c"):
-        assert f"animation: drop-{name} " in source
-        assert f"@keyframes drop-{name} " in source
-    reduced = source.split("@media (prefers-reduced-motion: reduce) {", 1)[1].split("\n}", 1)[0]
-    assert ".drop-blob, .drop-glow::after { animation: none; }" in reduced
+def _source():
+    return (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
 
 
-def test_footer_glow_has_three_blobs(client):
-    html = client.get(reverse("catalog:discover")).content.decode()
-    glow = html.split('class="drop-glow"', 1)[1].split("</div>", 1)[0]
-    assert re.findall(r'class="drop-blob drop-blob-(\w)"', glow) == ["a", "b", "c"]
-
-
-def test_a_softer_copy_of_the_glow_sits_behind_the_hero(client):
+def test_ambient_glow_runs_through_the_whole_page(client):
+    """The glow layer fills .content-stage, which grows with the content, so it runs
+    from the top of the page to the bottom of the footer, however long the page is
+    (user request, 2026-11-05)."""
     html = client.get(reverse("catalog:discover")).content.decode()
     content = html.split('id="content"', 1)[1]
-    hero_glow = content.split('class="drop-glow page-glow"', 1)[1].split("</div>", 1)[0]
-    assert re.findall(r'class="drop-blob drop-blob-(\w)"', hero_glow) == ["a", "b", "c"]
-    assert content.index("page-glow") < content.index('class="page-hero')
-    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
-    page_glow = re.search(r"\.page-glow \{([^}]*)\}", source).group(1)
-    assert "scaleY(-1)" in page_glow and "opacity: 0.4;" in page_glow
-    blob = re.search(r"\.drop-blob \{([^}]*)\}", source).group(1)
-    assert "opacity: 0.55;" in blob  # softer than the first vivid version (0.8)
+    stage = content.split('class="content-stage"', 1)[1]
+    assert stage.count('class="ambient" aria-hidden="true" data-ambient') == 1
+    # Back to front: the glow, the mark, the page, then the footer, all on the stage.
+    assert (
+        stage.index('class="ambient"')
+        < stage.index('class="hero-atmosphere"')
+        < stage.index('class="page-hero')
+        < stage.index('id="page-footer"')
+    )
+    # The old fixed hero and footer glows (three symmetrical blobs and rings) are gone.
+    assert "drop-glow" not in html and "drop-blob" not in html
+    source = _source()
+    assert ".content-stage { position: relative; flex: 1 0 auto;" in source
+    ambient = re.search(r"\.ambient \{([^}]*)\}", source).group(1)
+    assert "inset: 0;" in ambient and "pointer-events: none;" in ambient
+    assert ".drop-glow" not in source and "@keyframes drop-ripple" not in source
+
+
+def test_ambient_drops_are_big_loose_lava_lamp_wax():
+    """Each drop gets its own shape, colours, size, path, wobble, speed and phase from
+    ambient.js, so nothing moves in step; the CSS animates transforms only. The user
+    asked for bigger drops that move like water, then bigger, looser and faster, like
+    a lava lamp (2026-11-05)."""
+    script = (settings.BASE_DIR / "static" / "js" / "ambient.js").read_text(encoding="utf-8")
+    assert "Math.random()" in script
+    props = ("--top", "--left", "--size", "--shape", "--from", "--to", "--drift", "--delay")
+    for prop in (*props, "--wobble", "--wa", "--wb", "--hx", "--hy"):
+        assert f'"{prop}"' in script, prop
+    # Big: 620 px up to 1300 px across. One per band of page, more when the page grows.
+    assert "var size = whole(620, Math.max(720, Math.min(1300, width * 0.8)));" in script
+    assert "var BAND = 650;" in script
+    # Faster: 18-34 s to rise or fall, a 5-9 s wobble; and a long way up and down.
+    assert "var drift = whole(18, 34);" in script
+    assert 'between(5, 9).toFixed(1) + "s"' in script
+    assert '"--y" + i, Math.round(signed(180, 480))' in script
+    # Like wax: tall and thin while it travels, wide and squat as it turns.
+    for prop in ("--tall", "--thin", "--squat", "--flat"):
+        assert f'"{prop}"' in script, prop
+    assert "ResizeObserver" in script and "htmx.onLoad(setUp)" in script
+    # Water keeps its volume: as a drop stretches one way it squashes the other.
+    assert '"--wb", (2 - squash)' in script
+    # A drop's body and two shells that follow its wobble a beat behind.
+    assert script.count('layer("ambient-shell")') == 2 and 'layer("ambient-drop")' in script
+    source = _source()
+    blob = re.search(r"\.ambient-blob \{([^}]*)\}", source).group(1)
+    assert "animation: ambient-drift var(--drift)" in blob
+    body = re.search(r"\.ambient-blob > i \{([^}]*)\}", source).group(1)
+    assert (
+        "border-radius: var(--shape);" in body and "animation: ambient-wobble var(--wobble)" in body
+    )
+    drop = re.search(r"\.ambient-drop \{([^}]*)\}", source).group(1)
+    assert "filter: blur(var(--blur));" in drop and "at var(--hx) var(--hy)" in drop
+    assert "animation-delay: calc(var(--delay) - 0.5s);" in source
+    assert "animation-delay: calc(var(--delay) - 1s);" in source
+    drift = source.split("@keyframes ambient-drift {", 1)[1].split("} }", 1)[0]
+    assert (
+        "scale(var(--thin), var(--tall))" in drift and "scale(var(--flat), var(--squat))" in drift
+    )
+    for name in ("ambient-drift", "ambient-wobble"):
+        keyframes = source.split(f"@keyframes {name} {{", 1)[1].split("} }", 1)[0]
+        assert "transform:" in keyframes
+        assert not re.search(r"\b(top|left|width|height|border-radius):", keyframes)
+    reduced = source.split("@media (prefers-reduced-motion: reduce) {", 1)[1].split("\n}", 1)[0]
+    assert ".ambient-blob, .ambient-blob > i { animation: none; }" in reduced
+
+
+def test_glow_colours_come_only_from_the_page_drop_tokens():
+    script = (settings.BASE_DIR / "static" / "js" / "ambient.js").read_text(encoding="utf-8")
+    assert '["var(--drop-a)", "var(--drop-b)", "var(--drop-c)"]' in script
+    assert not re.search(r"#[0-9A-Fa-f]{3,8}\b", script)
 
 
 @pytest.mark.parametrize(
@@ -311,10 +358,9 @@ def test_drop_glow_is_tinted_per_page(member_client, name, drop):
     if name == "accounts:login":
         member_client = Client()
     html = member_client.get(reverse(name)).content.decode()
-    # The colours are set once on <main>, so the hero and footer glows match.
+    # The colours are set once on <main>, and the one glow layer reads them.
     assert re.search(rf'<main id="content" [^>]*data-drop="{drop}"', html)
-    footer = html.split('id="page-footer"', 1)[1].split("</footer>", 1)[0]
-    assert footer.index('class="drop-glow"') < footer.index('class="word ')
+    assert html.count("data-ambient") == 1
 
 
 @pytest.mark.parametrize("name", ["accounts:login", "accounts:signup"])
@@ -645,20 +691,51 @@ def test_each_page_picks_a_surface_mood(member_client, name):
 
 def test_showcase_is_expressive_and_work_is_restrained():
     source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
-    # Showcase: oversized mark, top light, a taller and stronger hero glow with rings.
-    assert ".hero-atmosphere { display: none; }" in source
-    assert '#content[data-surface="showcase"] .hero-atmosphere { display: block;' in source
+    # Showcase: the full-size mark, top light and a stronger glow.
     assert "width: min(46rem, 62%)" in re.search(r"\.hero-mark \{([^}]*)\}", source).group(1)
+    assert '#content[data-surface="showcase"] .ambient { opacity: 0.52; }' in source
+    # Work: a subtler, slower glow and a smaller mark tucked into the corner.
+    assert "opacity: 0.34;" in re.search(r"\.ambient \{([^}]*)\}", source).group(1)
     assert (
-        '#content[data-surface="showcase"] .page-glow { height: 40rem; opacity: 0.75; }' in source
+        '#content[data-surface="work"] .hero-mark { top: -3.5rem; right: -3rem; '
+        "width: min(22rem, 30%); opacity: 0.06; }" in source
     )
-    assert '#content[data-surface="showcase"] .page-glow::after { content: ""; }' in source
-    # Work: no hero glow, a dimmer and slower footer glow without rings.
-    assert '#content[data-surface="work"] .page-glow { display: none; }' in source
-    assert '#content[data-surface="work"] #page-footer .drop-glow { opacity: 0.35; }' in source
-    assert (
-        '#content[data-surface="work"] #page-footer .drop-glow::after { content: none; }' in source
-    )
+    assert "calc(var(--drift) * 1.15)" in source
+
+
+@pytest.mark.parametrize("name", SHOWCASE + WORK)
+def test_the_mark_shows_on_every_page_above_the_glow(member_client, name):
+    """The logo was hidden on work pages; now every page shows it, layered over the
+    glow so the glow never covers it (user request, 2026-11-05)."""
+    html = member_client.get(reverse(name)).content.decode()
+    content = html.split('id="content"', 1)[1]
+    assert content.count('class="mark hero-mark"') == 1
+    assert content.index('class="ambient"') < content.index('class="hero-atmosphere"')
+    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    assert ".hero-atmosphere { display: none; }" not in source
+    atmosphere = re.search(r"\.hero-atmosphere \{([^}]*)\}", source).group(1)
+    assert "position: absolute;" in atmosphere and "display: none" not in atmosphere
+
+
+def test_the_drawer_keeps_the_mark_in_view(member_client, member, make_asset):
+    from catalog.models import SavedAsset
+
+    entry = SavedAsset.objects.create(user=member, asset=make_asset())
+    html = member_client.get(reverse("catalog:entry", args=[entry.pk]), HTTP_HX_REQUEST="true")
+    html = html.content.decode()
+    assert '<i class="mark drawer-mark" aria-hidden="true"></i>' in html
+    # Behind the body, and nowhere near the thumbnail.
+    thumb = html.split('<div class="entry-thumb">', 1)[1].split("</div>", 1)[0]
+    assert "mark" not in thumb
+
+
+def test_side_panel_inputs_stay_inside_their_chips():
+    """A chip's hidden input used to be placed against the sidebar, which doesn't clip,
+    so a long tag list pushed inputs below the window and the whole page scrolled on
+    into empty space (user report, 2026-11-05)."""
+    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    chip = re.search(r"\.filter-chip \{([^}]*)\}", source).group(1)
+    assert "position: relative;" in chip
 
 
 def test_oversized_mark_renders_once_behind_the_content(client):
@@ -851,13 +928,41 @@ def test_chrome_uses_contrast_tokens_not_fixed_white_or_black():
 
 
 @pytest.mark.parametrize("name", ["packs:home", "catalog:library"])
-def test_watermarks_use_ink_so_they_show_in_both_modes(member_client, name):
+def test_marks_use_ink_so_they_show_in_both_modes(member_client, name):
     html = member_client.get(reverse(name)).content.decode()
     classes = " ".join(re.findall(r'class="([^"]*)"', html.split('id="content"', 1)[1]))
     assert "text-white" not in classes
-    assert "text-ink" in classes
+    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    assert "color: var(--color-ink);" in re.search(r"\.hero-mark \{([^}]*)\}", source).group(1)
 
 
-def test_settings_page_says_the_theme_follows_the_system(member_client):
-    html = member_client.get(reverse("accounts:settings")).content.decode()
-    assert "Axcenity, following your system (dark or light)" in html
+def test_scripts_and_the_stylesheet_carry_a_version(client):
+    """A browser kept running the old shell.js, so the new light/dark chips did
+    nothing (user report, 2026-11-05). Each URL now changes with its file."""
+    html = client.get(reverse("packs:home")).content.decode()
+    head = html.split("</head>", 1)[0]
+    assert re.search(r'<link rel="stylesheet" href="/static/css/tailwind\.css\?v=\d+">', head)
+    scripts = re.findall(r'<script src="/static/js/([\w-]+\.js)(\?v=\d+)?" defer>', head)
+    assert scripts and all(version for _, version in scripts)
+
+
+def test_versioned_static_follows_the_file_and_skips_missing_ones(tmp_path, settings):
+    import os
+
+    from catalog.templatetags.shell_tags import versioned_static
+
+    folder = tmp_path / "static"
+    (folder / "js").mkdir(parents=True)
+    script = folder / "js" / "probe.js"
+    script.write_text("//", encoding="utf-8")
+    os.utime(script, (1_700_000_000, 1_700_000_000))
+    settings.STATICFILES_DIRS = [folder]
+    assert versioned_static("js/probe.js") == "/static/js/probe.js?v=1700000000"
+    assert versioned_static("js/missing.js") == "/static/js/missing.js"
+
+
+@pytest.mark.parametrize("name", ["accounts:profile", "accounts:settings", "accounts:token"])
+def test_account_pages_are_centred_at_one_width(member_client, name):
+    """They sat to the left of the content area (user report, 2026-11-05)."""
+    html = member_client.get(reverse(name)).content.decode()
+    assert '<div class="account-page max-w-3xl mx-auto w-full space-y-8">' in html

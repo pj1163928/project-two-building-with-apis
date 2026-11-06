@@ -1,0 +1,3 @@
+{# One side-panel filter chip (library.html): a <label> around a hidden checkbox or radio #}
+{# that belongs to the toolbar's form. Tags carry how many of the member's entries use it. #}
+<label class="filter-chip"><input type="{% if group.multiple %}checkbox{% else %}radio{% endif %}" class="library-control sr-only" form="library-toolbar" name="{{ group.name }}" value="{{ chip.value }}"{% if chip.checked %} checked{% endif %}><span>{{ chip.label }}</span>{% if chip.count %}<span class="filter-chip-count">{{ chip.count }}</span>{% endif %}</label>

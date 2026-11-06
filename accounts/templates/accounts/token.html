@@ -6,7 +6,7 @@
   {% include "accounts/partials/account_pages.html" with current="token" %}
 {% endblock %}
 {% block content %}
-<div class="max-w-2xl space-y-8">
+<div class="account-page max-w-3xl mx-auto w-full space-y-8">
   {% include "partials/page_header.html" with label="API token" heading="Your API token." lead="Use it to call the Toolbox API from your own scripts. Anyone holding it can read and change your library, so keep it private." compact=True %}
   <div class="bg-surface border border-line rounded-xl px-5 py-4 space-y-2">
     <label class="micro text-fg-secondary block" for="api-token">Token</label>

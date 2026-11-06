@@ -4,10 +4,13 @@
 
 {# One library entry as a full page: what a direct visit, a bookmark or "Open as page" gets. #}
 {# The same body as the drawer (catalog/partials/entry_detail.html).                         #}
+{# Centred, like the rest of the content: the entry in the main column and what's around #}
+{# it (similar entries, featuring packs, Find more) in a side column on wide screens.     #}
 {% block content %}
-  <section class="space-y-5">
+  <section class="entry-layout">
     {% url 'catalog:library' as library_url %}
-    <a href="{{ library_url }}" class="btn btn-quiet btn-sm">Back to your library</a>
+    <a href="{{ library_url }}" class="btn btn-quiet btn-sm entry-back">Back to your library</a>
     <div class="entry-page">{% include "catalog/partials/entry_detail.html" with as_page=True %}</div>
+    <aside class="entry-aside" aria-label="Related">{% include "catalog/partials/entry_related.html" with as_page=True %}</aside>
   </section>
 {% endblock %}

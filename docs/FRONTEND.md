@@ -27,22 +27,38 @@ It's a throwaway prototype, so take its look, not its code.
   `control-active`, `line`, `line-strong`, `fg`, `fg-strong`,
   `fg-secondary`, `fg-weak` and `fg-muted`. `white` and `black` are also
   defined, but the chrome doesn't use them directly (see contrast tokens).
-- **Light and dark:** the site follows the system's colour scheme.
+- **Light and dark:** System (follow the computer), Light or Dark, chosen
+  by hand (user request, 2026-11-05).
+  - **The choice** is the `ax-theme` cookie (`accounts/theme.py`), for
+    visitors and members alike, so the server renders `<html
+    data-scheme-choice="…">` and, for Light or Dark, `data-scheme="…"` on
+    the first paint. For System, an inline `<head>` script sets
+    `data-scheme` from `matchMedia("(prefers-color-scheme: light)")` before
+    first paint and follows the computer live. Without JavaScript, System is
+    dark.
+  - **Setting it:** the title bar's switch (`#theme-toggle`, a monitor, sun
+    or moon for the current choice) steps System → Light → Dark, and the
+    Settings page's Appearance chips pick one. `shell.js` switches at once,
+    writes the cookie (a year, `SameSite=Lax`) and keeps every switch and
+    chip in step. Both are forms that POST `choice` to `accounts:theme`
+    (CSRF) when JavaScript is off; it sets the cookie and goes back to the
+    page (the Referer, if it's this site).
   - Dark is the default: the `@theme` values.
-  - `@media (prefers-color-scheme: light)` in `source.css` sets the same
-    tokens to the engine's light palette (`crates/editor/src/theme.rs`,
+  - `html[data-scheme="light"] { … }` in `source.css` (nested rules, which
+    Tailwind's build flattens) sets the same tokens to the engine's light palette (`crates/editor/src/theme.rs`,
     `Palette::new` with `dark = false`). It's still the one `axcenity`
     theme, just flipped, so every utility and component follows.
   - In light mode, the type colours become the engine's on-light accents
     (`#A8460B`, `#3451D1`, `#1C7547`, `#6741D9`), and the status colours
     its light ones.
-  - The drop-glow blobs switch from `screen` to `multiply` blending, at
-    40 %, because screen washes out on white.
+  - The ambient glow's blobs switch from `screen` to `multiply` blending,
+    and the layer drops to 22 % (30 % on showcase pages), because screen
+    washes out on white.
   - The title-bar wordmark image (white) is inverted through
     `--logo-filter`.
 - **Contrast tokens:** `ink`, `on-ink` and `shade`.
   - `ink` is white on dark and `#18181B` on light. Hover inversion,
-    current-page marks, tooltips and watermarks use it.
+    current-page marks, tooltips and the marks use it.
   - `on-ink` is what sits on ink.
   - `shade` sits behind text over the glow.
   - Never use `white` or `black` for chrome. `test_shell.py` allows white
@@ -68,8 +84,8 @@ It's a throwaway prototype, so take its look, not its code.
   other page's own content, and on library cards and pack items to those
   two icons only.
 - **Page drop colours (the one exception):** each page's content area has
-  a "water drop" glow in three vivid colours, behind the hero and in the
-  footer. The colours are chosen by `#content[data-drop="<active_nav>"]` in
+  an ambient glow in three vivid colours, drifting behind the whole page
+  (see "Ambient glow"). The colours are chosen by `#content[data-drop="<active_nav>"]` in
   `source.css` (`<main id="content" data-drop>`). These are decoration
   only. They appear in those rules and nowhere else, never in the bars or
   the side panel, and never match a type colour. This exception to the PRD's "colour only means asset
@@ -77,8 +93,9 @@ It's a throwaway prototype, so take its look, not its code.
   pastels, and the user asked for brighter ones the same day (the tests
   still call them `PAGE_PASTELS`).
 - `tests/test_theme.py` fails if `source.css` gains any colour outside this
-  palette (dark or light), or uses a drop colour outside the drop-glow
-  rules. It also checks the light block against the engine's values.
+  palette (dark or light), or uses a drop colour outside the
+  `#content[data-drop]` rules. `static/js/ambient.js` only ever names the
+  tokens (`var(--drop-a)`…), never a hex value. It also checks the light block against the engine's values.
 
 ## Fonts
 
@@ -113,10 +130,13 @@ this only matters on a full load or refresh.
 
 - The logo files in `static/brand/` are copied from the engine repo's
   `assets/branding/`. The identity is black, white and grey only.
-- **Wordmark:** `wordmark-white.png` in the title bar. The footer has two
-  `.word`s: a giant full-width `.watermark` at 6 % opacity, filling the
-  empty space where future features will go, and a small `w-20` wordmark
-  in the brand signature below it.
+- **Wordmark:** `wordmark-white.png` in the title bar, and a small `w-20`
+  `.word` in the footer's brand signature. The giant full-width footer
+  watermark was removed at the user's request (2026-11-05): they wanted it
+  in view rather than at the foot of the page, or gone if that wasn't
+  clean. Pinned to the bottom of the view it was cut off behind the content
+  on long pages, so it went. The top-right mark (`.hero-mark`) carries the
+  logo on every page.
 - **App icon tile:** `icon-256.png` stays in static, but no page uses it.
   The user removed it from the activity bar because the title-bar wordmark
   already links home.
@@ -138,7 +158,7 @@ this only matters on a full load or refresh.
 |---|---|---|
 | Title bar | `title-bar` | `h-12`. From the left: the wordmark (`h-8`, links home), a divider, **Home** (`#home-button`, the only Home chip), "TOOLBOX", the breadcrumb, then the account chips on the right. Every item is a square `h-8` chip (`.bar-item`, `.crumb`) with 16 px icons. The breadcrumb sits in `{% block breadcrumb_nav %}`. Home empties that block, because its Home chip already marks the page. Sign-out is a POST form |
 | Sidebar | `side-panel` (with `activity-bar` inside) | One column: the activity bar and the side panel merged (user request, 2026-11-05). From the top: an `h-14` slot with the panel toggle and `{% block panel_title %}` (`.sidebar-title`, "Explorer" by default); `nav#activity-bar` with Discover, Library and Packs (`pt-1`, `gap-1`); the page's own panel (`.side-panel-inner`, `{% block side_panel %}`: the Library filters, the Account pages' Profile, Settings and API token rows); and an Account nav at the foot with Account and Settings. Each entry is an `.act.act-row` (`h-11`): a 3.5 rem `.act-icon` cell holding its 20 px icon, its `.act-label`, and a `.tip` tooltip for the collapsed strip, instead of a `title`. The sidebar is `relative z-20` so tooltips sit over the content. A view sets `extra_context = {"active_nav": "<key>"}` to mark its entry with `aria-current="page"` |
-| Content | `content` | `data-drop` = the page's `active_nav`. The hero glow (`.page-glow`), then `{% block content %}` in a `px-8 lg:px-12 pt-14 pb-12 space-y-8` wrapper, then the footer (`page-footer`): the drop glow, the faint giant watermark, and the `.brand-signature` row ("Built for Axcenity Engine", a small wordmark, "Axcenity Studios · 2026") |
+| Content | `content` | `data-drop` = the page's `active_nav`. `.content-stage` holds the ambient glow, the mark, then `{% block content %}` in a `px-8 lg:px-12 pt-14 pb-12 space-y-8` wrapper, then the footer (`page-footer`): the `.brand-signature` row ("Built for Axcenity Engine", a small wordmark, "Axcenity Studios · 2026") |
 | Status bar | `status-bar` | Monochrome. Each provider's last known status (`partials/provider_status.html`, from `config.context_processors.shell`): a solid ink dot for OK, an alert icon for an error, a muted dot for unknown, with the words in `title` and screen-reader text. The saved count (`partials/saved_count.html`, `#saved-count`) appears only when signed in, counts only that member's entries, and is sent again out of band after each save |
 
 **Side panel collapse:** an inline script in `<head>` sets
@@ -220,19 +240,56 @@ wordmark's letters at `line-height: 1`. A 4 px `padding-top` on the chip
 text (not the icons) puts every label on the wordmark's centre line.
 Wrap chip text in a `<span>` so the padding applies.
 
-**Drop glow:** `.drop-glow` holds three blurred blobs
-(`.drop-blob-a|b|c`, screen-blended at 55 % opacity), each drifting and
-scaling on its own path (9 s, 11 s and 13 s), plus ripple rings (`::after`)
-that pulse every 6 s. A mask fades it upward. The glow layer itself never
-moves, and the blobs are anchored 45 % below the footer's bottom edge, so
-no bare strip shows along the bottom. (The first version slid the whole
-layer up, which showed as a grey bar shifting along the bottom.)
-`.page-glow` is the same layer flipped (`scaleY(-1)`), 26 rem tall, at
-40 % opacity and without rings, hanging from the top of the content
-behind the hero, so the page reads as one piece. `.brand-signature` has a
-dark drop shadow so it stays readable over the brightest ink. Reduced motion stops all of it. It's translucent,
-so the dot grid shows through. `.grid-bg` uses
-`background-attachment: local`, so the dots scroll with the content.
+**Ambient glow** (user request, 2026-11-05): the old glow was three
+blobs on fixed paths with concentric ripple rings, behind the hero and in
+the footer, and the user found it too regular and symmetrical. Now one
+layer runs through the whole page, fluid, random and subtle. Later the
+same day the user asked for big water drops, then for bigger, looser and
+faster ones, like a lava lamp:
+
+- **Where:** `<div class="ambient" data-ambient>` is the first child of
+  `.content-stage`, a wrapper inside `#content` that grows with the content
+  (`flex: 1 0 auto`). So the layer spans the page from the top to the end of
+  the footer, however long it is, and scrolls with it. `#content` clips it.
+- **What:** `static/js/ambient.js` places the drops on load and after each
+  swap (`htmx.onLoad`): one per 650 px band of page, at a random height in
+  the band (a second in some bands on wide screens), up to 22. Each is 620
+  to 1300 px across, with its own loose, uneven shape, a two-colour
+  gradient from the page's drop tokens with its light off-centre (`--hx`,
+  `--hy`), aspect, blur, opacity, three drift waypoints (180–480 px up or
+  down, a little sideways), wobble, speeds (18–34 s to rise or fall, 5–9 s
+  wobble) and a random starting point in its cycle, so nothing moves in
+  step. A page that grows (Load
+  more, a filter) gets drops for the new part (`ResizeObserver`), and the
+  old ones stay put. Every page load rolls a new arrangement.
+- **How it moves, like lava-lamp wax:** only transforms animate.
+  `.ambient-blob` rises and falls between its waypoints (`ambient-drift`),
+  pulling tall and thin while it travels (`--thin`, `--tall`) and squashing
+  wide as it turns (`--flat`, `--squat`). Inside
+  it, the drop's body (`.ambient-drop`) wobbles (`ambient-wobble`): it
+  stretches one way as it squashes the other (`--wa` and `--wb = 2 - --wa`,
+  so it keeps its volume, as water does) and turns a little. Two thin
+  shells (`.ambient-shell`) wobble the same way 0.5 s and 1 s behind, like
+  the layered edges of a drop settling, as in the user's reference image.
+- **How strong:** 34 % on work pages (and 1.15× slower), 52 % on showcase pages,
+  24 % and 32 % in light mode, where the drops multiply instead of screen.
+  Reduced motion keeps the arrangement, still. Without JavaScript there's no
+  glow, only the dot grid.
+
+`.brand-signature` has a dark drop shadow so it stays readable over the
+brightest ink. The layer is translucent, so the dot grid shows through.
+`.grid-bg` uses `background-attachment: local`, so the dots scroll with
+the content.
+
+**Nothing sticks out of the window** (user report, 2026-11-05): the page
+used to scroll on past the shell into empty space. Each `.filter-chip`
+hides its input with `sr-only`, which is absolutely positioned. The chips
+weren't positioned, so those inputs were placed against the sidebar,
+which deliberately doesn't clip (its tooltips stick out). A long Tags list
+pushed hidden inputs below the window, and the document grew by that
+much. `.filter-chip` is `position: relative` now, so each input sits in
+its chip, inside the panel that scrolls and clips. Anything absolutely
+positioned in the side panel needs a positioned parent inside it.
 
 **Partials:**
 
@@ -300,12 +357,18 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
   a swap replaces `#app` but keeps `<body>`. Django rotates the token at
   sign-in, so the header has to come from the newest page. Never exempt a
   view from CSRF.
+- **Versioned URLs:** the stylesheet and every script load through
+  `{% versioned_static %}` (`catalog/templatetags/shell_tags.py`), which adds
+  `?v=<the file's last change>`. A member once clicked the new light/dark
+  chips while their browser still ran the old cached `shell.js`, and nothing
+  happened (2026-11-05). Now every change is a new URL.
 - **Scripts:** every script loads once, in `base.html`'s `<head>`, for
   every page. A swap doesn't run a new page's `<head>`, so there's no
   per-page scripts block. Scripts listen on the `document` (delegation)
   rather than binding to elements a swap replaces, as `shell.js`,
-  `password-toggle.js`, `sound-preview.js`, `card-actions.js` and
-  `entry-drawer.js` do.
+  `password-toggle.js`, `sound-preview.js`, `card-actions.js`,
+  `entry-drawer.js`, `entry-files.js`, `bundle-download.js` and `ambient.js`
+  do (the last sets itself up through `htmx.onLoad`).
 - **Preserved:** the title-bar logo link (`#brand-link`) is
   `hx-preserve`, so it isn't rebuilt on each swap. A rebuilt image left a
   blank frame with the chips sliding left. Its `<img>` also has
@@ -336,19 +399,25 @@ in the htmx config.
 `<main id="content" data-surface>` comes from `{% block surface %}`, which
 defaults to `work`. Home and Discover override it with `showcase`.
 
-- **Showcase** (discovery and marketing): the hero glow is 40 rem tall,
-  at 75 % opacity, with its ripple rings. A soft light falls from the top
-  (an extra background layer under the dot grid). `.hero-atmosphere`
-  shows an oversized, cropped `.hero-mark` at 5 % opacity, top right,
-  fading downward. The headline is full size.
-- **Work** (Library, Packs, Account, Settings): no hero glow and no
-  mark. The footer glow is at 35 % opacity, slower
-  (22 s) and has no rings. Headers are `compact`. The header, controls and
-  content sit in a `space-y-5` section, so they read as one block.
+- **Showcase** (discovery and marketing): the ambient glow at 50 %. A soft
+  light falls from the top (an extra background layer under the dot
+  grid). `.hero-atmosphere` shows an oversized, cropped `.hero-mark`
+  (`min(46rem, 62%)`) at 5 % opacity, top right, fading downward. The
+  headline is full size.
+- **Work** (Library, Packs, Account, Settings): the ambient glow at 32 %
+  and 1.4× slower. A smaller mark (`min(22rem, 30%)`, 6 %) tucked into the
+  top right corner, clear of the cards and toolbars. Headers are
+  `compact`. The header, controls and content sit in a `space-y-5`
+  section, so they read as one block.
+- **The mark on every page** (user request, 2026-11-05): it used to show
+  on showcase pages only. Now every page has it, layered above the glow
+  (`.hero-atmosphere` comes after `.ambient`), so the glow never covers it.
+  The library drawer has its own faint cropped mark (`.drawer-mark`) in
+  its lower corner, behind its content, so the logo stays in view while the
+  drawer covers the page. Never on a provider thumbnail.
 
 - **Sign-in and sign-up** are work surfaces too, with the same calm
-  footer glow. They also leave out the footer watermark (an empty
-  `{% block watermark %}`), so the form is the focal point. A brief
+  glow, so the form is the focal point. A brief
   corner-weighted `auth` mood was tried and dropped at the user's request.
 
 New pages are work surfaces unless they're for browsing or discovery.
@@ -356,8 +425,7 @@ New pages are work surfaces unless they're for browsing or discovery.
 ## Sign-in and sign-up
 
 Both extend `templates/registration/auth_base.html`, which fills the blocks
-`auth_heading`, `auth_lead`, `auth_form` and `auth_switch`, and empties
-`{% block watermark %}`.
+`auth_heading`, `auth_lead`, `auth_form` and `auth_switch`.
 
 - **Layout:** one `#auth-card`: a `.auth-card` with a `line-strong`
   border, two equal-height grid columns, and both columns' contents
@@ -398,7 +466,12 @@ library is empty.
   (Phase 4 polish) are checkboxes too, one per tag on the member's saved
   assets from every provider, most used first, each with its count
   (`.filter-chip-count`); an entry needs every chosen tag. With no tags
-  yet, the group says where they'll come from. Each chip
+  yet, the group says where they'll come from. The first 8 tags show; the
+  rest (up to 48) fold into `<details class="filter-more">` behind "Show N
+  more" / "Show fewer" (user request, 2026-11-05). A chosen tag behind the
+  fold opens it (`data-forced-open`), and otherwise `shell.js` reopens it
+  the way the member last left it (`data-remember`, in `localStorage`).
+  Each chip
   is a `<label>` around a `sr-only` input, so it works with the keyboard
   (a focus ring on the chip), and a chip that's on is inverted (ink). The
   inputs carry `form="library-toolbar"`, so they belong to the toolbar's
@@ -508,9 +581,22 @@ after the swap.
   entry", **Open as page** (the entry's URL) and Close. Close, a backdrop
   click or Escape shuts it. Reduced motion turns off the slide. The address
   bar doesn't change.
-- **The full page** (`catalog/entry.html`): the same body in a bordered
-  `.entry-page` surface, under "Back to your library". The crumbs are
-  library / entry, and Library stays current in the bars.
+- **The full page** (`catalog/entry.html`): `.entry-layout`, centred
+  (`max-width: 76rem; margin-inline: auto`; it used to sit pinned to the
+  left in a 46 rem box, user report 2026-11-05). "Back to your library",
+  then the body in a bordered `.entry-page` with the thumbnail and title
+  side by side, and `.entry-aside` beside it on wide screens (sticky),
+  holding `entry_related.html`. The crumbs are library / entry, and
+  Library stays current in the bars.
+- **Around the entry** (`catalog/partials/entry_related.html`, user
+  request 2026-11-05): **Similar in your library** (`#entry-similar`, up to
+  6 of the member's own entries with the most shared tags, then the same
+  kind; each a small thumbnail over the type icon, the title and "N shared
+  tags"), **Find more like this on Discover** (the kind and the asset's two
+  most widely used tags), and **Featured in public packs** (`#entry-featured`,
+  other members' public packs holding the asset, with owner and item count;
+  never a private pack). The drawer shows the same after the entry, and
+  there a similar entry opens in the drawer itself.
 - **The body** (`catalog/partials/entry_detail.html`, `.entry`): the
   thumbnail (provider URL over the type icon, square and whole for
   textures), the type and provider, the title (`h2` in the drawer, `h1` on
@@ -522,13 +608,47 @@ after the swap.
     Under the stars, `#entry-community` gives the community rating ("from
     every member who rated it, you included", or "No one has rated this
     yet."). A rating change sends it again out of band.
+  - **Who set the status, and why** (user request, 2026-11-05), under the
+    status chips: `#entry-status-note` ("Approved by you · 5 Nov 2026,
+    14:02", "· via the API" when a token set it, the reason in quotes, and a
+    folded "History · N changes"), or "To review since you saved it on …"
+    for an entry with no record yet. Then `#entry-status-reason`, one line
+    ("Why is it approved? Add a reason (optional)") that posts only
+    `status_reason` on change or Enter (`data-autosave="reason"`, so
+    `entry-drawer.js` handles its errors and Try again). A status change
+    sends the note and an empty reason box out of band; a reason sends the
+    note only, so the box being typed in is never replaced.
   - **License and credit:** the linked license, the attribution, "View on
     <provider>", tags and the saved date.
-  - **Files:** one `<details>` per variant ("2K JPG · 2 files · 5.2 MB"),
-    opening to each file's link and size.
-  - **Packs** *(Phase 7)*: the packs the entry is in (`#entry-packs`),
+  - **Your packs** *(Phase 7)*: the packs the entry is in (`#entry-packs`),
     each linking to its builder with the item's variant, or "It isn't in
     any of your packs yet."
+  - **Files** (`catalog/partials/entry_files.html`, user request
+    2026-11-05):
+    - **Your bundle** (`#entry-bundle`): what the member's download
+      defaults pick (`catalog.files.pick_bundle`): resolution and format
+      badges (`.file-badge`), the package, the file count and size, the map
+      types, a note wherever it had to differ ("No 8K here, so 4K, the
+      nearest."), and "Defaults: 2K · JPG · every map" linking to Settings.
+      One file is a plain **Download** link to the provider's file. Several
+      are **Download bundle** (`btn-primary`): `static/js/bundle-download.js`
+      reads the `json_script` `entry-bundle-data` (each file's provider URL,
+      its path in the zip and size, plus the credits), fetches the files one
+      at a time straight from the provider, and saves a stored zip with a
+      `CREDITS.txt` (and `MISSING.txt` for any file the provider wouldn't
+      hand over). Progress shows in `[data-bundle-status]` and a 2 px bar.
+      Over 2 GB it says to use the links instead. The Toolbox never
+      downloads, hosts or proxies a file (PRD, Out of Scope): Poly Haven,
+      the only provider with multi-file variants, serves its files with
+      `Access-Control-Allow-Origin: *`.
+    - **Filters:** Resolution and Format chips (`[data-file-filters]`,
+      `hidden` until `static/js/entry-files.js` shows them) narrow the list
+      in the page.
+    - **Variants:** one `<details>` per variant, its summary the resolution
+      and format badges, the package (Loose maps, Bundle, Archive, Audio),
+      "Your default" (inverted) on the bundle's variant, and "N files ·
+      size". Each file row starts with its role: the map it holds (Color,
+      Normal GL, Roughness…) or Scene, Data, Archive, Audio.
   - **Remove from library** (`entry_remove.html`): in the drawer it opens
     the Remove dialog; on the full page it links to the confirm page.
 - **Type colour:** only the type icon beside the label and the fallback
@@ -568,6 +688,22 @@ reported this on 2026-11-05.
 
 Escape in `card-actions.js` ignores every open dialog, the drawer
 included.
+
+## Settings
+
+The Account pages (Profile, Settings, API token) share one centred column,
+`.account-page max-w-3xl mx-auto` (they sat to the left until the user
+pointed it out, 2026-11-05). `accounts/settings.html`, a work surface: **Appearance** (`#appearance`: the
+System, Light and Dark chips, see "Light and dark"), then **Download
+defaults** (`#download-defaults`, user request 2026-11-05). One small form
+per group of `.filter-chip`s (Resolution, Texture format, HDRI format,
+Model format, Sound format, and the Texture maps checkboxes), each posting
+only its own field to `accounts:download_preferences` on change. There's
+no Save button (a `<noscript>` one stands in without JavaScript). Every
+reply replaces `#settings-save-status`. The maps form also sends
+`maps_posted`, so unticking every map still counts as posted (and is
+refused: "Choose at least one map type."). The library drawer's bundle and
+"Your default" badge follow these settings.
 
 ## Packs
 

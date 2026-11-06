@@ -43,10 +43,10 @@ the standalone binary in `.django_tailwind_cli/`; the code isn't the cause.
 - **Tests:** no test reaches the network. The autouse guard enforces it, and
   nothing may switch it off.
 - **Colour:** the chrome is monochrome. The four type colours mean asset type
-  and nothing else. The only other colour is each page's drop glow, behind
-  the hero and in the footer (see docs/FRONTEND.md). Only the `axcenity`
-  palette exists. It has a dark and a light set (the site follows the system
-  setting), and chrome uses the `ink`/`on-ink` tokens, never raw white/black.
+  and nothing else. The only other colour is each page's ambient drop
+  glow, drifting behind the whole page (see docs/FRONTEND.md). Only the `axcenity`
+  palette exists. It has a dark and a light set (System, Light or Dark, chosen
+  in the title bar or Settings), and chrome uses the `ink`/`on-ink` tokens, never raw white/black.
 - **Stay in the phase:** build only what the current plan phase asks for.
   Note anything a later phase needs; don't build it.
 

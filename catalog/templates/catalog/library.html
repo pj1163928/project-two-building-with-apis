@@ -6,6 +6,7 @@
 {# through form="library-toolbar", so one request carries the search, filters and sort.   #}
 {# Type, provider and status chips are checkboxes; minimum rating is one radio choice.    #}
 {# Tags: the member's most used tags, from every provider; an entry needs every chosen one. #}
+{# The first eight show; the rest fold behind "Show N more" (user request, 2026-11-05).    #}
 {# Disabled while the library is empty.                                                    #}
 {% block side_panel %}
   <section id="library-filters" class="mt-3 border-t border-line" aria-labelledby="library-filters-title">
@@ -15,7 +16,15 @@
       {% for group in filter_groups %}
       <div class="filter-group" role="group" aria-label="{{ group.title }}"><p class="micro text-fg-muted">{{ group.title }}</p>
         {% if group.chips %}
-        <div class="flex flex-wrap gap-1.5">{% for chip in group.chips %}<label class="filter-chip"><input type="{% if group.multiple %}checkbox{% else %}radio{% endif %}" class="library-control sr-only" form="library-toolbar" name="{{ group.name }}" value="{{ chip.value }}"{% if chip.checked %} checked{% endif %}><span>{{ chip.label }}</span>{% if chip.count %}<span class="filter-chip-count">{{ chip.count }}</span>{% endif %}</label>{% endfor %}</div>
+        <div class="flex flex-wrap gap-1.5">{% for chip in group.lead_chips %}{% include "catalog/partials/filter_chip.html" %}{% endfor %}</div>
+        {% if group.more_chips %}
+        {# The rest of the tags fold away; a chosen one keeps the fold open. shell.js remembers #}
+        {# whether the member last left it open (data-remember).                              #}
+        <details class="filter-more" data-remember="ax-filter-more-{{ group.name }}"{% if group.more_open %} open data-forced-open{% endif %}>
+          <summary class="filter-more-toggle"><span class="when-closed">Show {{ group.more_chips|length }} more</span><span class="when-open">Show fewer</span>{% include "partials/icon.html" with name="chevron-down" size=14 %}</summary>
+          <div class="flex flex-wrap gap-1.5 pt-1.5">{% for chip in group.more_chips %}{% include "catalog/partials/filter_chip.html" %}{% endfor %}</div>
+        </details>
+        {% endif %}
         {% else %}
         <p class="text-xs text-fg-muted">The tags on your saved assets, from every provider, show here.</p>
         {% endif %}

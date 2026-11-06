@@ -175,17 +175,20 @@ def test_the_drawer_shows_the_assets_details_license_source_and_files(entry, mem
     assert "&quot;Red Brick 03&quot; by Rob Tuytel, from Poly Haven, CC0 1.0" in html
     assert 'href="https://polyhaven.com/a/red_brick_03"' in html and "View on Poly Haven" in text
     assert "Tags brick, wall" in text
-    # Each variant, with its file count and size, opening to its files.
-    assert "2K JPG 2 files · 5.2 MB" in text
-    assert "glTF 1 file" in text and "glTF 1 file ·" not in text
+    # Each variant, told apart by resolution, format and package, with its file count
+    # and size, opening to its files, each labelled with the map it holds.
+    assert "2K JPG Loose maps Your default 2 files · 5.2 MB" in text
+    assert "glTF Bundle 1 file" in text and "glTF Bundle 1 file ·" not in text
     assert 'href="https://dl.polyhaven.org/red_brick_03_diff_2k.jpg"' in html
-    assert "red_brick_03_nor_gl_2k.jpg 2.9 MB" in text
+    assert "Color red_brick_03_diff_2k.jpg 2.4 MB" in text
+    assert "Normal GL red_brick_03_nor_gl_2k.jpg 2.9 MB" in text
+    assert "Scene red_brick_03.gltf" in text
     # Thumbnail: the provider's URL over the type icon, never the logo.
     thumb = html.split('<div class="entry-thumb">', 1)[1].split("</div>", 1)[0]
     assert 'src="https://cdn.polyhaven.com/thumbs/red_brick_03.png"' in thumb
     assert 'referrerpolicy="no-referrer"' in thumb and "mark" not in thumb
     # The packs it's in (none yet), after "License and credit".
-    assert text.index("License and credit") < text.index("Packs") < text.index("Files")
+    assert text.index("License and credit") < text.index("Your packs") < text.index("Files")
     assert "It isn't in any of your packs yet." in text
     # And Remove, through the same URL as a card's: it opens the library's Remove dialog.
     remove = reverse("catalog:remove", args=[entry.pk])

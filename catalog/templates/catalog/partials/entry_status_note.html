@@ -1,0 +1,27 @@
+{# Who set the entry's status, when, where and why (#entry-status-note), under the status #}
+{# chips, with the earlier changes folded away. A status change or a new reason sends it  #}
+{# again out of band. Entries are private, so today the person is always the owner (or   #}
+{# their API token); naming them keeps the history right once members work in teams.     #}
+{% with latest=entry.latest_status_change changes=entry.status_changes.all %}
+<div id="entry-status-note" class="entry-status-note"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% if latest %}
+    <p class="entry-status-who">
+      <span>{{ latest.get_status_display }}</span>
+      <span>by {% if latest.changed_by_id == user.pk %}you{% elif latest.changed_by %}{{ latest.changed_by.get_username }}{% else %}a former member{% endif %}</span>
+      <span>· <time datetime="{{ latest.changed_at|date:'c' }}">{{ latest.changed_at|date:"j M Y, H:i" }}</time></span>
+      {% if latest.via == "api" %}<span>· via the API</span>{% endif %}
+    </p>
+    {% if latest.reason %}<p class="entry-status-reason">“{{ latest.reason }}”</p>{% endif %}
+  {% else %}
+    <p class="entry-status-who"><span>{{ entry.get_status_display }}</span><span>since you saved it on <time datetime="{{ entry.saved_at|date:'c' }}">{{ entry.saved_at|date:"j M Y" }}</time></span></p>
+  {% endif %}
+  {% if changes|length > 1 %}
+    <details class="entry-status-history">
+      <summary class="micro">History · {{ changes|length }} changes</summary>
+      <ol>
+        {% for change in changes %}<li><span class="entry-status-history-status">{{ change.get_status_display }}</span><span>{% if change.changed_by_id == user.pk %}you{% elif change.changed_by %}{{ change.changed_by.get_username }}{% else %}a former member{% endif %} · <time datetime="{{ change.changed_at|date:'c' }}">{{ change.changed_at|date:"j M Y, H:i" }}</time>{% if change.via == "api" %} · API{% endif %}</span>{% if change.reason %}<q>{{ change.reason }}</q>{% endif %}</li>{% endfor %}
+      </ol>
+    </details>
+  {% endif %}
+</div>
+{% endwith %}

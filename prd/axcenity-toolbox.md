@@ -186,6 +186,19 @@ asset catalog and pack creator for the engine.
 93. As a member, I want to see the average rating every member has given an asset, and how many rated it, on my library cards, in the drawer and on Discover results, and to sort my library by it, so that I can lean on what others found. My own rating stays private: the average never shows who rated. **[T1]**
 94. As a member, I want the side panel to be one column, each icon beside its label when it's open and the icon strip when it's closed, so that I can read where each icon goes. **[T1]**
 
+### Added 2026-11-05 (at the user's request, after Phase 7)
+
+95. As a member, I want an entry's files told apart by resolution, format and map type, and to narrow the list by resolution and format, so that I can find the file I need among dozens. **[T1]**
+96. As a member, I want to choose in Settings the resolution, the format for each kind and the texture maps I want by default, so that the Toolbox marks the files I usually take. **[T1]**
+97. As a member, I want to download the files my defaults pick as one bundle, with the asset's credit inside, so that I get a ready set in one click. My browser fetches the files from the provider; the Toolbox never downloads or hosts them. **[T1]**
+98. As a member, I want an entry's full page centred, with similar assets from my library, the public packs that feature it and a link to find more like it on Discover, so that one asset leads me to the next. **[T1]**
+99. As a member, I want to see who set an entry's review status, when, from where, and why, with its history, so that a status still makes sense later and once members work in teams. **[T1]**
+100. As a member, I want the library's Tags filter to show my top tags and fold the rest away, so that a long tag list doesn't bury the other filters. **[T1]**
+101. As a visitor, I want the Axcenity mark on every page, never hidden by the decoration, and a background glow that drifts at random through the whole page, so that the site feels like one branded piece. **[T1]**
+102. As a member, I want the page never to scroll past its end into empty space. **[T1]**
+103. As a visitor or member, I want to choose light, dark or my computer's setting myself, from the title bar or Settings, so that the Toolbox looks the way I work. **[T1]**
+104. As a visitor, I want the background drops big and moving like water, and no giant wordmark half hidden behind the content, so that the decoration stays calm and clean. **[T1]**
+
 ### Requirement traceability
 
 | Graded requirement | User stories |
@@ -600,7 +613,8 @@ so any change to the shape fails the tests.
 - **Tier 3 stretch items:** a "Popular assets" row, a light theme, and a sample Rust or Lua manifest loader in the
   docs. They're built only if Tier 1 and Tier 2 are finished.
 - Downloading, hosting or proxying asset files or thumbnails. The Toolbox
-  stores and links to provider URLs only.
+  stores and links to provider URLs only. (Story 97's bundle is built in the
+  member's browser from the provider's URLs, so this still holds.)
 - Creating, editing, deleting or copying packs through the API.
 - Users deleting shared Asset records, and soft delete or undo for
   anything.

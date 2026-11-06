@@ -4,7 +4,7 @@ from collections.abc import Mapping
 
 from django import forms
 
-from .models import SavedAsset
+from .models import STATUS_REASON_MAX_LENGTH, SavedAsset, StatusChange
 
 # Notes are free text; this keeps one entry's notes to a sensible size.
 NOTES_MAX_LENGTH = 10_000
@@ -59,8 +59,19 @@ class ReviewForm(forms.ModelForm):
         """The first problem with the posted values, as one sentence for the status line."""
         return next(iter(self.errors.values()))[0] if self.errors else ""
 
-    def save(self, commit: bool = True) -> SavedAsset:
+    def save(self, commit: bool = True, *, by=None) -> SavedAsset:
+        """Write the posted fields only. A real status change is recorded as made
+        by `by` on the website (SavedAsset.save_review)."""
         entry = super().save(commit=False)
         if commit:
-            entry.save(update_fields=self.changed_fields)
+            entry.save_review(self.changed_fields, by=by, via=StatusChange.Via.SITE)
         return entry
+
+
+def clean_status_reason(value: str) -> tuple[str, str]:
+    """A posted status reason, trimmed: (reason, error). The error is one sentence,
+    or "" when the reason is fine."""
+    reason = " ".join(value.split())
+    if len(reason) > STATUS_REASON_MAX_LENGTH:
+        return reason, f"A reason can be up to {STATUS_REASON_MAX_LENGTH} characters."
+    return reason, ""

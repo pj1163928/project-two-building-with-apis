@@ -94,6 +94,75 @@
     true
   );
 
+  // ---------- Colour scheme ----------
+  // The title bar's switch steps System → Light → Dark, and the Settings page's
+  // Appearance chips pick one. Either switches at once and saves the ax-theme
+  // cookie, which the server reads for the next page's first paint (see the
+  // inline script in base.html). Without JavaScript the forms post to
+  // accounts:theme instead.
+  var SCHEMES = ["system", "light", "dark"];
+  var SCHEME_LABELS = { system: "System", light: "Light", dark: "Dark" };
+
+  function setScheme(choice) {
+    if (SCHEMES.indexOf(choice) === -1) return;
+    root.dataset.schemeChoice = choice;
+    document.cookie = "ax-theme=" + choice + "; path=/; max-age=31536000; SameSite=Lax";
+    if (window.axScheme) window.axScheme.apply();
+    syncScheme(document);
+  }
+
+  function syncScheme(within) {
+    if (!within.querySelectorAll) return;
+    var choice = root.dataset.schemeChoice || "system";
+    var next = SCHEMES[(SCHEMES.indexOf(choice) + 1) % SCHEMES.length];
+    within.querySelectorAll("#theme-toggle").forEach(function (button) {
+      button.value = next;
+      button.title = "Theme: " + SCHEME_LABELS[choice];
+      button.setAttribute("aria-label", "Theme: " + SCHEME_LABELS[choice] + ". Switch to " + SCHEME_LABELS[next]);
+    });
+    within.querySelectorAll("input[data-theme-choice]").forEach(function (input) {
+      input.checked = input.value === choice;
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("#theme-toggle");
+    if (!button) return;
+    event.preventDefault();
+    setScheme(button.value);
+  });
+  document.addEventListener("change", function (event) {
+    if (event.target.matches && event.target.matches("input[data-theme-choice]")) setScheme(event.target.value);
+  });
+  // A boosted swap keeps <html> (and so the choice) but brings a new switch.
+  if (window.htmx) htmx.onLoad(syncScheme);
+
+  // ---------- Remembered folds ----------
+  // A <details data-remember="key"> (the library's "Show N more" tags) opens the
+  // way the member last left it, in localStorage. One the server opened because
+  // a chosen chip sits inside (data-forced-open) stays open.
+  function restoreFolds(root) {
+    if (!root.querySelectorAll) return;
+    root.querySelectorAll("details[data-remember]").forEach(function (fold) {
+      if (fold.hasAttribute("data-forced-open")) return;
+      var saved = null;
+      try { saved = localStorage.getItem(fold.dataset.remember); } catch (error) { /* storage off */ }
+      if (saved !== null) fold.open = saved === "open";
+    });
+  }
+  document.addEventListener(
+    "toggle",
+    function (event) {
+      var fold = event.target;
+      if (!fold.matches || !fold.matches("details[data-remember]")) return;
+      // A fold the server opened fires toggle as it's parsed; that isn't the member's choice.
+      if (fold.hasAttribute("data-forced-open") && fold.open) return;
+      try { localStorage.setItem(fold.dataset.remember, fold.open ? "open" : "closed"); } catch (error) { /* storage off */ }
+    },
+    true
+  );
+  if (window.htmx) htmx.onLoad(restoreFolds);
+
   // ---------- After every boosted swap ----------
   document.addEventListener("htmx:afterSwap", function (event) {
     if (event.detail.boosted) {

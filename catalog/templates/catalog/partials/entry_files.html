@@ -1,0 +1,74 @@
+{# An entry's files (catalog.files): first the bundle the member's download defaults pick #}
+{# (accounts:settings), with Download bundle, then every variant told apart by           #}
+{# resolution, format and package, each file by the map it holds. The Resolution and    #}
+{# Format chips narrow the list in the browser (static/js/entry-files.js; without        #}
+{# JavaScript they stay hidden and every variant shows). The bundle is the provider's    #}
+{# URLs only: the browser fetches and zips them (static/js/bundle-download.js).          #}
+{% with asset=entry.asset variants=entry.asset.file_variants %}
+<section class="entry-section" aria-labelledby="entry-files-title">
+  <h3 id="entry-files-title" class="micro text-fg-secondary">Files</h3>
+  {% if variants %}
+    <div id="entry-bundle" class="entry-bundle" data-bundle-state="idle">
+      <div class="entry-bundle-head">
+        <p class="micro text-fg-muted">Your bundle</p>
+        <a href="{% url 'accounts:settings' %}" class="entry-link entry-bundle-defaults" title="Change your download defaults">Defaults: {{ preferences.summary }}</a>
+      </div>
+      {% if bundle.files %}
+        <p class="entry-bundle-pick">
+          {% if bundle.variant.resolution %}<span class="file-badge">{{ bundle.variant.resolution }}</span>{% endif %}<span class="file-badge">{{ bundle.variant.format_label }}</span><span class="entry-bundle-package">{{ bundle.variant.package_label }}</span>
+          <span class="entry-bundle-meta">{{ bundle.files|length }} file{{ bundle.files|length|pluralize }}{% if bundle.total_size is not None %} · {{ bundle.total_size|filesizeformat }}{% endif %}</span>
+        </p>
+        {% if bundle.map_labels %}<p class="entry-bundle-maps">{{ bundle.map_labels|join:" · " }}</p>{% endif %}
+        {% for note in bundle.notes %}<p class="entry-bundle-note">{{ note }}</p>{% endfor %}
+        {% if bundle.files|length == 1 %}
+          {# One file needs no zip: a plain link to the provider's file. #}
+          <div class="entry-bundle-actions">
+            <a href="{{ bundle.files.0.url }}" class="btn btn-primary btn-sm rounded-none" target="_blank" rel="noopener noreferrer" download>{% include "partials/icon.html" with name="download" size=16 %}<span>Download {{ bundle.files.0.filename }}</span></a>
+          </div>
+        {% elif bundle_manifest %}
+          {{ bundle_manifest|json_script:"entry-bundle-data" }}
+          <div class="entry-bundle-actions">
+            <button type="button" class="btn btn-primary btn-sm rounded-none" data-bundle-download="entry-bundle-data">{% include "partials/icon.html" with name="download" size=16 %}<span data-bundle-label>Download bundle</span></button>
+            <p class="entry-bundle-status" data-bundle-status role="status"></p>
+          </div>
+          <div class="entry-bundle-progress" aria-hidden="true"><span data-bundle-progress></span></div>
+        {% else %}
+          <p class="entry-bundle-note">That's over 2 GB, too big to bundle in the browser. Download the files one by one below.</p>
+        {% endif %}
+      {% else %}
+        <p class="entry-bundle-note">None of these files match your defaults.</p>
+      {% endif %}
+    </div>
+
+    {% with filters=asset.file_filters %}
+    <div class="entry-file-filters" data-file-filters hidden>
+      {% if filters.resolutions|length > 1 %}<fieldset class="entry-file-filter"><legend class="micro text-fg-muted">Resolution</legend>
+        <label class="filter-chip"><input type="radio" class="sr-only" name="file-resolution" value="" data-file-filter="resolution" checked><span>All</span></label>{% for resolution in filters.resolutions %}<label class="filter-chip"><input type="radio" class="sr-only" name="file-resolution" value="{{ resolution }}" data-file-filter="resolution"><span>{{ resolution }}</span></label>{% endfor %}
+      </fieldset>{% endif %}
+      {% if filters.formats|length > 1 %}<fieldset class="entry-file-filter"><legend class="micro text-fg-muted">Format</legend>
+        <label class="filter-chip"><input type="radio" class="sr-only" name="file-format" value="" data-file-filter="format" checked><span>All</span></label>{% for key, label in filters.formats %}<label class="filter-chip"><input type="radio" class="sr-only" name="file-format" value="{{ key }}" data-file-filter="format"><span>{{ label }}</span></label>{% endfor %}
+      </fieldset>{% endif %}
+    </div>
+    {% endwith %}
+
+    <ul class="entry-variants" data-file-list>
+      {% for variant in variants %}
+        <li data-resolution="{{ variant.resolution }}" data-format="{{ variant.format_key }}">
+          <details class="entry-variant">
+            <summary>
+              <span class="entry-variant-label">{% if variant.resolution %}<span class="file-badge">{{ variant.resolution }}</span>{% endif %}<span class="file-badge">{{ variant.format_label }}</span><span class="entry-variant-package">{{ variant.package_label }}</span>{% if variant == bundle.variant %}<span class="file-badge file-badge-default">Your default</span>{% endif %}</span>
+              <span class="entry-variant-meta">{{ variant.files|length }} file{{ variant.files|length|pluralize }}{% if variant.total_size is not None %} · {{ variant.total_size|filesizeformat }}{% endif %}</span>
+            </summary>
+            <ul class="entry-files">
+              {% for file in variant.files %}<li><span class="entry-file-role">{{ file.role|default:"File" }}</span><a href="{{ file.url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ file.filename }}</a>{% if file.size is not None %}<span class="entry-file-size">{{ file.size|filesizeformat }}</span>{% endif %}</li>{% endfor %}
+            </ul>
+          </details>
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="entry-file-empty text-sm text-fg-weak" data-file-empty hidden>No files match those filters.</p>
+  {% else %}
+    <p class="text-sm text-fg-weak">{{ asset.get_provider_display }} listed no downloadable files for this asset.</p>
+  {% endif %}
+</section>
+{% endwith %}

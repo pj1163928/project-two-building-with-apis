@@ -1,15 +1,21 @@
 from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect, resolve_url
+from django.contrib.auth.views import redirect_to_login
+from django.http import HttpResponse, HttpResponseBadRequest
+from django.shortcuts import redirect, render, resolve_url
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views import View
 from django.views.decorators.cache import never_cache
 from django.views.generic import CreateView, TemplateView
+from django_htmx.http import HttpResponseClientRedirect
 from rest_framework.authtoken.models import Token
 
-from .forms import SignUpForm
+from .forms import DownloadPreferencesForm, SignUpForm
+from .models import DownloadPreferences, preference_groups
+from .theme import COOKIE_MAX_AGE, COOKIE_NAME, THEME_CHOICES, THEME_LABELS, theme_choice
 
 
 class SignUpView(CreateView):
@@ -51,8 +57,50 @@ class ProfileView(LoginRequiredMixin, TemplateView):
 
 
 class SettingsView(LoginRequiredMixin, TemplateView):
+    """The member's settings: the theme, and their download defaults."""
+
     template_name = "accounts/settings.html"
     extra_context = {"active_nav": "settings"}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["theme_choices"] = THEME_CHOICES
+        context["theme_choice"] = theme_choice(self.request)
+        context["preferences"] = DownloadPreferences.objects.for_user(self.request.user)
+        context["preference_groups"] = preference_groups(context["preferences"])
+        return context
+
+
+class DownloadPreferencesView(LoginRequiredMixin, View):
+    """Save whichever download defaults were posted (DownloadPreferencesForm).
+
+    Members only, with CSRF. The Settings page's HTMX request gets the status
+    line: "Saved", or a 400 with the first problem and nothing saved. A plain
+    POST is sent back to the Settings page.
+    """
+
+    http_method_names = ["post"]
+    template_name = "accounts/partials/settings_save_status.html"
+
+    def handle_no_permission(self):
+        login = redirect_to_login(reverse("accounts:settings"))
+        return HttpResponseClientRedirect(login.url) if self.request.htmx else login
+
+    def post(self, request):
+        preferences = DownloadPreferences.objects.for_user(request.user)
+        form = DownloadPreferencesForm(request.POST, instance=preferences)
+        if not form.changed_fields:
+            return self.reply(400, "There was nothing to save.")
+        if not form.is_valid():
+            return self.reply(400, form.first_error)
+        form.save()
+        if not request.htmx or request.htmx.boosted:
+            return redirect("accounts:settings")
+        return self.reply(200)
+
+    def reply(self, status: int, message: str = ""):
+        context = {"state": "error" if message else "saved", "message": message}
+        return render(self.request, self.template_name, context, status=status)
 
 
 @method_decorator(never_cache, name="dispatch")
@@ -71,3 +119,31 @@ class TokenView(LoginRequiredMixin, TemplateView):
         context["token"], _created = Token.objects.get_or_create(user=self.request.user)
         context["api_url"] = self.request.build_absolute_uri(reverse("catalog:api_library"))
         return context
+
+
+class ThemeView(View):
+    """Set the colour scheme: POST `choice` ("system", "light" or "dark"), with CSRF.
+
+    Open to everyone, signed in or not. It stores the choice in the ax-theme
+    cookie for a year. An HTMX request gets a 204 (the page has already
+    switched itself); any other is sent back to the page it came from (`next`,
+    else the Referer) when that's on this site, otherwise to the home page.
+    An unknown choice is a 400.
+    """
+
+    http_method_names = ["post"]
+
+    def post(self, request):
+        choice = request.POST.get("choice", "")
+        if choice not in THEME_LABELS:
+            return HttpResponseBadRequest("Choose system, light or dark.")
+        if request.htmx and not request.htmx.boosted:
+            response = HttpResponse(status=204)
+        else:
+            next_url = request.POST.get("next") or request.META.get("HTTP_REFERER", "")
+            safe = url_has_allowed_host_and_scheme(
+                next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+            )
+            response = redirect(next_url if safe else "packs:home")
+        response.set_cookie(COOKIE_NAME, choice, max_age=COOKIE_MAX_AGE, samesite="Lax")
+        return response

@@ -6,7 +6,7 @@
   {% include "accounts/partials/account_pages.html" with current="profile" %}
 {% endblock %}
 {% block content %}
-<div class="max-w-xl space-y-8">
+<div class="account-page max-w-3xl mx-auto w-full space-y-8">
   {% include "partials/page_header.html" with label="Account" heading=user.username compact=True %}
   <dl class="bg-surface border border-line rounded-xl divide-y divide-line">
     <div class="flex justify-between gap-4 px-5 py-3"><dt class="micro text-fg-muted">Username</dt><dd class="text-fg-strong">{{ user.username }}</dd></div>
