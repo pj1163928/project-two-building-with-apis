@@ -20,7 +20,7 @@ from django.views.generic import FormView, TemplateView
 from django_htmx.http import HttpResponseClientRedirect, push_url, trigger_client_event
 
 from catalog.library import UnknownProviderError, filter_library
-from catalog.models import SavedAsset
+from catalog.models import Asset, SavedAsset
 from providers import PROVIDERS_BY_KEY, ProviderError
 
 from .credits import pack_credits, pack_notice
@@ -33,11 +33,13 @@ from .services import (
     ITEM_SORTS,
     ReorderError,
     add_from_provider,
+    add_suggestion,
     add_to_pack,
     move_item,
     reorder_items,
     sort_items,
 )
+from .suggestions import find_more, suggest_assets
 
 
 def _wants_fragment(request) -> bool:
@@ -174,6 +176,7 @@ class PackBuilderView(OwnPackMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         pack = self.get_pack()
         context.update(_items_context(pack), **_share_context(self.request, pack))
+        context.update(_suggestions_context(self.request.user, pack))
         return context
 
 
@@ -210,7 +213,11 @@ class PackDetailsView(OwnPackMixin, View):
         if not _wants_fragment(request):
             return redirect(pack)
         context = {"state": "saved", "pack": pack, "title_oob": "title" in form.changed_fields}
-        return render(request, "packs/partials/save_status.html", context)
+        response = render(request, "packs/partials/save_status.html", context)
+        if "tags" in form.changed_fields:
+            # Its own event: only the suggestions (and Find more) depend on the tags.
+            response = trigger_client_event(response, "packTagsChanged")
+        return response
 
 
 def _status(request, message: str, status: int):
@@ -334,6 +341,62 @@ def _own_entry(request) -> SavedAsset:
     return get_object_or_404(
         SavedAsset.objects.for_user(request.user).select_related("asset"), pk=entry_id
     )
+
+
+class PackSuggestionsView(OwnPackMixin, TemplateView):
+    """Suggested for this pack: stored Assets sharing the pack's tags, with Find
+    more from providers. A fragment the builder reloads on packItemsChanged and
+    packTagsChanged; any other request goes to the builder."""
+
+    template_name = "packs/partials/suggestions.html"
+
+    def get(self, request, *args, **kwargs):
+        pack = self.get_pack()
+        if not _wants_fragment(request):
+            return redirect(pack)
+        return self.render_to_response(_suggestions_context(request.user, pack))
+
+
+def _suggestions_context(user, pack: Pack) -> dict:
+    """The suggestions, which of them the owner has saved, and Find more.
+
+    "In your library" checks only `user`'s own entries.
+    """
+    suggestions = suggest_assets(pack)
+    in_library = set(
+        SavedAsset.objects.for_user(user)
+        .filter(asset__in=[asset.pk for asset in suggestions])
+        .values_list("asset_id", flat=True)
+    )
+    return {
+        "pack": pack,
+        "suggestions": suggestions,
+        "suggestions_in_library": in_library,
+        "has_tags": pack.tags.exists(),
+        "find_more": find_more(pack),
+    }
+
+
+class PackSuggestionAddView(OwnPackMixin, View):
+    """Add a suggestion (`asset`, a stored Asset's id) to the pack.
+
+    add_suggestion() saves it to the owner's library as To review when they
+    don't have it, then adds it, in one transaction, never calling a
+    provider. Replies with the item list (packItemsChanged refreshes the
+    suggestions and Add from my library), plus the saved count out of band
+    only when a new library entry was made. An unknown asset is a 404.
+    """
+
+    http_method_names = ["post"]
+
+    def post(self, request, pk):
+        pack = self.get_pack()
+        asset_id = request.POST.get("asset") or ""
+        if not asset_id.isdigit():
+            raise Http404("No such asset.")
+        asset = get_object_or_404(Asset, pk=asset_id)
+        _entry, entry_created, _item = add_suggestion(pack, asset)
+        return _items_reply(request, pack, count_oob=entry_created)
 
 
 class PackItemUpdateView(OwnPackMixin, View):

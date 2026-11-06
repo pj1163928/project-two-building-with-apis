@@ -808,6 +808,23 @@ open pack current. With none: "The packs you create are listed here."
     add, move and remove), into `#pack-library-results`: up to 12 entries,
     each with Add (posting to `packs:add_item`, swapping `#pack-items`) or
     "In pack".
+  - **Suggested for this pack** *(Phase 10)*: a `.builder-section` in the
+    left column, under the items (Add from my library keeps the sticky right
+    column to itself). `packs/partials/suggestions.html` (`#pack-suggestions`,
+    `.pack-suggestions`) lists up to 8 `.pack-pick` rows, two to a line from
+    48 rem: the thumbnail over the type icon (no hover preview here, as it
+    would open over the side panel), the title, type, provider and license,
+    then "N shared tags" and "In your library" when the owner has it, and
+    **Add** (posting `asset` to `packs:suggestion_add`, swapping
+    `#pack-items`), with the note "Adding one that isn't in your library
+    saves it there as To review." The block `hx-get`s itself on
+    `packItemsChanged from:body` and `packTagsChanged from:body` (two
+    separate events). Then **Find more from providers** (`#pack-find-more`,
+    `btn btn-quiet btn-sm rounded-none`, to Discover) with "Searches Discover
+    for “…”.". With no tags: "Add tags to this pack to see suggestions." and
+    `#pack-find-more-hint`, "Add tags to this pack to find more from
+    providers."; with no match: "No other assets share this pack's tags
+    yet." Type colour only on the type icons.
 - All the builder's swaps say `transition:false`, so the page doesn't fade
   behind each save.
 - *(Phase 8)* The builder's toolbar has **View pack page** (`#pack-page-link`)

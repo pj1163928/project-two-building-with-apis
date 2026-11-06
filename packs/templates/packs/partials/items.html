@@ -32,3 +32,4 @@
   {# Checked again with every add, move or remove, since the list swaps whole. #}
   {% if items %}{% include "packs/partials/compatibility.html" %}{% endif %}
 </section>
+{% if count_oob %}{% include "partials/saved_count.html" with oob=True %}{% endif %}

@@ -40,6 +40,8 @@ phases add.
 | `packs:details`, `packs:visibility`, `packs:delete` | `/packs/<id>/details/`, `…/visibility/`, `…/delete/` | The owner only; POST only, with CSRF. Details saves whichever of `title`, `description`, `tags` is posted; visibility takes `private`, `unlisted` or `public` |
 | `packs:library_search` | `/packs/<id>/library/?q=` | The owner only; the builder's Add from my library fragment (any other request goes to the builder) |
 | `packs:add_item` | `/packs/<id>/items/` | The owner only; POST `entry` (their own, **404** otherwise), with CSRF |
+| `packs:suggestions` | `/packs/<id>/suggestions/` | The owner only (**404** otherwise); the builder's Suggested for this pack fragment, with Find more (any other request goes to the builder) |
+| `packs:suggestion_add` | `/packs/<id>/suggestions/add/` | The owner only (**404** otherwise); POST `asset` (a stored Asset's id, **404** when unknown), with CSRF. Saves it to the owner's library as To review when needed, then adds it; never calls a provider |
 | `packs:item_update`, `packs:item_move`, `packs:item_remove` | `/packs/<id>/items/<item>/`, `…/move/`, `…/remove/` | The owner only; POST only, with CSRF. Update saves whichever of `preferred_variant`, `import_path` is posted; move takes `direction` `up` or `down` |
 | `packs:picker` | `/packs/picker/?entry=<id>` or `?provider=&external_id=` | Members; the Add to pack picker's list of their own packs |
 | `packs:picker_add` | `/packs/<id>/add/` | The owner only; POST `entry`, or `provider` and `external_id` (a Discover result), with CSRF |
@@ -459,6 +461,31 @@ workflows), `packs/forms.py` and `packs/views.py`.
     `sort_items(pack, sort)` sorts by one of `ITEM_SORTS`: `type` (the
     Discover order), `title`, `provider`, or `license` (what needs no credit
     first), ties by title then id.
+- **Suggestions and Find more** *(Phase 10)*, `packs/suggestions.py`:
+  - `suggest_assets(pack, limit=8)`: stored Assets ranked by how many tags
+    they share with the pack (`shared_tags`, a `Count` of the asset's tags
+    filtered to the pack's), highest first; equal counts by title A–Z (case
+    ignored), then id. Assets sharing no tag and assets already in the pack
+    are left out. It reads only `Asset` and `Tag`, never a `SavedAsset`, so
+    no member's notes, rating, status or saves can reach it; "In your
+    library" is checked against the owner's own entries in the view.
+  - `add_suggestion(pack, asset)` (`packs/services.py`) returns `(entry,
+    entry_created, item)`: `save_asset()` for the owner (their entry used
+    untouched, otherwise a new To review one with its status record), then
+    `add_to_pack()`, in **one transaction**. It never calls a provider: the
+    Asset is already stored. `catalog.library.save_asset(user, asset)` is the
+    create-or-reuse step `save_to_library()` now shares.
+  - `find_more(pack)` returns a `FindMore(kind, query, url)` or `None` when
+    the pack has no tags. The query is up to `FIND_MORE_TAGS` (2) of the
+    pack's tags, those most stored assets carry first, then A–Z, as the entry
+    page's Find more does; the type is the one most of the pack's items have
+    (ties in Discover's order), textures for an empty pack. The URL is
+    `discover_url()`.
+  - Add replies with the item list and `packItemsChanged`, plus the saved
+    count out of band only when a new library entry was made. A tags save
+    (`packs:details`) sends `packTagsChanged`, and only then. The two events
+    stay separate: Add from my library listens for `packItemsChanged` only,
+    the suggestions for both.
 - **Forms:** `NewPackForm` (title, intended use, tags). `PackDetailsForm`
   and `PackItemForm` bind only the posted fields, like `ReviewForm`, so each
   autosaving field writes only itself. A variant must be one of the asset's
@@ -804,6 +831,7 @@ the API. All are built:
 | `seed_demo(snapshot=None)` | Built (Phase 9), `packs/demo.py`. The demo members, libraries and packs from the committed snapshot, offline and safe to run again (see "Demo data") |
 | `pack_credits(items)` | Built (user request, 2026-11-05), `packs/credits.py`. A pack's licenses, required and optional credits and warnings, and the formal notice (see "Licenses and credits") |
 | `license_info(name)` | Built (user request, 2026-11-05), `catalog/licenses.py`. What a license allows and asks |
+| `suggest_assets(pack, limit)` | Built (Phase 10), `packs/suggestions.py`. Stored Assets ranked by shared tags with the pack, ties by title then id, never the pack's own (see "Packs") |
 | `add_to_pack(pack, saved_asset)` | Built (Phase 7), `packs/services.py`. Adds an item at the end on the default variant, once per entry, and refuses another member's entry (see "Packs") |
 | `build_manifest(pack, *, source_url, exported_at=None)` | Built (Phase 8), `packs/manifest.py`. The Option A export, locked by a golden file (see "Export manifest") |
 | `search_records()` | Built (Phase 2a). Returns `AssetRecord`s (`providers/records.py`), next to the console's `search()`. Openverse's also takes `licenses=` (user request, 2026-11-06) |

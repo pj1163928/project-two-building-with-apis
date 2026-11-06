@@ -905,6 +905,10 @@
   .pack-pick-meta { display: flex; align-items: center; gap: 0.3rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .pack-picks-pager { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .pack-picks-pager .card-action:disabled { cursor: not-allowed; opacity: 0.35; }
+  /* Suggested for this pack (Phase 10): the same rows, two to a line where there's room, then Find more. */
+  .pack-suggestions { display: grid; gap: 0.75rem; }
+  @media (min-width: 48rem) { .pack-suggestions .pack-picks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .pack-find-more { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; }
 
   /* A pack's credits and the Attribution center: monochrome blocks per license. */
   .credits-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }

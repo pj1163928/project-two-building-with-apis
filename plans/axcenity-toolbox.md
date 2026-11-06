@@ -1123,21 +1123,36 @@ providers" opens Discover with a search built from the pack's tags.
 
 ### Acceptance criteria
 
-- [ ] Suggestions are ranked by shared-tag count, highest first. Assets
+- [x] Suggestions are ranked by shared-tag count, highest first. Assets
   with no shared tags and assets already in the pack are left out.
-- [ ] Ties on shared-tag count break by title A–Z, then by id, so the
+- [x] Ties on shared-tag count break by title A–Z, then by id, so the
   order is stable. The ranking test checks the groups of equal count in
   order, not the order inside a group.
-- [ ] Adding a suggestion the owner hasn't saved creates a To review
+- [x] Adding a suggestion the owner hasn't saved creates a To review
   SavedAsset. Adding one they have saved reuses it untouched.
-- [ ] "Find more" builds its query from the pack's tags. A pack with no
+- [x] "Find more" builds its query from the pack's tags. A pack with no
   tags shows a hint instead of an empty search.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: suggestions and their add
+- [x] Standard gate (see top). Access rules: suggestions and their add
   URLs return **404** for another member's pack and send signed-out
   visitors to sign in. Adding a suggestion needs a valid CSRF token.
+
+> **Built as (2026-11-06):** `packs/suggestions.py` holds `suggest_assets()`
+> (the top 8, reading only Asset and Tag rows) and `find_more()`;
+> `add_suggestion()` is in `packs/services.py`. At the user's request, adding a
+> suggestion never calls a provider: `catalog.library.save_asset()` (now shared
+> by `save_to_library()`) creates or reuses the entry from the stored Asset,
+> and `add_to_pack()` follows in the same transaction. The saved count goes
+> out of band only when a new entry was made. A tags save sends
+> `packTagsChanged`, item changes `packItemsChanged`, kept separate; the
+> suggestions listen for both. The section sits under the items, so Add from
+> my library keeps the sticky right column. Find more searches up to 2 of the
+> pack's tags (the most used across stored assets first, then A–Z, as the
+> entry page does) for the pack's main type (textures when empty). In the
+> demo data, Castle Siege and Golden Hour Skies have no matching assets, so
+> they show "No other assets share this pack's tags yet."
 
 ---
 

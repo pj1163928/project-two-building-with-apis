@@ -9,6 +9,8 @@
 {# removing and adding items swap the item list (#pack-items), and Add from my library   #}
 {# refreshes itself after each (the packItemsChanged event). Download files and each     #}
 {# item's Download are zipped in the browser from the providers' URLs (packs:files).     #}
+{# Suggested for this pack reloads on packItemsChanged and on packTagsChanged (a tags     #}
+{# save), and ends with Find more from providers.                                         #}
 {% block content %}
   {% url 'packs:details' pack.pk as details_url %}{% url 'packs:library_search' pack.pk as search_url %}
   <section class="space-y-5">
@@ -48,6 +50,11 @@
 
         {% include "packs/partials/import_path_help.html" %}
         {% include "packs/partials/items.html" %}
+
+        <section class="builder-section" aria-labelledby="pack-suggestions-title">
+          <h2 id="pack-suggestions-title" class="micro text-fg-secondary">Suggested for this pack</h2>
+          {% include "packs/partials/suggestions.html" %}
+        </section>
       </div>
 
       <section class="builder-section builder-aside" aria-labelledby="pack-add-title">

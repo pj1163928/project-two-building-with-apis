@@ -9,8 +9,8 @@ from collections.abc import Sequence
 from django.db import transaction
 from django.db.models import Max
 
-from catalog.library import save_to_library
-from catalog.models import SavedAsset
+from catalog.library import save_asset, save_to_library
+from catalog.models import Asset, SavedAsset
 from providers import KINDS
 
 from .models import Pack, PackItem, default_variant
@@ -153,3 +153,18 @@ def add_from_provider(pack: Pack, provider_key: str, external_id: str) -> tuple[
     with transaction.atomic():
         entry, _ = save_to_library(pack.owner, provider_key, external_id)
         return add_to_pack(pack, entry)
+
+
+def add_suggestion(pack: Pack, asset: Asset) -> tuple[SavedAsset, bool, PackItem]:
+    """Add a suggestion, a stored Asset, to `pack`; return (entry, entry_created, item).
+
+    The asset goes through the owner's library first (save_asset): an entry
+    they already have is used untouched, otherwise a new To review entry is
+    made. Then add_to_pack(). No provider is ever called, because the Asset
+    is already stored. Both steps share one transaction, so a failure leaves
+    no new entry and no item behind.
+    """
+    with transaction.atomic():
+        entry, entry_created = save_asset(pack.owner, asset)
+        item, _ = add_to_pack(pack, entry)
+    return entry, entry_created, item

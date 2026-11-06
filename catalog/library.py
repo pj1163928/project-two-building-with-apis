@@ -69,6 +69,25 @@ def save_to_library(
     ProviderError, and then saves nothing.
     """
     asset = get_or_fetch_asset(provider_key, external_id)
+    return save_asset(user, asset, via=via, status_reason=status_reason, **review)
+
+
+def save_asset(
+    user,
+    asset: Asset,
+    *,
+    via: str = StatusChange.Via.SITE,
+    status_reason: str = "",
+    **review: Any,
+) -> tuple[SavedAsset, bool]:
+    """Save an Asset that's already stored to `user`'s library; return (entry, created).
+
+    It never contacts a provider. An entry the member already has comes back
+    untouched with created=False. A new one starts as To review with no
+    rating (unless `review` says otherwise), its first status recorded as set
+    by `user` from `via`. The entry and its status record share one
+    transaction.
+    """
     with transaction.atomic():
         entry, created = SavedAsset.objects.get_or_create(user=user, asset=asset, defaults=review)
         if created:

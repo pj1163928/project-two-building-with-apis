@@ -28,6 +28,92 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Axcenity Toolbox: Phase 10/13, Suggestions and "Find more from providers"
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 10`.
+2. Looks good just make sure that query stored asset records and not
+   anothers users saved information. Adding a sugggestion to be atomic;
+   create or reuse the library entry and add it to the pack. never call a
+   provicer when adding a suggestion. Only update the saved count when a new
+   library entry is created. Enforce pack ownership on both suggestion
+   endpoints. keep the two HTMX refresh events independent: packItemsChange
+   and packTagsChanged.
+3. Looks good move to next test (approving TDD 1's red test).
+4. Looks good move to next (approving TDD 2's red test).
+5. Looks good continue to building (approving TDD 3's red test).
+
+### Summary
+
+- **Outcome:** Tier 2 has begun.
+  - The builder shows "Suggested for this pack": up to 8 stored Assets
+    ranked by how many tags they share with the pack, ties by title A–Z then
+    id, never one already in it. Each row shows its shared-tag count and "In
+    your library" when the owner has it, with Add.
+  - Adding a suggestion saves it to the owner's library as To review when
+    needed and adds it, in one transaction and without calling a provider.
+  - "Find more from providers" opens Discover with the pack's tags for its
+    main type; a pack with no tags shows hints instead.
+  - 1,169 tests pass (1,139 before; 30 new, and both suggestion URLs joined
+    the existing pack access lists). `ruff check` and `ruff format` are
+    clean.
+- **Changes:**
+  - `packs/suggestions.py` (new): `suggest_assets()`, `SUGGESTION_LIMIT`,
+    `FindMore` and `find_more()`.
+  - `packs/services.py`: `add_suggestion()`, returning `(entry,
+    entry_created, item)` so the view knows when to update the saved count.
+  - `catalog/library.py`: `save_asset(user, asset)`, the create-or-reuse
+    step pulled out of `save_to_library()`, which now calls it. It never
+    contacts a provider.
+  - `packs/views.py`: `PackSuggestionsView` and `PackSuggestionAddView`
+    (both through `OwnPackMixin`), `_suggestions_context()`, the builder's
+    context, and `packTagsChanged` from a tags save in `PackDetailsView`.
+  - `packs/urls.py`: `packs:suggestions` and `packs:suggestion_add`.
+  - Templates: `packs/partials/suggestions.html` (new); `builder.html` (the
+    section under the items); `items.html` (the saved count out of band when
+    asked).
+  - `styles/source.css`: `.pack-suggestions` (two rows to a line from
+    48 rem) and `.pack-find-more`.
+  - `tests/test_pack_suggestions.py` (new); `tests/test_access_control.py`
+    (both URLs added to `_pack_gets()` and `_pack_writes()`).
+  - Docs: ARCHITECTURE (URLs, "Suggestions and Find more", shared
+    functions), FRONTEND (the builder's section), TESTING (the new file);
+    the plan's Phase 10 ticked with a "Built as" note.
+- **TDD:** three behaviors, each RED on an assertion, approved, then GREEN:
+  1. `suggest_assets()` returns shared-tag groups highest first, leaving out
+     assets with no shared tags and the pack's own (checked as groups).
+  2. Equal counts go by title A–Z ignoring case, then id.
+  3. `add_suggestion()` makes a To review entry or reuses the member's
+     untouched, with every provider function failing the test if called.
+- **Decisions:**
+  - The section sits under the items in the left column, so Add from my
+    library keeps the sticky right column; its rows have no hover preview,
+    which would open over the side panel there.
+  - Find more uses up to 2 of the pack's tags (the most used across stored
+    assets first, then A–Z, like the entry page's Find more) and the type
+    most of the pack's items have, ties in Discover's order, textures for an
+    empty pack.
+  - An unknown asset id is a 404; adding an asset already in the pack
+    changes nothing.
+- **Deviations:** the user's six conditions (prompt 2) were all adopted.
+  "Never call a provider" changed the plan: `add_suggestion()` was going to
+  reuse `add_from_provider()`, which can fetch, so `save_asset()` was pulled
+  out of `save_to_library()` instead.
+- **Sideways:**
+  - TDD 3's first run failed with `DoesNotExist`, not an assertion; the test
+    was repaired to read the entry with `.first()` (what it asserts was
+    unchanged) and rerun RED.
+  - The builder's context first passed `pack` through two `**` expansions,
+    a `TypeError` caught by the access tests.
+  - The event tests expected `null` details; django-htmx sends `{}`, so they
+    compare the event names only.
+  - The new tests' import block missed on the first edit (TDD 3 had
+    already changed it) and was redone.
+  - Checked against the seeded demo data in a throwaway test database:
+    Castle Siege and Golden Hour Skies have no matching assets, so they show
+    "No other assets share this pack's tags yet."
+
 ## 2026-11-06 — Axcenity Toolbox: Phase 9/13, Main page, public gallery and demo data
 
 ### Prompts

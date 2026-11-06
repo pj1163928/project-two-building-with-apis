@@ -1,0 +1,41 @@
+{# Suggested for this pack (Phase 10): stored Assets ranked by the tags they share with   #}
+{# the pack (packs.suggestions.suggest_assets), never anything from anyone's library     #}
+{# entry. Add posts to packs:suggestion_add and swaps #pack-items; that reply's           #}
+{# packItemsChanged event reloads this block, and so does packTagsChanged (sent only when #}
+{# the pack's tags are saved). The two events stay separate. Then Find more from          #}
+{# providers: Discover searching the pack's tags, or a hint when it has none.             #}
+{% url 'packs:suggestions' pack.pk as suggestions_url %}{% url 'packs:suggestion_add' pack.pk as add_url %}
+<div id="pack-suggestions" class="pack-suggestions" aria-live="polite"
+     hx-get="{{ suggestions_url }}" hx-trigger="packItemsChanged from:body, packTagsChanged from:body" hx-swap="outerHTML transition:false" hx-sync="this:replace">
+  {% if not has_tags %}
+    <p class="picker-empty">Add tags to this pack to see suggestions.</p>
+  {% elif not suggestions %}
+    <p class="picker-empty">No other assets share this pack's tags yet.</p>
+  {% else %}
+    <ul class="pack-picks" aria-label="Suggested for this pack">
+      {% for asset in suggestions %}{% with tile=asset.tile %}
+        <li class="pack-pick" id="suggestion-{{ asset.pk }}" data-kind="{{ asset.kind }}">
+          <div class="pack-pick-thumb">
+            <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=16 %}</span>
+            {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+          </div>
+          <div class="min-w-0">
+            <p class="pack-pick-title" title="{{ asset.title }}">{{ asset.title }}</p>
+            <p class="pack-pick-meta micro text-fg-muted"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=11 %}</span>{{ asset.get_kind_display }} · {{ asset.get_provider_display }} · {{ asset.license }}</p>
+            <p class="pack-pick-meta micro text-fg-muted"><span class="pack-suggestion-shared">{{ asset.shared_tags }} shared tag{{ asset.shared_tags|pluralize }}</span>{% if asset.pk in suggestions_in_library %} · <span class="pack-suggestion-saved">In your library</span>{% endif %}</p>
+          </div>
+          <form method="post" action="{{ add_url }}" hx-post="{{ add_url }}" hx-target="#pack-items" hx-swap="outerHTML transition:false" hx-disabled-elt="find button">{% csrf_token %}<input type="hidden" name="asset" value="{{ asset.pk }}"><button type="submit" class="btn btn-quiet btn-xs" aria-label="Add {{ asset.title }} to this pack">Add</button></form>
+        </li>
+      {% endwith %}{% endfor %}
+    </ul>
+    <p class="picker-note">{% include "partials/icon.html" with name="info" size=14 %}<span>Adding one that isn't in your library saves it there as To review.</span></p>
+  {% endif %}
+  <div class="pack-find-more">
+    {% if find_more %}
+      <a href="{{ find_more.url }}" id="pack-find-more" class="btn btn-quiet btn-sm rounded-none gap-1.5">{% include "partials/icon.html" with name="search" size=14 %}<span>Find more from providers</span></a>
+      <p class="text-xs text-fg-weak">Searches Discover for “{{ find_more.query }}”.</p>
+    {% else %}
+      <p id="pack-find-more-hint" class="text-xs text-fg-weak">Add tags to this pack to find more from providers.</p>
+    {% endif %}
+  </div>
+</div>

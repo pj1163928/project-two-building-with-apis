@@ -19,6 +19,13 @@ urlpatterns = [
     path("packs/<int:pk>/link/", views.PackRotateLinkView.as_view(), name="rotate_link"),
     path("packs/<int:pk>/library/", views.PackLibrarySearchView.as_view(), name="library_search"),
     path("packs/<int:pk>/items/", views.PackAddItemView.as_view(), name="add_item"),
+    # Suggested for this pack: the list (GET, a fragment) and Add (POST `asset`).
+    path("packs/<int:pk>/suggestions/", views.PackSuggestionsView.as_view(), name="suggestions"),
+    path(
+        "packs/<int:pk>/suggestions/add/",
+        views.PackSuggestionAddView.as_view(),
+        name="suggestion_add",
+    ),
     path(
         "packs/<int:pk>/items/<int:item_pk>/",
         views.PackItemUpdateView.as_view(),

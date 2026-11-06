@@ -640,10 +640,11 @@ def their_pack(theirs):
 
 
 def _pack_gets(pack):
-    """Every GET on one pack: the builder and Add from my library."""
+    """Every GET on one pack: the builder, Add from my library and the suggestions."""
     return [
         reverse("packs:builder", args=[pack.pk]),
         reverse("packs:library_search", args=[pack.pk]),
+        reverse("packs:suggestions", args=[pack.pk]),
     ]
 
 
@@ -660,6 +661,7 @@ def _pack_writes(pack, entry):
         (reverse("packs:items_sort", args=[pack.pk]), {"sort": "title"}),
         (reverse("packs:item_remove", args=[pack.pk, item.pk]), {}),
         (reverse("packs:picker_add", args=[pack.pk]), {"entry": entry.pk}),
+        (reverse("packs:suggestion_add", args=[pack.pk]), {"asset": entry.asset_id}),
         (reverse("packs:rotate_link", args=[pack.pk]), {}),
         (reverse("packs:delete", args=[pack.pk]), {}),
     ]
