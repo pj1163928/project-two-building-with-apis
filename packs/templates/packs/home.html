@@ -6,7 +6,7 @@
 {% block content %}
   <section class="space-y-8">
     {% include "partials/page_header.html" with label="Axcenity Toolbox" heading="The asset toolbox for Axcenity Engine." lead="Find free textures, HDRIs, models and sounds, keep them in your own library, and build packs your projects can import." %}
-    {# The one primary action. Discover reads the query once Phase 2a builds search. #}
+    {# The one primary action: a search that lands in Discover's command bar. #}
     <form id="hero-search" method="get" action="{% url 'catalog:discover' %}" role="search" class="hero-search">
       <label for="hero-search-input" class="sr-only">Search free assets</label>
       {% include "partials/icon.html" with name="search" size=20 %}
@@ -19,9 +19,83 @@
         <a href="{% url 'catalog:discover' %}" class="btn btn-quiet">Browse Discover</a>
         <a href="{% url 'catalog:library' %}" class="btn btn-quiet">Open your library</a>
       {% else %}
-        <a href="{% url 'accounts:signup' %}" class="btn btn-quiet">Sign up</a>
-        <a href="{% url 'accounts:login' %}" class="btn btn-quiet">Sign in</a>
+        <a href="{% url 'accounts:signup' %}" id="home-signup" class="btn btn-quiet">Sign up</a>
+        <a href="{% url 'accounts:login' %}" id="home-signin" class="btn btn-quiet">Sign in</a>
       {% endif %}
     </div>
+  </section>
+
+  {% if not user.is_authenticated %}
+    {# How the Toolbox works, for visitors: four steps from finding an asset to the engine. #}
+    <section id="home-steps" class="space-y-5" aria-labelledby="home-steps-title">
+      <div class="space-y-2">
+        <p class="micro text-fg-secondary">How it works</p>
+        <h2 id="home-steps-title" class="headline text-[1.75rem]">Four steps from search to engine.</h2>
+      </div>
+      <ol class="home-steps">
+        <li class="home-step">
+          <span class="home-step-number micro">01</span>
+          <span class="home-step-icon" aria-hidden="true">{% include "partials/icon.html" with name="search" size=20 %}</span>
+          <h3 class="home-step-title">Discover</h3>
+          <p>Search ambientCG, Poly Haven and Openverse side by side, filtered by type and license.</p>
+        </li>
+        <li class="home-step">
+          <span class="home-step-number micro">02</span>
+          <span class="home-step-icon" aria-hidden="true">{% include "partials/icon.html" with name="library" size=20 %}</span>
+          <h3 class="home-step-title">Save</h3>
+          <p>Keep what you find in your private library, with your notes, a rating and a review status.</p>
+        </li>
+        <li class="home-step">
+          <span class="home-step-number micro">03</span>
+          <span class="home-step-icon" aria-hidden="true">{% include "partials/icon.html" with name="pack" size=20 %}</span>
+          <h3 class="home-step-title">Pack</h3>
+          <p>Gather assets into a pack for one project, choosing each file and where it lands.</p>
+        </li>
+        <li class="home-step">
+          <span class="home-step-number micro">04</span>
+          <span class="home-step-icon" aria-hidden="true">{% include "partials/icon.html" with name="download" size=20 %}</span>
+          <h3 class="home-step-title">Export</h3>
+          <p>Download a manifest the engine imports, with every credit the licenses ask for.</p>
+        </li>
+      </ol>
+      <p class="text-sm text-fg-muted">Sign up above to start a library. Browsing Discover and public packs needs no account.</p>
+    </section>
+  {% endif %}
+
+  {# The public gallery: public packs only (packs.gallery.filter_public_packs). A change #}
+  {# swaps only #gallery-results and pushes the tidy URL, as the library does; without  #}
+  {# JavaScript it's a plain GET form.                                                    #}
+  <section id="gallery" class="space-y-5" aria-labelledby="gallery-title">
+    <div class="space-y-2">
+      <p class="micro text-fg-secondary">Public packs</p>
+      <h2 id="gallery-title" class="headline text-[1.75rem]">See what others have built.</h2>
+    </div>
+    {% url 'packs:home' as home_url %}
+    <form id="gallery-toolbar" class="work-toolbar" role="search" aria-label="Gallery controls"
+          action="{{ home_url }}" method="get"
+          hx-get="{{ home_url }}" hx-target="#gallery-results" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace"
+          hx-trigger="submit, input changed delay:300ms from:#gallery-search, change from:.gallery-control">
+      <label class="toolbar-search">
+        <span class="sr-only">Search public packs</span>
+        {% include "partials/icon.html" with name="search" size=16 %}
+        <input type="search" id="gallery-search" name="q" value="{{ gallery_params.q }}" placeholder="Search pack titles and tags" autocomplete="off">
+      </label>
+      <label class="toolbar-field">
+        <span class="sr-only">Packs containing</span>
+        {% include "partials/icon.html" with name="shapes" size=16 %}
+        <select name="type" class="gallery-control">
+          {% for value, label in gallery_types %}<option value="{{ value }}"{% if value == gallery_params.type %} selected{% endif %}>{% if value %}Containing {{ label|lower }}{% else %}{{ label }}{% endif %}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="toolbar-field">
+        <span class="sr-only">Sort by</span>
+        {% include "partials/icon.html" with name="sort" size=16 %}
+        <select name="sort" class="gallery-control">
+          {% for value, label in gallery_sorts %}<option value="{{ value }}"{% if value == gallery_params.sort %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <noscript><button type="submit" class="btn btn-quiet btn-sm">Apply</button></noscript>
+    </form>
+    {% include "packs/partials/gallery_results.html" %}
   </section>
 {% endblock %}

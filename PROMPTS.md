@@ -28,6 +28,135 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Axcenity Toolbox: Phase 9/13, Main page, public gallery and demo data
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 9`.
+2. Ok looks good just make sure that gallery privacy tests include a private
+   or unlisted pack whose titel and tags would otherwise match the search
+   query. Preventing accidental filtering pagination or other query
+   operations.
+3. Looks good move to next (approving TDD 1's red test).
+4. Go ahead and move to next test just look at red phases for each test
+   (after TDD 1 went green: stop only at each red from then on).
+5. Looks good move to next (approving TDD 2's red test).
+6. Looks good move to building (approving TDD 3's red test).
+
+### Summary
+
+- **Outcome:** Tier 1 is finished.
+  - The main page explains the Toolbox to visitors in four steps (01
+    Discover · 02 Save · 03 Pack · 04 Export), with the hero's Sign up and
+    Sign in. Members see neither.
+  - The side panel starts collapsed there.
+  - The public gallery searches titles and tags, filters by type, sorts by
+    newest or most items and pages by 12. It swaps only its results through
+    HTMX and pushes the URL.
+  - Each card has a mosaic of the first four thumbnails, the title, owner,
+    tags and a count by type.
+  - `seed_demo` loads three demo members, 43 real assets, 53 library entries,
+    six public packs and one private pack, offline. It's safe to run again.
+  - The README is rewritten for the Toolbox.
+  - 1,139 tests pass (1,074 before; 65 new). `ruff check` and `ruff format`
+    are clean.
+- **Changes:**
+  - `packs/gallery.py` (new): `filter_public_packs()`, `GalleryParams`,
+    `GalleryPage`, `clean_gallery_params()`, `GalleryCard`/`gallery_card()`
+    and `type_summary()`.
+  - `packs/views.py`: `HomeView` serves the gallery (the fragment for HTMX,
+    with `HX-Push-Url`) and sets `panel_start`.
+  - Templates:
+    - `packs/templates/packs/home.html`: the four steps and the gallery
+      toolbar
+    - `packs/partials/gallery_results.html` and `gallery_card.html` (new)
+  - `templates/base.html` and `static/js/shell.js`: `data-panel-start` on
+    `<html>` and `#app`. The head script and `applyPanelStart()` (after
+    each boosted swap) use it ahead of the saved choice.
+  - `styles/source.css`: `.home-steps`/`.home-step`, `.gallery-grid`,
+    `.gallery-card`, `.gallery-mosaic`/`.gallery-tile`; the card's
+    transition joins the reduced-motion list.
+  - `packs/demo.py` (new): the demo users, packs, reviews and extra saves,
+    the snapshot's JSON reader and writer, and `seed_demo()`.
+  - `packs/management/commands/` (new): `seed_demo` and
+    `capture_demo_assets`.
+  - `packs/demo_assets.json` (new): the snapshot, captured live this
+    session.
+  - `README.md`: setup, running with Tailwind, the demo sign-ins, tests and
+    Ruff, the API with a token, the snapshot, the layout. The console
+    script's section is kept.
+  - Tests (new): `tests/test_gallery.py`, `tests/test_home.py` and
+    `tests/test_seed_demo.py`.
+  - Docs:
+    - `ARCHITECTURE.md`: new "Main page and gallery" and "Demo data"
+      sections, the URL row and the shared functions
+    - `FRONTEND.md`: "Main page" in place of "Home hero"; the gallery tiles
+      join the type-colour list
+    - `TESTING.md`: the new files and the demo accounts
+  - Plan: Phase 9 ticked, with "Built as" notes and notes for Phases 10–12.
+- **TDD:** three behaviours, each red on an assertion first.
+  1. The gallery never lists a private or unlisted pack. Following the
+     user's note, the test's private and unlisted packs match every query:
+     - their titles and tags match the search
+     - they hold every type
+     - they have the most items, and they're the newest
+     There are 13 public packs, so a second page exists. Ten queries
+     (search by title, by tag, by both, type, both sorts, page 2,
+     combinations) are each walked over every page. It was red against a
+     scaffold that started from every pack.
+  2. `type_summary()`: Discover's order, singular or plural ("1 HDRI",
+     "2 HDRIs"), types with no items left out, and "No items yet". It was
+     red against a stub returning "".
+  3. Running `seed_demo` twice leaves every table's row count (many-to-many
+     tables included) as one run does, under the network guard with every
+     provider function failing. The test also checks what the first run
+     made, so a seed that does nothing can't pass. It was red against a
+     stub that seeded nothing.
+- **Decisions:**
+  - The gallery's controls sit in the page, because the side panel starts
+    collapsed there.
+  - The type filter takes one type.
+  - "Newest" is `created_at`; there's no "made public at" field, and none
+    was added.
+  - Search works like the library's: every word is in the title or a tag
+    (tidied like a tag).
+  - Empty public packs are listed, reading "No items yet".
+  - The collapsed start doesn't overwrite the member's saved panel choice.
+  - Demo accounts are `demo_mira`, `demo_otto` and `demo_juno`, with the
+    password `toolbox-demo`.
+  - 43 assets rather than exactly 40, because the themed packs share a few.
+  - The demo includes one private pack, to show the 404 rule, and CC BY,
+    CC BY-NC and Sampling+ sounds, so the credits and compatibility warnings
+    have something to show.
+  - A second seed run restores the demo packs but leaves members' own entry
+    edits alone.
+  - The snapshot and the seed live in `packs`, the app that depends on
+    `catalog`.
+- **Deviations:** the user asked for the privacy test's hidden packs to
+  match every query (prompt 2), and it was built that way. After the first
+  green, the user asked to stop only at reds.
+- **Sideways:**
+  - The first privacy test used the query "Castle Fortresses", which tidies
+    to "fortresse" and would never match the tag "fortress". It was caught
+    before the red was shown and changed to "Castle FORTRESS".
+  - `{% for value, label in gallery_sorts.items %}` crashed, because the
+    sort key `"items"` hid `dict.items()`. The view now passes the pairs as
+    a list.
+  - The existing hero test caught a second `btn-primary` ("Sign up free" in
+    the steps) and an extra member link. Both were removed, keeping the
+    hero's Search as the page's one primary action.
+  - `rjust` would have drawn one blank tile when none was needed, so the
+    card has `blank_tiles` instead.
+  - The seed test first wrote its output to `/dev/null`, which doesn't
+    exist on Windows. It uses `StringIO` now.
+  - Killing the scratch server with `pkill -f` matched the shell running it
+    (exit 144) until the pattern was bracketed.
+  - The headless Firefox screenshot showed type icons instead of
+    thumbnails, because lazy images load after the shot is taken. The URLs
+    were checked with `curl`, and thumbnails are left to the manual test.
+  - The README was checked in a fresh copy of the working tree, not a real
+    `git clone`, because the files weren't committed yet.
+
 ## 2026-11-06 — Consistent layout, Discover license filters and drawer, packs as a list, sounds everywhere
 
 ### Prompts

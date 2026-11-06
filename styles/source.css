@@ -728,6 +728,29 @@
   .pack-card-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
   .pack-card-tags span { padding: 0.1rem 0.4rem; font-size: 11.5px; color: var(--color-fg-secondary);
     box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+  /* The main page (Phase 9): the four steps for visitors, and the public gallery's cards,
+     each a 2 x 2 mosaic of its first four thumbnails (the providers' images over each
+     asset's type icon, empty tiles after a short pack), then the title, owner, tags and
+     the count by type. The title's link is stretched over the card, to the pack's page. */
+  .home-steps { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+  .home-step { display: grid; gap: 0.5rem; align-content: start; padding: 1.1rem; background: var(--color-surface);
+    box-shadow: inset 0 0 0 1px var(--color-line); }
+  .home-step-number { color: var(--color-fg-muted); }
+  .home-step-icon { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; color: var(--color-fg-strong);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+  .home-step-title { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; color: var(--color-fg-strong); }
+  .home-step p { font-size: 13.5px; line-height: 1.55; color: var(--color-fg-weak); }
+  .gallery-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+  .gallery-card { position: relative; display: flex; flex-direction: column; background: var(--color-surface);
+    box-shadow: inset 0 0 0 1px var(--color-line); transition: box-shadow 0.15s; }
+  html[data-pointer] .gallery-card:hover, .gallery-card:has(:focus-visible) { box-shadow: inset 0 0 0 1px var(--color-ink); }
+  .gallery-mosaic { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; padding: 1px; background: var(--color-line); }
+  .gallery-tile { position: relative; display: grid; place-items: center; aspect-ratio: 1 / 1; overflow: hidden;
+    background: var(--color-inset); }
+  .gallery-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .gallery-tile.is-blank { background: var(--color-panel); }
+  .gallery-card-body { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; padding: 0.9rem 1rem 1rem; }
+  .gallery-card-summary { margin-top: auto; padding-top: 0.25rem; }
   .pack-card-page { position: relative; z-index: 1; color: var(--color-fg-secondary); text-decoration: underline; text-underline-offset: 2px; }
   html[data-pointer] .pack-card-page:hover, .pack-card-page:focus-visible { color: var(--color-fg-strong); outline: none; }
   /* Your packs as a list (user request, 2026-11-06): one row per pack, the same facts as a
@@ -1263,7 +1286,7 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .type-tile-bar { transition: none; }
   .result-details, .sound-play { transition: none; }
   [data-sound-card][data-sound="loading"] .sound-play { animation: none; }
-  .card-action, .card-tip, .picker-close, .picker-pack, .pack-card, .panel-action { transition: none; }
+  .card-action, .card-tip, .picker-close, .picker-pack, .pack-card, .gallery-card, .panel-action { transition: none; }
   .card-actions .htmx-request .card-action, .card-actions .htmx-request.card-action { animation: none; }
   .drawer-dialog[open] { animation: none; }
   .rate-star, .entry-notes, .entry-link { transition: none; }

@@ -1054,31 +1054,56 @@ testing, Ruff, the demo sign-in details, and using the API with a token.
 
 ### Acceptance criteria
 
-- [ ] Signed-out visitors see the four steps and both buttons. Members
+- [x] Signed-out visitors see the four steps and both buttons. Members
   don't see the sign-up prompt.
-- [ ] Unit tests cover `filter_public_packs()` for search, the type
+- [x] Unit tests cover `filter_public_packs()` for search, the type
   filter, both sorts and pagination.
-- [ ] The gallery never shows a private pack.
-- [ ] The mosaic uses the first 4 items by position. The type count reads
+- [x] The gallery never shows a private pack.
+- [x] The mosaic uses the first 4 items by position. The type count reads
   correctly for singular and plural, and for types with no items.
-- [ ] `seed_demo` runs under the network guard without touching it.
-- [ ] Running `seed_demo` twice leaves the same row counts as running it
+- [x] `seed_demo` runs under the network guard without touching it.
+- [x] Running `seed_demo` twice leaves the same row counts as running it
   once.
-- [ ] The demo credentials are obviously demo values and match the
+- [x] The demo credentials are obviously demo values and match the
   README.
-- [ ] Every Tier 1 feature can be tried against the seeded data with all
+- [x] Every Tier 1 feature can be tried against the seeded data with all
   providers offline. The only exception is Discover, which shows its
   error alerts.
-- [ ] Following the README from a fresh clone, through setup, seeding,
+- [x] Following the README from a fresh clone, through setup, seeding,
   the server and the tests, works without extra steps.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: the main page and the
+- [x] Standard gate (see top). Access rules: the main page and the
   gallery work signed out. Gallery parameters can't surface private
   packs.
-- [ ] Tier 1 sign-off: every acceptance criterion from Phases 1–9 still
+- [x] Tier 1 sign-off: every acceptance criterion from Phases 1–9 still
   holds.
+
+> **Built as (2026-11-06):** the gallery is on `/` (`packs:home`) with its
+> controls in the page's toolbar (search, one type, Newest or Most items),
+> because the side panel starts collapsed there; `HomeView` sets
+> `panel_start`, which `base.html` and `shell.js` read, and every other page
+> keeps the member's own choice. "Newest" is `created_at` (no "made public
+> at" field). The four steps show to visitors only, and the hero's Sign up
+> and Sign in stay the page's buttons. The demo is 43 real assets (captured
+> live by `capture_demo_assets`, committed as `packs/demo_assets.json`),
+> `demo_mira`, `demo_otto` and `demo_juno` (password `toolbox-demo`), six
+> public packs and one private one; `seed_demo` restores the demo packs on a
+> second run and keeps members' own entry edits. The README was followed in
+> a fresh copy of the working tree (sync, migrate, seed twice, Tailwind
+> build, the tests, the server); a `git clone` can't be tried until it's
+> committed. The headless screenshot showed the type icons, not the
+> thumbnails (lazy images load after it's taken); the URLs answer, so check
+> the thumbnails by hand.
+>
+> **For Phase 10:** "Find more from providers" can reuse
+> `catalog.discover.discover_url()`, as the entry page's Find more does.
+> **For Phase 11:** the demo packs are a ready source for Copy pack.
+> **For Phase 12:** the hero's thumbnails can come from `gallery_items` of
+> `Pack.objects.public()` packs. **Still open from Phase 7:** after Add to
+> pack on Discover saves a result, its Save corner still says Save until the
+> next search.
 
 ---
 

@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import FormView, TemplateView
-from django_htmx.http import HttpResponseClientRedirect, trigger_client_event
+from django_htmx.http import HttpResponseClientRedirect, push_url, trigger_client_event
 
 from catalog.library import UnknownProviderError, filter_library
 from catalog.models import SavedAsset
@@ -26,6 +26,7 @@ from providers import PROVIDERS_BY_KEY, ProviderError
 from .credits import pack_credits, pack_notice
 from .downloads import item_download, pack_download
 from .forms import NewPackForm, PackDetailsForm, PackItemForm
+from .gallery import GALLERY_SORTS, filter_public_packs, gallery_type_choices
 from .manifest import build_manifest, credit_line, is_cc0, manifest_item
 from .models import Pack, PackItem
 from .services import (
@@ -39,15 +40,46 @@ from .services import (
 )
 
 
-class HomeView(TemplateView):
-    template_name = "packs/home.html"
-    extra_context = {"active_nav": "home"}
-
-
 def _wants_fragment(request) -> bool:
     """An HTMX request that swaps in a fragment (not boosted navigation or Back)."""
     htmx = request.htmx
     return bool(htmx) and not htmx.boosted and not htmx.history_restore_request
+
+
+class HomeView(TemplateView):
+    """The main page, open to everyone: what the Toolbox does (the four steps,
+    with Sign up and Sign in, for visitors only) and the public gallery.
+
+    The gallery's search, type, sort and page come from the query string,
+    through filter_public_packs(), which lists public packs only. The
+    gallery's HTMX requests get only the results, with the tidy URL pushed,
+    as the library does; any other request gets the whole page in the same state.
+    """
+
+    template_name = "packs/home.html"
+    results_template_name = "packs/partials/gallery_results.html"
+    # The side panel starts collapsed here (PRD); base.html and shell.js read it,
+    # and every other page keeps the member's own choice.
+    extra_context = {"active_nav": "home", "panel_start": "collapsed"}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        gallery = filter_public_packs(self.request.GET)
+        context.update(
+            gallery=gallery,
+            gallery_params=gallery.params,
+            gallery_sorts=list(GALLERY_SORTS.items()),  # a "items" key hides dict.items()
+            gallery_types=gallery_type_choices(),
+            gallery_empty=not (gallery.page.paginator.count or Pack.objects.public().exists()),
+        )
+        return context
+
+    def get(self, request, *args, **kwargs):
+        context = self.get_context_data(**kwargs)
+        if _wants_fragment(request):
+            response = render(request, self.results_template_name, context)
+            return push_url(response, context["gallery"].url)
+        return self.render_to_response(context)
 
 
 class PacksPageMixin(LoginRequiredMixin):

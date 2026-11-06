@@ -1,5 +1,5 @@
 {% load static django_htmx shell_tags %}<!doctype html>
-<html lang="en" data-theme="axcenity" data-scheme-choice="{{ theme_choice }}"{% if theme_choice != "system" %} data-scheme="{{ theme_choice }}"{% endif %}
+<html lang="en" data-theme="axcenity" data-scheme-choice="{{ theme_choice }}"{% if theme_choice != "system" %} data-scheme="{{ theme_choice }}"{% endif %}{% if panel_start %} data-panel-start="{{ panel_start }}"{% endif %}
       style="--mark-url: url('{% static 'brand/mark-white.png' %}'); --word-url: url('{% static 'brand/wordmark-white.png' %}');">
 <head>
   <meta charset="utf-8">
@@ -29,9 +29,11 @@
       if (query.addEventListener) query.addEventListener("change", apply);
       window.axScheme = { apply: apply };
     })();
-    // Apply the saved side-panel state before first paint so it never flashes.
+    // Apply the side-panel state before first paint so it never flashes: the
+    // page's own start (data-panel-start: the main page starts collapsed), else
+    // the member's saved choice, else open (collapsed on a phone).
     (function () {
-      var state = localStorage.getItem("ax-panel");
+      var state = document.documentElement.dataset.panelStart || localStorage.getItem("ax-panel");
       if (!state) state = matchMedia("(max-width: 767px)").matches ? "collapsed" : "open";
       document.documentElement.dataset.panel = state;
     })();
@@ -75,7 +77,7 @@
 <body class="bg-app text-fg" hx-boost="true">
 {# The CSRF header lives on #app, not <body>: a boosted swap replaces #app but keeps <body>, #}
 {# and Django rotates the token at sign-in, so the header must come from the newest page.   #}
-<div id="app" class="h-screen flex flex-col" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<div id="app" class="h-screen flex flex-col" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'{% if panel_start %} data-panel-start="{{ panel_start }}"{% endif %}>
 
   {# ---------- Title bar: every item is a square h-8 chip, so they share one centre line ---------- #}
   {# Text chips marked chip-swap trade their label for an icon on hover.                        #}

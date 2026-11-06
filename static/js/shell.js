@@ -17,6 +17,22 @@
     if (tip) tip.textContent = open ? "Collapse panel" : "Expand panel";
   }
 
+  // A page may ask for the panel to start collapsed (the main page does, per the
+  // PRD): <html data-panel-start> on a full load (read by base.html's head
+  // script) and #app[data-panel-start] after a boosted swap. Other pages go back
+  // to the member's own choice. The toggle still works, and saves that choice.
+  function savedPanel() {
+    var state = localStorage.getItem("ax-panel");
+    if (state) return state;
+    return matchMedia("(max-width: 767px)").matches ? "collapsed" : "open";
+  }
+
+  function applyPanelStart() {
+    var app = document.getElementById("app");
+    var start = app && app.dataset.panelStart;
+    root.dataset.panel = start || savedPanel();
+  }
+
   document.addEventListener("click", function (event) {
     if (!event.target.closest("#panel-toggle")) return;
     root.dataset.panel = root.dataset.panel === "collapsed" ? "open" : "collapsed";
@@ -208,6 +224,7 @@
   document.addEventListener("htmx:afterSwap", function (event) {
     if (event.detail.boosted) {
       armHoverGate();
+      applyPanelStart();
       syncPanel();
     }
   });

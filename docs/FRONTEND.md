@@ -81,6 +81,8 @@ It's a throwaway prototype, so take its look, not its code.
   - the same two icons on each item in the pack builder (Phase 7) and on
     a pack's page (Phase 8), and on each row of Add from my library
     (2026-11-05)
+  - each gallery card's mosaic tiles on the main page: the asset's type
+    icon under its thumbnail (Phase 9)
 
   `test_shell.py` keeps them out of the chrome on every page, out of every
   other page's own content, and on library cards and pack items to those
@@ -982,14 +984,62 @@ open pack current. With none: "The packs you create are listed here."
     - Every Attribution page is a centred column (`.attribution`, 64 rem,
       `margin-inline: auto`).
 
-## Home hero
+## Main page
 
-`packs/home.html` puts a `#hero-search` form directly below the
-description. It's a square, 56 px bar that sends `q` to `catalog:discover`,
-whose search arrives in Phase 2a. Its Search button is the page's only
-`btn-primary`. Under it, Browse Discover and Open your library (members)
-or Sign up and Sign in (visitors) are secondary `.btn-quiet` buttons:
-outlined, square, and inverted on hover.
+`packs/home.html` is a showcase surface. From the top:
+
+- **Hero:** the header, then `#hero-search` directly below the
+  description: a square, 56 px bar that sends `q` to `catalog:discover`. Its
+  Search button is the page's only `btn-primary`. Under it are secondary
+  `.btn-quiet` buttons (outlined, square, inverted on hover): Browse
+  Discover and Open your library for members, or Sign up (`#home-signup`)
+  and Sign in (`#home-signin`) for visitors.
+- **How it works** (`#home-steps`, visitors only, Phase 9): "Four steps
+  from search to engine.", then four `.home-step` boxes: 01 Discover, 02
+  Save, 03 Pack and 04 Export. Each has its number in mono, a monochrome
+  icon in a square, a title and one line. Then a note that browsing needs no
+  account. It adds no second primary button; the hero's Sign up and Sign in
+  are the buttons. Members see neither the steps nor any sign-up prompt.
+- **The gallery** (`#gallery`, everyone, Phase 9): "Public packs" and "See
+  what others have built.", then `#gallery-toolbar`, a `.work-toolbar` GET
+  form like the library's. It holds the search (`#gallery-search`, `q`) and
+  two `.gallery-control` selects: Any type or "Containing textures" and so
+  on (`type`), and Newest or Most items (`sort`). The controls sit in the
+  page, not the side panel, because the panel starts collapsed here.
+  - **Swaps:** it `hx-get`s `/` into `#gallery-results` (`outerHTML`,
+    `hx-push-url`), on submit, 300 ms after typing, or on a select's change.
+    The view pushes the tidy URL. Pager links are real URLs with the same
+    swap. Without JavaScript a `<noscript>` Apply submits the form.
+  - **Results** (`packs/partials/gallery_results.html`): "1–12 of N public
+    packs", a `.gallery-grid` of cards, and `#gallery-pager`. Instead, there
+    may be an empty state:
+    - "No public packs yet.", with Go to your packs (members) or Sign up
+      (visitors)
+    - "No public pack matches “q”." or "No public pack holds that type
+      yet.", with Clear filters (`/#gallery`)
+  - **A card** (`packs/partials/gallery_card.html`, `.gallery-card`):
+    - a 2 x 2 `.gallery-mosaic` of the first four items' thumbnails by
+      position. Each `.gallery-tile` is the provider's image over the
+      asset's type icon, square and cover. A short pack gets empty
+      `.is-blank` tiles.
+    - the title (`.pack-card-link`, stretched over the card, to the pack's
+      page)
+    - "By <owner>", the tags (`.pack-card-tags`), and the count by type in
+      mono at the foot
+    - nothing from anyone's library. Hovering inverts the edge, behind the
+      hover gate.
+
+**The side panel starts collapsed here** (PRD), whatever the member chose
+elsewhere:
+
+- `HomeView` sets `panel_start = "collapsed"`, and `base.html` writes it as
+  `data-panel-start` on `<html>` (for the first paint) and on `#app` (for
+  boosted swaps, which replace `#app` but not `<html>`).
+- The head script uses it ahead of `localStorage["ax-panel"]`.
+- After each boosted swap, `shell.js`'s `applyPanelStart()` sets the panel
+  to the arriving page's start, or back to the saved choice, so leaving the
+  main page restores it.
+- The toggle still works on the main page and still saves the choice.
 
 ## Discover
 

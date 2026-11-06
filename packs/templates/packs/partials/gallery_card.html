@@ -1,0 +1,24 @@
+{# One public pack in the gallery (packs.gallery.GalleryCard): a mosaic of its first four #}
+{# items' thumbnails by position (the provider's URLs, never the logo, over each asset's #}
+{# type icon, which takes its type colour because it shows the type; empty tiles fill a  #}
+{# pack with fewer), then the title (its link stretched over the card, to the pack's     #}
+{# page), the owner, the tags and the count by type. Nothing from anyone's library.      #}
+{% with pack=card.pack %}
+<li class="gallery-card" id="gallery-pack-{{ pack.pk }}">
+  <div class="gallery-mosaic" aria-hidden="true">
+    {% for asset in card.mosaic %}{% with tile=asset.tile %}
+      <span class="gallery-tile" data-kind="{{ asset.kind }}">
+        <span class="result-fallback {{ tile.text_class }}">{% include "partials/icon.html" with name=tile.key size=20 %}</span>
+        {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+      </span>
+    {% endwith %}{% endfor %}
+    {% for _ in card.blank_tiles %}<span class="gallery-tile is-blank"></span>{% endfor %}
+  </div>
+  <div class="gallery-card-body">
+    <h3 class="pack-card-title"><a href="{{ pack.get_public_url }}" class="pack-card-link">{{ pack.title }}</a></h3>
+    <p class="gallery-card-owner micro text-fg-muted">By {{ pack.owner.username }}</p>
+    {% with tags=pack.tags.all %}{% if tags %}<p class="pack-card-tags">{% for tag in tags %}<span>{{ tag.name }}</span>{% endfor %}</p>{% endif %}{% endwith %}
+    <p class="gallery-card-summary micro text-fg-secondary">{{ card.summary }}</p>
+  </div>
+</li>
+{% endwith %}

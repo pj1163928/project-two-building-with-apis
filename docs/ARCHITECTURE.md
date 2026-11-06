@@ -14,7 +14,7 @@ phases add.
 | `providers` | API clients for ambientCG, Poly Haven and Openverse (plain Python, not a Django app) | — |
 | `accounts` | Sign-up, sign-in, sign-out, profile, settings, and the API token page | `accounts:` |
 | `catalog` | Discover (its shelves, license filters and drawer) and the library; Asset, Tag and SavedAsset; saving; the library API | `catalog:` |
-| `packs` | Home; Pack and PackItem, the member's packs, the builder and the Add to pack picker; each pack's page, its export and the pack API; the public gallery *(planned)* | `packs:` |
+| `packs` | The main page and its public gallery; Pack and PackItem, the member's packs, the builder and the Add to pack picker; each pack's page, its export and the pack API; the demo data (`seed_demo`) | `packs:` |
 
 `config/urls.py` mounts `accounts.urls` at `/accounts/`, and mounts
 `catalog.urls` and `packs.urls` at the root.
@@ -23,7 +23,7 @@ phases add.
 
 | Name | Path | Access |
 |---|---|---|
-| `packs:home` | `/` | Everyone |
+| `packs:home` | `/?q=&type=&sort=&page=` | Everyone: the main page and the public gallery (public packs only). The gallery's HTMX requests get the results fragment |
 | `catalog:discover` | `/discover/?type=<kind>&q=<query>&license=<key>&commercial=1` | Everyone (`license` repeats; both filters are optional) |
 | `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>&page=<n>&license=&commercial=` | Everyone (an HTMX fragment; `page` is optional, 1 to 20; the filters as on the page) |
 | `catalog:discover_asset` | `/discover/asset/<provider>/<external_id>/` | Everyone (Discover's drawer for HTMX, a page otherwise; never writes) |
@@ -502,6 +502,81 @@ workflows), `packs/forms.py` and `packs/views.py`.
   `PackExportView` (`/packs/<slug>/export/`) serves `manifest_for()` as an
   indented JSON download.
 
+## Main page and gallery
+
+*(Phase 9.)* `packs/gallery.py` and `HomeView` (`packs/views.py`).
+
+- **`filter_public_packs(params)`** returns a `GalleryPage` (one Django
+  `Page` of 12 and the tidied `GalleryParams`), like `filter_library()`. It
+  starts from `Pack.objects.public()`, and every parameter only narrows
+  that, so no query can list a private or unlisted pack. A test runs every
+  kind of query against private and unlisted packs built to match it and to
+  sort first.
+  - `q`: every word must be in the title or a tag, ignoring case. A word is
+    tidied by `normalize_tag()` before it's matched against tags, and tags
+    match through a subquery, so a pack is listed once.
+  - `type`: one of the four kinds. It keeps packs holding at least one item
+    of that kind.
+  - `sort`: `newest` (the default, `created_at`; there's no "made public at")
+    or `items` (`item_count`, then newest). Both end on newest, then id.
+  - `clean_gallery_params()` never fails. An unknown type is no filter, an
+    unknown sort is `newest`, and a bad page is 1. A page past the end is
+    the last page. `GalleryParams.url()` is the tidy URL, defaults left out,
+    so the whole gallery is plain `/`.
+- **Cards:** each pack is prefetched with its owner, tags and
+  `gallery_items` (every item in position order, with its Asset), so a
+  page of cards costs a fixed number of queries. `gallery_card(pack)` gives
+  a `GalleryCard`:
+  - `mosaic`: the Assets of the first 4 items by position
+  - `blanks`: how many empty tiles fill the rest
+  - `summary`: `type_summary()` of every item's kind, for example "3
+    textures · 1 HDRI · 2 sounds". It uses Discover's order, singular or
+    plural, leaves out types with no items, and an empty pack reads "No
+    items yet"
+
+  Nothing comes from anyone's library.
+- **`HomeView`** (everyone) answers the gallery's HTMX requests (not
+  boosted, not a history restore) with `packs/partials/gallery_results.html`
+  and `HX-Push-Url`, as `LibraryView` does. Any other request gets the whole
+  page in the same state. It sets `panel_start = "collapsed"` (see
+  FRONTEND.md, "Main page").
+
+## Demo data
+
+*(Phase 9.)* `packs/demo.py`, two management commands, and the committed
+snapshot `packs/demo_assets.json`.
+
+- **The definitions:**
+  - `DEMO_USERS`: `demo_mira`, `demo_otto` and `demo_juno`, all with the
+    password `DEMO_PASSWORD` (`toolbox-demo`, obviously a demo value; the
+    README lists it).
+  - `DEMO_PACKS`: six themed public packs and one private pack, each item
+    naming its asset and an optional import path.
+  - `REVIEWS` and `REVIEW_CYCLE`: the reviews of each member's pack
+    entries, so every status and a range of ratings appear.
+  - `DEMO_SAVES`: more entries outside each member's own packs, so several
+    members rate the same assets.
+  - `demo_entries(username)` and `demo_asset_refs()` derive each library
+    and the 43 assets.
+- **`capture_demo_assets`** (run once, by hand, online) calls each
+  provider's `fetch_record()` for every demo asset, spacing out Openverse's
+  calls. It writes the snapshot (`write_snapshot()`, each `AssetRecord` as
+  JSON, `record_to_json()`) only if every fetch worked.
+- **`seed_demo`** calls `seed_demo()`, in one transaction:
+  1. It checks the snapshot holds every asset the demo needs. A gap is a
+     `ValueError` before anything is written.
+  2. It gets or creates the users and resets their passwords.
+  3. It stores each Asset with `Asset.objects.from_record()`.
+  4. It saves each entry with `save_to_library()`. The Asset is stored, so
+     no provider is called, and the first status is recorded as on the
+     website.
+  5. It finds each pack by owner and title (or `create_pack()`), restores
+     its description, tags and visibility, then `add_to_pack()`s each item
+     and sets its position and import path.
+
+  A second run creates nothing, which a row-count test over every table
+  checks. Entries a member already has are left as they are.
+
 ## Downloads
 
 *(User request, 2026-11-05.)* `packs/downloads.py`. The Toolbox never
@@ -719,13 +794,14 @@ Every rule has a test (see [TESTING.md](TESTING.md)).
 ## Shared functions
 
 Each of these has exactly one implementation, used by both the pages and
-the API. all but `filter_public_packs()` are built:
+the API. All are built:
 
 | Function | Purpose |
 |---|---|
 | `normalize_tag()` | Built (Phase 3), `catalog/tags.py`. The one way to tidy tag names: lowercase, trimmed, single spaces; number-only tags dropped; a plural "s" stripped from the last word unless it ends in "ss". Returns `None` for a dropped tag |
 | `filter_library(user, params)` | Built (Phase 4), `catalog/library.py`. Library search (title, tags, notes), filters (type, provider, status, tags, minimum rating), sorts and pages of 12, for the caller's own entries only (see "Library and saving") |
-| `filter_public_packs(params)` | *(planned)* Gallery search, type filter, sorts, pages of 12 |
+| `filter_public_packs(params)` | Built (Phase 9), `packs/gallery.py`. The gallery's search (title and tags), type filter, sorts (newest, most items) and pages of 12, over public packs only (see "Main page and gallery") |
+| `seed_demo(snapshot=None)` | Built (Phase 9), `packs/demo.py`. The demo members, libraries and packs from the committed snapshot, offline and safe to run again (see "Demo data") |
 | `pack_credits(items)` | Built (user request, 2026-11-05), `packs/credits.py`. A pack's licenses, required and optional credits and warnings, and the formal notice (see "Licenses and credits") |
 | `license_info(name)` | Built (user request, 2026-11-05), `catalog/licenses.py`. What a license allows and asks |
 | `add_to_pack(pack, saved_asset)` | Built (Phase 7), `packs/services.py`. Adds an item at the end on the default variant, once per entry, and refuses another member's entry (see "Packs") |

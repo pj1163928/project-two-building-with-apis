@@ -1,0 +1,34 @@
+{# The gallery's results: the main page includes it, and the gallery's HTMX requests get   #}
+{# it alone, swapped over itself (outerHTML). One page of pack cards with the count and    #}
+{# the pager, or an empty state that says what to do next. Public packs only.             #}
+{% url 'packs:home' as home_url %}
+<div id="gallery-results" class="space-y-5">
+  {% if gallery_empty %}
+    {% if user.is_authenticated %}{% url 'packs:list' as packs_url %}
+      {% include "partials/empty_state.html" with title="No public packs yet." body="Make one of your packs public from its builder and it will be the first here." link_url=packs_url link_text="Go to your packs" %}
+    {% else %}{% url 'accounts:signup' as signup_url %}
+      {% include "partials/empty_state.html" with title="No public packs yet." body="Sign up to build a pack and share it here." link_url=signup_url link_text="Sign up" %}
+    {% endif %}
+  {% elif not gallery.page.object_list %}
+    {# Clear filters is a plain (boosted) link, so the search box and selects reset too. #}
+    {% if gallery_params.q %}
+      {% include "partials/empty_state.html" with title="No public pack matches “"|add:gallery_params.q|add:"”." body="Try other words, or clear the search to see every public pack." link_url=home_url|add:"#gallery" link_text="Clear filters" %}
+    {% else %}
+      {% include "partials/empty_state.html" with title="No public pack holds that type yet." body="Clear the filter to see every public pack." link_url=home_url|add:"#gallery" link_text="Clear filters" %}
+    {% endif %}
+  {% else %}
+    {% with page=gallery.page %}
+    <p id="gallery-count" class="micro text-fg-muted">{{ page.start_index }}–{{ page.end_index }} of {{ page.paginator.count }} public pack{{ page.paginator.count|pluralize }}</p>
+    <ul class="gallery-grid" aria-label="Public packs">
+      {% for card in gallery.cards %}{% include "packs/partials/gallery_card.html" %}{% endfor %}
+    </ul>
+    {% if page.has_other_pages %}
+      <nav id="gallery-pager" class="library-pager" aria-label="Gallery pages">
+        {% if gallery.previous_url %}<a href="{{ gallery.previous_url }}" hx-get="{{ gallery.previous_url }}" hx-target="#gallery-results" hx-swap="outerHTML show:#gallery-toolbar:top" hx-push-url="true" rel="prev" class="btn btn-quiet btn-sm">Previous</a>{% else %}<span class="btn btn-quiet btn-sm btn-disabled" aria-disabled="true">Previous</span>{% endif %}
+        <span class="micro text-fg-secondary">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        {% if gallery.next_url %}<a href="{{ gallery.next_url }}" hx-get="{{ gallery.next_url }}" hx-target="#gallery-results" hx-swap="outerHTML show:#gallery-toolbar:top" hx-push-url="true" rel="next" class="btn btn-quiet btn-sm">Next</a>{% else %}<span class="btn btn-quiet btn-sm btn-disabled" aria-disabled="true">Next</span>{% endif %}
+      </nav>
+    {% endif %}
+    {% endwith %}
+  {% endif %}
+</div>
