@@ -65,6 +65,7 @@ PAGE_PASTELS = {
     "packs": {"#9BF03B", "#2FC8FF", "#C15CFF"},
     "account": {"#FF5C8A", "#8F5CFF", "#3EE6E0"},
     "settings": {"#4DE1FF", "#FF7AD9", "#B8FF4D"},
+    "attribution": {"#FFE14D", "#FF4D6D", "#4DFFB8"},
 }
 ALL_PASTELS = set().union(*PAGE_PASTELS.values())
 ALLOWED = (

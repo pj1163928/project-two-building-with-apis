@@ -85,7 +85,7 @@ from django.urls import reverse
 
 pytestmark = pytest.mark.django_db
 
-PUBLIC_PAGES = ["packs:home", "catalog:discover"]
+PUBLIC_PAGES = ["packs:home", "catalog:discover", "packs:attribution"]
 MEMBERS_ONLY_PAGES = [
     "catalog:library",
     "packs:list",
@@ -93,6 +93,8 @@ MEMBERS_ONLY_PAGES = [
     "accounts:profile",
     "accounts:settings",
     "accounts:token",
+    "packs:attribution_packs",
+    "packs:attribution_assets",
 ]
 
 
@@ -654,8 +656,11 @@ def _pack_writes(pack, entry):
         (reverse("packs:add_item", args=[pack.pk]), {"entry": entry.pk}),
         (reverse("packs:item_update", args=[pack.pk, item.pk]), {"import_path": "changed/"}),
         (reverse("packs:item_move", args=[pack.pk, item.pk]), {"direction": "down"}),
+        (reverse("packs:items_reorder", args=[pack.pk]), {"order": str(item.pk)}),
+        (reverse("packs:items_sort", args=[pack.pk]), {"sort": "title"}),
         (reverse("packs:item_remove", args=[pack.pk, item.pk]), {}),
         (reverse("packs:picker_add", args=[pack.pk]), {"entry": entry.pk}),
+        (reverse("packs:rotate_link", args=[pack.pk]), {}),
         (reverse("packs:delete", args=[pack.pk]), {}),
     ]
 
@@ -667,7 +672,7 @@ def _pack_state(pack):
     if pack is None:
         return None
     items = list(pack.items.values_list("saved_asset", "import_path", "position"))
-    return (pack.title, pack.is_public, items)
+    return (pack.title, pack.visibility, pack.share_token, items)
 
 
 def test_a_visitor_is_sent_to_sign_in_from_every_pack_url_and_nothing_changes(

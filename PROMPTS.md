@@ -28,6 +28,228 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-05 — Pack builder polish, pack and item downloads, credits and the Attribution center
+
+### Prompts
+
+1. Alright a few thinkgs I want to change the current pack builder is ok but
+   I do want to make it a little better. In the add from library section I
+   want to make it by default not show items taht I have already added. Also
+   there is no arrow for me to view additional items. I would also like to
+   see a thumbnail image view of the asset to let me get a visual on what I
+   might be adding. For the pack itself I want to be able to downloa the raw
+   files as well as the import manifest. I would also like some more
+   information on the credits essentially what attribution is required and
+   how to gain the attribution requiements for the specifc licenses as well
+   as optional credits if desired. Additionally I think it would be cool if I
+   can optionally download one asset. Next I would like to be able to drag
+   and drop items as well as auto sort them. The variant dropdown menu is
+   also not formatted in css. Please give site viewers a idea of what the
+   import path means. You can also create a new tab for attribution center
+   giving user an idea of hat each license type is and means and what
+   licenses are on a specifc asset or what licenses are active on a pack and
+   how to address them.
+2. Ok for the attribution center can you seperate the pages based on guide
+   and individaul attribution for each pack or asset. Also for the copy and
+   paste section I would like to make it more formal and infomative to all
+   viewers dictating specifically how they can and can not use it. For the
+   lookup section I would also like it to have filters to license types and
+   credit requirements.
+3. Ok for the licenses I feel like it would be better to list them on row at
+   a time also the license guide page and other attribution pages are not
+   centered accross the page with their content. I also think some
+   iconography would be nice here with some visual guides. For the actual
+   packs I would like them to show license compatability when they can not
+   be used for the project commericial personal or internal use. Essentially
+   stating that this pack may not be usable due to these reasons edit the
+   pack or contact the owner before using.
+4. Go ahead and append this session to PROMPTS.md
+
+### Summary
+
+- **Outcome:** the builder, the pack page and a new Attribution center, built
+  on top of the still-uncommitted Phase 8 polish. Recorded as a second Phase 8
+  polish section in the plan (with a third and fourth request below it) and as
+  PRD stories 107–119. 1,024 tests pass at the end (976 after the first
+  request, 1,001 after the second); `ruff check` and `ruff format --check` are
+  clean. Nothing was committed.
+  - **Builder:** Add from my library hides what's already in the pack (a
+    checkbox shows it again, and the hidden count is said), pages 12 at a
+    time with Previous/Next arrows, and shows each asset's thumbnail with a
+    bigger preview on hover. Items drag by a grip (`reorder_items()`; a stale
+    order is a 400 that changes nothing) and auto sort by type, title,
+    provider or license (`sort_items()`). The variant dropdown is styled
+    (`.ax-select`) and shows each variant's file count and size.
+  - **Downloads:** Download files zips the whole pack in the browser, each
+    file under its item's import path, with CREDITS.txt and the manifest; each
+    item can be downloaded alone. The Toolbox only lists the providers' URLs
+    (`packs/downloads.py`, `packs:files`), so the PRD's Out of Scope holds.
+  - **Import paths:** a "What's an import path?" explainer with an example
+    project tree, and a hint under each item's field.
+  - **Licenses and credits:** `catalog/licenses.py` reads every license as the
+    providers write it and says what it allows; `packs/credits.py` groups a
+    pack's items by license, with required credits equal to the manifest's
+    (the manifest itself is unchanged).
+  - **Attribution center** (a new sidebar tab), split by the second prompt
+    into the license guide (everyone), pack attribution (a page per pack, on
+    the pack page's reader rule, by share link for unlisted packs) and asset
+    attribution (the member's library, filtered by license type and credit
+    rule, with a page per asset).
+  - **The notice:** a formal Attribution and License Notice (who owns the
+    assets, required attribution, each license's You may / You must / You may
+    not, permitted uses, restrictions, optional acknowledgements, a
+    disclaimer). It's the CREDITS.txt in every download and the text to copy,
+    with a short credit-lines version beside it.
+  - **Third prompt:** one license per row, the Attribution pages centred,
+    license symbols with a legend and a "Can I use it?" verdict (commercial,
+    personal, internal), and each pack's license compatibility, with a
+    warning that tells the owner to edit the pack and anyone else to contact
+    the owner. It's on the pack page, the pack's attribution and the builder.
+- **Deviations:** no recommendation was overridden, and no questions were
+  asked. The agent chose these defaults and reported them for review: the
+  Public Domain Mark is "credit recommended" (to match the manifest, which
+  credits everything that isn't CC0), and the use rules (non-commercial
+  blocks commercial use and limits internal use to private testing; share-
+  alike and no-derivatives add conditions; an unknown license blocks both
+  public uses). The second and third prompts reshaped the Attribution center
+  the first one built.
+- **Sideways:**
+  - The Bash tool's wrapper broke on quotes in several heredoc edit scripts,
+    so the edits moved to script files in the scratchpad. One of those failed
+    with nothing written, and was redone with the Edit tool.
+  - A duplicate `sort` icon was added and removed at once.
+  - Several new tests were wrong at first and were fixed, not the code: a
+    sound's default variant is its MP3, not its OGG; pages HTML-escape
+    quotes; the notice's wrapping splits phrases; a pack's attribution page
+    has more use cells than its compatibility box.
+  - Ruff flagged the reused fixtures as redefinitions (F811), so they're bound
+    as module attributes instead of imported.
+  - The read-only pack page test caught a `<textarea>` for the credits text;
+    it became a `<pre>`, and Copy learned to copy an element's text.
+  - The sequential CSRF test ran Remove before the new reorder write, which
+    then got a 400; the write list was reordered.
+  - The notice's "Prepared" date comes from `timezone.localdate()`, and a
+    sample printed 6 November while the session date was 5 November.
+  - Nothing was driven in a real browser: the drag and drop, the zips, the
+    hover preview, the filter chips, the Copy buttons and the new icons were
+    checked only by server-side tests, a JavaScript parse and a Tailwind
+    build.
+
+## 2026-11-05 — Axcenity Toolbox: Phase 8/13, Public pack page, export and pack API
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 8`.
+2. Ok looks good go ahead and make sure to explicitly test that a private
+   pack's export ednpoint returns in a 404 to a signed out visitor and
+   another authenticated user, while still succeeding for the owner.
+3. looks good move to next (approving TDD 1's test).
+4. looks good move to next (approving TDD 2's test, after TDD 1 went green).
+5. looks good move on (approving TDD 3's sentinel test and its mutation
+   check).
+
+### Summary
+
+- **Outcome:** packs can be shared and exported.
+  - Every pack has a page at `/packs/<slug>/`. A public pack's page is open
+    to anyone, signed out included. A private pack's page is a 404 to
+    everyone but its owner. The page is read-only and lists each item's
+    license, credit, variant, files and import path. Only the owner gets
+    Edit in builder.
+  - **Download manifest** saves the PRD's Option A manifest as
+    `<slug>.axcenity-pack.json`. The API's export returns the same
+    document.
+  - The read-only pack API: `/api/packs/` (public packs plus your own, and
+    `?mine=1`), `/api/packs/<id>/` and `/api/packs/<id>/export/`. Writes are
+    a 405.
+  - The builder, the pack cards and "Featured in public packs" now link to
+    the pack page.
+  - 877 tests pass (820 before). `ruff check` and `ruff format --check` are
+    clean.
+- **Changes:**
+  - `packs/models.py`: `Pack.objects.visible_to()` (the one rule for who may
+    read a pack), `Pack.get_public_url()`, and `RESERVED_SLUGS` (`new` and
+    `picker`) in `free_slug()`.
+  - `packs/manifest.py` (new): `build_manifest()` with `chosen_variant()`,
+    `manifest_item()`, `is_cc0()` and `credit_line()`.
+  - `packs/views.py`: `PackPageView`, `PackExportView` and `manifest_for()`,
+    which the API shares.
+  - `packs/api.py` and `packs/serializers.py` (new): the pack API and its
+    public serializers, which reuse `AssetSerializer`.
+  - `packs/urls.py`: `packs:public`, `packs:export`, `packs:api_packs`,
+    `packs:api_pack` and `packs:api_pack_export`.
+  - `packs/templates/packs/pack_page.html` (new). `builder.html` gains View
+    pack page, `pack_list.html` a View page link on each card, and
+    `catalog/partials/entry_related.html` links each featured pack.
+  - `styles/source.css`: the read-only item rows (`.pack-item-read`,
+    `.pack-item-facts`), `.pack-page` and `.pack-card-page`.
+  - Tests:
+    - new: `tests/test_pack_public.py`, `tests/test_api_packs.py` and the
+      golden file `tests/golden/pack_manifest.json`
+    - `tests/test_shell.py`: type colour on the pack page, signed in and
+      out
+  - Docs:
+    - `ARCHITECTURE.md`: the URLs, `visible_to()`, the pack page, and new
+      "Export manifest" and "Pack API" sections
+    - `FRONTEND.md`: the pack page and the new links
+    - `TESTING.md`: the new files
+  - Plan: Phase 8 ticked, with "Built as" notes and notes for Phase 9.
+- **TDD:** three behaviours.
+  1. `visible_to()` returns public packs plus the caller's own, and public
+     packs only for a visitor. It was red on an assertion against a stub
+     that returned every pack.
+  2. `build_manifest()` matches a hand-written golden file field for field,
+     with `exported_at` frozen. The test pack has five items, arranged out
+     of creation order:
+     - a two-file 2K JPG
+     - a `null` size
+     - MP3 picked over OGG
+     - a WAV-only sound
+     - an asset with no variants
+     - a blank and a custom import path
+     - two items sharing one credit
+     - a built credit line
+     - CC0 left out of the credits
+     It was red against a stub that returned `{}`.
+  3. The sentinel: the owner's notes, rating and status, and another
+     member's rating, never appear on the pack page, in either export, in
+     the API list or in the API detail. It covers a visitor, the owner, and
+     another member by token and by session. It was never red: the page
+     and API had to exist before it could run, and they were built safe.
+     Instead, four planted leaks (one at a time, each restored) proved it
+     fails when it should.
+- **Decisions:**
+  - `visible_to()` is the one reader rule. `owned_by()` still decides who
+    may change a pack.
+  - The manifest looks up `preferred_variant` by its exact label. An unknown
+    label falls back to `default_variant()`. An asset with no variants
+    exports `variant: null`, `files: []` and `total_size: null`.
+  - CC0 means the license starts with "CC0". A non-CC0 item with no
+    attribution is credited as `"<title>" by <author>, <license>`. Each
+    credit line appears once, in item order.
+  - `exported_at` is in UTC to the second. Pack tags are listed A–Z, and
+    `source_url` is the absolute URL of the pack's page.
+  - The API list pages by 12, in the library API's shape. A signed-out
+    `?mine=1` is a 401.
+  - `new` and `picker` are reserved slugs, so a pack's page can never hide
+    behind `/packs/new/` or `/packs/picker/`.
+  - The pack page shows no community rating. A visitor's side panel gets
+    "Shared pack" with Sign up. The download link isn't boosted, because a
+    boosted link would swap the JSON into the page.
+- **Deviations:** at the user's request, one named test checks both export
+  endpoints (the website and the API): a private pack's export is a 404 for
+  a signed-out visitor and for another member, and works for the owner.
+- **Sideways:**
+  - The sentinel's first version missed a leak of the notes on the page.
+    The sentinel text held an apostrophe, which Django escapes, so the
+    search never matched. The mutation check caught it. The sentinel is
+    now plain characters, and the test also searches for the escaped form.
+  - A Python heredoc mis-encoded `·` on Windows, so one replacement in a
+    test silently didn't apply. It was redone with the Edit tool, and the
+    changed files were checked for mangled characters.
+  - `_text()` in the page tests turns a non-breaking space into a plain
+    one, so the size assertion was corrected to match (a mechanical fix).
+
 ## 2026-11-05 — Lava-lamp drops, versioned static files, centred Account pages
 
 ### Prompts

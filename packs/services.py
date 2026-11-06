@@ -4,11 +4,14 @@ Every write here runs in one transaction, so a failure part-way leaves no
 half-made item behind.
 """
 
+from collections.abc import Sequence
+
 from django.db import transaction
 from django.db.models import Max
 
 from catalog.library import save_to_library
 from catalog.models import SavedAsset
+from providers import KINDS
 
 from .models import Pack, PackItem, default_variant
 
@@ -64,6 +67,78 @@ def move_item(item: PackItem, step: int) -> bool:
                 other.position = position
                 other.save(update_fields=["position"])
     return True
+
+
+# The builder's auto sorts, by their form value, each with its label. Every
+# sort ends on the title and then the item's id, so equal items keep a stable
+# order.
+ITEM_SORTS = {
+    "type": "Type",
+    "title": "Title A–Z",
+    "provider": "Provider",
+    "license": "License",
+}
+
+
+class ReorderError(ValueError):
+    """A new order must name every item of the pack exactly once."""
+
+
+def _rewrite_positions(items: Sequence[PackItem]) -> None:
+    """Save positions 0, 1, 2… in the given order, touching only items that moved."""
+    for position, item in enumerate(items):
+        if item.position != position:
+            item.position = position
+            item.save(update_fields=["position"])
+
+
+def reorder_items(pack: Pack, item_ids: Sequence[int]) -> None:
+    """Put the pack's items in the order of `item_ids` (drag and drop).
+
+    `item_ids` must hold every item of the pack exactly once, so a stale
+    page (an item added or removed in another tab) can't lose or duplicate
+    one: it raises ReorderError and writes nothing. Positions are rewritten
+    0, 1, 2… in one transaction.
+    """
+    with transaction.atomic():
+        items = {item.pk: item for item in pack.items.select_for_update()}
+        if len(item_ids) != len(items) or set(item_ids) != set(items):
+            raise ReorderError("That order doesn't match the pack's items. Reload and try again.")
+        _rewrite_positions([items[pk] for pk in item_ids])
+
+
+def _sort_key(sort: str):
+    kind_rank = {kind: index for index, kind in enumerate(KINDS)}
+
+    def key(item: PackItem):
+        asset = item.asset
+        title = (asset.title.casefold(), item.pk)
+        if sort == "type":
+            return (kind_rank.get(asset.kind, len(kind_rank)), *title)
+        if sort == "provider":
+            return (asset.get_provider_display().casefold(), *title)
+        if sort == "license":
+            info = asset.license_info
+            # Freest first: what needs no credit, then by the license's name.
+            return (info.needs_credit, asset.license.casefold(), *title)
+        return title
+
+    return key
+
+
+def sort_items(pack: Pack, sort: str) -> None:
+    """Auto sort the pack's items by one of ITEM_SORTS, in one transaction.
+
+    "type" follows the Discover order (textures, HDRIs, models, sounds),
+    "provider" and "title" go A–Z, and "license" puts what needs no credit
+    first. Ties fall back to the title, then the item's id. Raises
+    ValueError for an unknown sort, writing nothing.
+    """
+    if sort not in ITEM_SORTS:
+        raise ValueError(f"Unknown sort: {sort!r}")
+    with transaction.atomic():
+        items = list(pack.items.select_for_update().select_related("saved_asset__asset"))
+        _rewrite_positions(sorted(items, key=_sort_key(sort)))
 
 
 def add_from_provider(pack: Pack, provider_key: str, external_id: str) -> tuple[PackItem, bool]:

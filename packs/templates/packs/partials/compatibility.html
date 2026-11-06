@@ -1,0 +1,45 @@
+{# A pack's license compatibility (credits.compatibility): can it be used for commercial, #}
+{# personal and internal projects? When an item's license rules a use out, a warning     #}
+{# says the pack may not be usable that way and why, then what to do: the owner can edit #}
+{# the pack (is_owner); anyone else should contact the owner first. Then the three uses, #}
+{# each with its verdict and the items that limit it. Monochrome.                        #}
+<section id="pack-compatibility" class="builder-section compat" aria-labelledby="pack-compat-title">
+  <div class="credits-head">
+    <h2 id="pack-compat-title" class="micro text-fg-secondary">License compatibility</h2>
+    <a href="{% url 'packs:attribution' %}#attribution-glance" class="entry-link text-xs">What the uses mean</a>
+  </div>
+  {% with blocked=credits.blocked_uses %}
+    {% if blocked %}
+      <div class="compat-warning" role="note">
+        {% include "partials/icon.html" with name="alert" size=18 %}
+        <div class="space-y-1.5">
+          <p class="compat-warning-title">This pack may not be usable for {% for check in blocked %}{{ check.label|lower }}{% if not forloop.last %}{% if forloop.revcounter == 2 %} or {% else %}, {% endif %}{% endif %}{% endfor %} use.</p>
+          <ul class="compat-reasons">
+            {% for check in blocked %}{% for reason in check.reasons %}<li><span class="micro">{{ check.label }}</span> {{ reason }}</li>{% endfor %}{% endfor %}
+          </ul>
+          {% if is_owner %}
+            <p class="text-sm">You own this pack: <a href="{% url 'packs:builder' pack.pk %}" class="entry-link">edit the pack</a> to remove or replace these items, or keep it to the uses it allows.</p>
+          {% else %}
+            <p class="text-sm">Before using it that way, contact the owner, <strong>{{ pack.owner.get_username }}</strong>, or leave those items out of your project.</p>
+          {% endif %}
+        </div>
+      </div>
+    {% elif credits.groups %}
+      <p class="compat-clear text-sm text-fg-secondary">{% include "partials/icon.html" with name="check" size=14 %}<span>{% if credits.has_conditions %}No license here rules out a use, but some come with conditions, listed below.{% else %}Every item's license allows commercial, personal and internal use.{% endif %}</span></p>
+    {% endif %}
+  {% endwith %}
+  {% if credits.groups %}
+    <ul class="use-grid" aria-label="Can this pack be used?">
+      {% for check in credits.compatibility %}
+        <li class="use-cell" data-status="{{ check.status }}">
+          <span class="use-cell-head">{% include "partials/icon.html" with name=check.icon size=16 %}<span>{{ check.label }}</span><span class="use-status" aria-hidden="true">{% include "partials/icon.html" with name=check.status_icon size=14 %}</span></span>
+          <span class="use-verdict">{{ check.status_label }}</span>
+          <span class="use-note">{{ check.description }}</span>
+          {% if check.reasons %}<ul class="use-reasons">{% for reason in check.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-sm text-fg-weak">Add items and their licenses are checked here.</p>
+  {% endif %}
+</section>

@@ -1,9 +1,12 @@
-{# The public/private switch: two chips that post on change and swap this form for the reply. #}
+{# Who can see the pack: three chips (Private, Unlisted, Public) that post on change and #}
+{# swap this whole block for the reply. While unlisted, the share link sits below them.  #}
 {% url 'packs:visibility' pack.pk as visibility_url %}
-<form id="pack-visibility" class="visibility-switch" method="post" action="{{ visibility_url }}" hx-post="{{ visibility_url }}" hx-trigger="change" hx-target="this" hx-swap="outerHTML transition:false">{% csrf_token %}
-  <fieldset class="flex items-center gap-1.5"><legend class="sr-only">Who can see this pack</legend>
-    <label class="filter-chip"><input type="radio" class="sr-only" name="visibility" value="private"{% if not pack.is_public %} checked{% endif %}><span>Private</span></label>
-    <label class="filter-chip"><input type="radio" class="sr-only" name="visibility" value="public"{% if pack.is_public %} checked{% endif %}><span>Public</span></label>
-  </fieldset>
-  <span class="text-xs text-fg-weak" role="status">{% if saved %}{% include "partials/icon.html" with name="check" size=13 %} {% endif %}{% if pack.is_public %}Anyone can view and export it.{% else %}Only you can see it.{% endif %}</span>
-</form>
+<div id="pack-visibility" class="visibility-block">
+  <form class="visibility-switch" method="post" action="{{ visibility_url }}" hx-post="{{ visibility_url }}" hx-trigger="change" hx-target="#pack-visibility" hx-swap="outerHTML transition:false">{% csrf_token %}
+    <fieldset class="flex items-center gap-1.5"><legend class="sr-only">Who can see this pack</legend>
+      {% for value, label in pack.Visibility.choices %}<label class="filter-chip"><input type="radio" class="sr-only" name="visibility" value="{{ value }}"{% if pack.visibility == value %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}
+    </fieldset>
+    <span class="text-xs text-fg-weak" role="status">{% if saved %}{% include "partials/icon.html" with name="check" size=13 %} {% endif %}{% if pack.is_public %}Anyone can view and export it.{% elif pack.is_unlisted %}Anyone with the link can view and export it. It isn't listed anywhere.{% else %}Only you can see it.{% endif %}</span>
+  </form>
+  {% if pack.is_unlisted %}{% include "packs/partials/share_link.html" %}{% endif %}
+</div>

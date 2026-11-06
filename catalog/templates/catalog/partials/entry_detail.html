@@ -57,7 +57,7 @@
   <section class="entry-section" aria-labelledby="entry-license-title">
     <h3 id="entry-license-title" class="micro text-fg-secondary">License and credit</h3>
     <dl class="entry-facts">
-      <div><dt class="micro">License</dt><dd>{% if asset.license_url %}<a href="{{ asset.license_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ asset.license }}</a>{% else %}{{ asset.license }}{% endif %}</dd></div>
+      <div><dt class="micro">License</dt><dd>{% if asset.license_url %}<a href="{{ asset.license_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ asset.license }}</a>{% else %}{{ asset.license }}{% endif %} <span class="text-fg-muted">· {{ asset.license_info.credit_label }} ·</span> <a href="{% url 'packs:attribution' %}#{{ asset.license_info.anchor }}" class="entry-link text-fg-muted">What it means</a></dd></div>
       {% if asset.attribution %}<div><dt class="micro">Attribution</dt><dd class="entry-attribution">{{ asset.attribution }}</dd></div>{% endif %}
       <div><dt class="micro">Source</dt><dd>{% if asset.source_url %}<a href="{{ asset.source_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">View on {{ asset.get_provider_display }}</a>{% else %}{{ asset.get_provider_display }}{% endif %}</dd></div>
       {% with tags=asset.tags.all %}{% if tags %}<div><dt class="micro">Tags</dt><dd>{{ tags|join:", " }}</dd></div>{% endif %}{% endwith %}

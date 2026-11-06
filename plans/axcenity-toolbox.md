@@ -803,30 +803,183 @@ The public serializer carries only PackItem and Asset fields.
 
 ### Acceptance criteria
 
-- [ ] A golden-file test locks the manifest's shape. It freezes
+- [x] A golden-file test locks the manifest's shape. It freezes
   `exported_at` and compares the whole document field for field.
-- [ ] The manifest:
+- [x] The manifest:
   - lists each item's chosen variant's files with `url`, `filename` and
     `size`, plus `total_size`
   - puts every non-CC0 item's attribution in `credits` exactly once, and
     leaves CC0 items out of `credits`
   - gives a blank import path the `<kind>s/<external_id>/` default
-- [ ] The website download and the API export return the same manifest.
-- [ ] A sentinel test puts known text in the owner's notes and sets a
+- [x] The website download and the API export return the same manifest.
+- [x] A sentinel test puts known text in the owner's notes and sets a
   rating and status. That text and those values never appear in the
   public page, the API detail, the API list or the export.
-- [ ] A non-owner viewing a public pack sees no edit controls.
-- [ ] POST, PUT, PATCH and DELETE on the pack API return 405.
+- [x] A non-owner viewing a public pack sees no edit controls.
+- [x] POST, PUT, PATCH and DELETE on the pack API return 405.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: every pack row of the PRD's
+- [x] Standard gate (see top). Access rules: every pack row of the PRD's
   access table is tested on the website and the API.
   - A private pack's page, detail and export return **404** to signed-out
     visitors and to other members, and work for the owner.
   - A public pack's page, detail and export work for everyone.
   - The API list never includes another member's private packs.
   - `?mine=1` is refused when signed out.
+  - *(User request, 2026-11-05.)* An explicit test: a private pack's export,
+    on the website and the API, is a **404** to a signed-out visitor and to
+    another member, and works for the owner.
+
+> **Built as (2026-11-05):** `Pack.objects.visible_to(user)` is the one
+> reader rule, and `build_manifest()` (`packs/manifest.py`) the one export,
+> through `manifest_for()` for the page's download and the API alike. The
+> website download is `/packs/<slug>/export/` (`<slug>.axcenity-pack.json`).
+> A stored variant label the Asset doesn't list falls back to the default
+> variant; an asset with no variants exports `variant: null`. A non-CC0 item
+> with no attribution is credited as `"<title>" by <author>, <license>`. The
+> API list pages by 12 in the library API's shape. `new` and `picker` are
+> never given as slugs. The builder, the pack cards and "Featured in public
+> packs" link to the pack page. The pack page keeps the community rating off.
+>
+> **For Phase 9:** the gallery's cards can link to `pack.get_public_url()`,
+> and `filter_public_packs()` should start from `Pack.objects.public()`
+> (not `visible_to()`, which adds the member's own private packs). Still open
+> from Phase 7: after Add to pack on Discover saves a result, its Save corner
+> still says Save until the next search.
+
+### Phase 8 polish (2026-11-05, at the user's request)
+
+Added after the phase. The PRD records it as stories 105 and 106, a
+`visibility` field in place of `is_public`, and three rows of the access
+table.
+
+- [x] **Unlisted packs:** a pack is Private, Unlisted or Public (three chips in
+  the builder; `Pack.visibility`, migration `0002` keeps public packs public).
+  Unlisting a pack the first time makes its share link,
+  `/packs/link/<token>/` (128 random bits, `secrets.token_urlsafe`), with its
+  download at `…/export/`. Anyone holding the link can view and export it,
+  signed in or not. The link is kept through later visibility changes.
+- [x] **Never listed:** for everyone but the owner, an unlisted pack is a 404 by
+  slug and id (the pack page, its download, the API detail and export), and
+  the API list, "Featured in public packs" and `Pack.objects.public()` never
+  hold it. The manifest's `source_url` and the API's `page_url` are the share
+  link. Share pages say `X-Robots-Tag: noindex, nofollow`, and the site's
+  `Referrer-Policy: same-origin` keeps the token from leaving in a Referer.
+- [x] **New link:** the builder shows the link with Copy link and New link. New
+  link asks first, then replaces the token (`rotate_share_token()`), so every
+  older link is a 404 at once. Owner only (404 otherwise), POST, CSRF.
+- [x] A private pack's link is a 404, even for the owner; a public pack's link
+  goes to its page. `link` joins the reserved slugs.
+- [x] Standard gate (see top). Access rules: every new row of the PRD's access
+  table, on the website and the API; New link in the Phase 7 pack-write checks
+  (sign-in, 404, CSRF); a sentinel over the share link's page and download.
+
+> **For Phase 9:** the gallery starts from `Pack.objects.public()`, which never
+> holds an unlisted pack. **For Phase 11:** decide whether Copy pack works from
+> an unlisted pack's share link; the PRD says "copy a public pack".
+> **For Phase 12:** the hero's thumbnails come from `public()` packs only.
+
+### Phase 8 polish, second request (2026-11-05, at the user's request)
+
+Added after the phase, out of plan order. The PRD records it as stories
+107–113. See docs/ARCHITECTURE.md ("Packs", "Downloads", "Licenses and
+credits") and docs/FRONTEND.md ("Packs", "Attribution center").
+
+- [x] **Add from my library:** entries already in the pack are hidden by
+  default ("N already in this pack are hidden."), with "Show ones already in
+  this pack" to bring them back marked "In pack". Hidden entries are left out
+  before paging (`filter_library(..., exclude_entries=)`). Previous and Next
+  arrows page through 12 at a time, keeping the page across an Add. Each row
+  has the asset's thumbnail (a bigger preview on hover), type, provider and
+  license.
+- [x] **Drag and drop:** each item has a grip; dropping posts the new order to
+  `packs:items_reorder` (`reorder_items()`, one transaction). An order that
+  doesn't name every item exactly once (a stale page) is a 400 that changes
+  nothing. Move up and Move down stay for the keyboard.
+- [x] **Auto sort:** Type, Title A–Z, Provider or License (no credit needed
+  first), `packs:items_sort` (`sort_items()`, one transaction, ties by title
+  then id).
+- [x] **Variant dropdown styled:** `.ax-select` (no native arrow, the chevron
+  icon, options on the panel colours), each option with its file count and
+  size.
+- [x] **Download files:** the whole pack in one zip, each file under its
+  item's import path, with CREDITS.txt and the manifest at the top; and
+  **Download** for one item (a plain link when it's one file). The Toolbox
+  serves only the providers' URLs (`packs:files`, `packs:shared_files`, the
+  pack page's reader rule); the browser fetches and zips them, as story 97's
+  bundle does, so the PRD's Out of Scope holds. Over 2 GB, or no files, says
+  so instead.
+- [x] **Credits explained:** the pack page groups items by license
+  (`pack_credits()`), each with what it allows, "How to meet it", its items
+  and their credit lines; warnings for non-commercial, no-changes,
+  share-alike and unknown licenses; the text to paste with Copy (the same as
+  CREDITS.txt); and optional thank-you lines for CC0 items. The required
+  lines are exactly the manifest's `credits`; the manifest is unchanged.
+- [x] **Attribution center** (`/attribution/`, a new sidebar tab): every
+  license in plain words (`catalog/licenses.py`), a table at a glance, how to
+  credit and optional credits, for everyone; for members, the licenses in
+  each of their packs and a lookup over their own library. Its own drop
+  colours. The drawer's License links to the license's card.
+- [x] **Import path explained:** "What's an import path?" with an example
+  project tree on the builder and the pack page, and a hint under each
+  item's field.
+- [x] Standard gate (see top). Access rules: reorder and sort join the pack
+  writes (sign-in, 404 for another member's pack, CSRF); a private pack's
+  files are a 404 to anyone but the owner, an unlisted pack's come only
+  through its share link (noindex); an item from another pack is a 404; the
+  files never carry the owner's notes, rating or status; the lookup needs
+  sign-in and lists only the member's own entries, and the center only their
+  own packs.
+
+> **Not checked in a browser this session:** dragging, the zips and the hover
+> preview are covered by the server-side tests and a JavaScript parse, not by
+> driving a real browser. Try them by hand before Phase 9.
+
+**Third request, the same day** (PRD stories 114–116):
+
+- [x] **Separate pages:** the Attribution center is the license guide
+  (`/attribution/`, everyone), Pack attribution (the member's packs) with a
+  page per pack (`/attribution/packs/<slug>/`, the pack page's reader rule,
+  and `/packs/link/<token>/attribution/` by share link), and Asset
+  attribution (the member's library) with a page per asset
+  (`/attribution/assets/<id>/`, own entries only). Views in
+  `packs/attribution.py`. The pack page's credits are now a summary linking
+  to the pack's attribution.
+- [x] **A formal notice:** `PackCredits.notice()`, the Attribution and License
+  Notice: who owns the assets, the required attribution, each license's terms
+  as You may / You must / You may not (`LicenseInfo.permits`, `.requires`,
+  `.prohibits`), the restrictions in force, optional acknowledgements and a
+  disclaimer. It's CREDITS.txt in every download and the text to copy, beside
+  the credit lines alone for a credits screen. Every license card shows the
+  same three lists.
+- [x] **Filters:** Asset attribution filters by license type and credit
+  requirement (chips with counts, both must match, with the search), kept in
+  the address and across pages (`filter_library(licenses=)`,
+  `license_filter()`, `license_choices()`).
+- [x] Standard gate (see top). Access rules: a pack's attribution follows the
+  pack page (a private pack a 404 to anyone else, an unlisted one only by
+  link, noindex), never shows the owner's review, and links to asset pages
+  for the owner only; the pack and asset lists need sign-in and hold only the
+  member's own; another member's asset page is a 404.
+
+**Fourth request, the same day** (PRD stories 117–119):
+
+- [x] **License compatibility:** `LicenseInfo.use_status()` and `.uses` give a
+  verdict (usable, with conditions, not usable) for commercial, personal and
+  internal use; `PackCredits.compatibility` takes the most restrictive per use,
+  with the items that limit it, and `blocked_uses` drives the warning ("This
+  pack may not be usable for commercial use."), which tells the owner to edit
+  the pack and anyone else to contact the owner. On the pack page, the pack's
+  attribution, the builder (rechecked with every change to the list) and the
+  pack attribution list; the notice gains "3. Permitted uses".
+- [x] **Iconography:** a symbol per license element (`SYMBOLS`, `lic-*` icons),
+  a legend, the three use icons, and a check, warning sign or cross for each
+  verdict, always with the words beside it (monochrome).
+- [x] **Layout:** one license per row in the guide, its table showing each
+  use's verdict; every Attribution page centred.
+- [x] Standard gate (see top). Access rules: unchanged; the warning names the
+  owner's username only, as the pack page already does.
 
 ---
 

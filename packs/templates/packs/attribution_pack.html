@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ pack.title }} · Attribution{% endblock %}
+{% block breadcrumb %}{% url 'packs:attribution' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="attribution" icon="license" %}<span class="crumb-sep" aria-hidden="true">/</span>{% include "partials/crumb.html" with href=attribution_url label="pack" icon="pack" current=True %}{% endblock %}
+{% block panel_title %}Attribution{% endblock %}
+{% block side_panel %}{% include "packs/partials/attribution_nav.html" %}{% endblock %}
+
+{# One pack's attribution: who the assets belong to, the restrictions in force, the      #}
+{# notice to copy, then each license with its formal terms and every item's credit, and  #}
+{# the optional acknowledgements. The pack page's reader rule (packs/attribution.py);    #}
+{# only Pack, PackItem and Asset data, never anyone's notes, ratings or statuses.        #}
+{% block content %}
+  <section class="attribution space-y-6">
+    <header class="page-hero space-y-3 max-w-2xl">
+      <div class="micro text-fg-secondary flex items-center gap-2"><i class="mark w-3" aria-hidden="true"></i>Pack attribution</div>
+      <h1 id="attribution-pack-title" class="headline text-[1.75rem] md:text-[2rem] text-fg-strong">{{ pack.title }}</h1>
+      <p class="micro text-fg-muted">Compiled by {{ pack.owner.get_username }} · {{ items|length }} item{{ items|length|pluralize }} · {{ credits.groups|length }} license{{ credits.groups|length|pluralize }}</p>
+      <p class="text-sm leading-relaxed text-fg-secondary">These assets belong to their creators, not to the pack's author or to Axcenity Toolbox. Anyone who uses them must follow each asset's license, set out below.</p>
+    </header>
+
+    <div class="work-toolbar justify-between">
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ page_url }}" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="eye" size=15 %}<span>View pack page</span></a>
+        {% if is_owner %}<a href="{% url 'packs:builder' pack.pk %}" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="pack-add" size=15 %}<span>Edit in builder</span></a>{% endif %}
+      </div>
+      <span class="text-xs text-fg-weak px-1">{% if credits.needing_credit %}{{ credits.needing_credit }} item{{ credits.needing_credit|pluralize }} need{{ credits.needing_credit|pluralize:"s," }} credit.{% elif items %}Every item is CC0: no credit is required.{% else %}This pack is empty.{% endif %}</span>
+    </div>
+
+    {% if items %}{% include "packs/partials/compatibility.html" %}{% endif %}
+
+    {% if credits.warnings %}
+      <section class="builder-section" aria-labelledby="attribution-restrictions-title">
+        <h2 id="attribution-restrictions-title" class="micro text-fg-secondary">Restrictions in force</h2>
+        <ul class="credits-warnings">{% for warning in credits.warnings %}<li>{% include "partials/icon.html" with name="alert" size=14 %}<span>{{ warning }}</span></li>{% endfor %}</ul>
+      </section>
+    {% endif %}
+
+    {% if items %}
+      {% include "packs/partials/notice_copy.html" %}
+
+      <section class="space-y-3" aria-labelledby="attribution-terms-title">
+        <h2 id="attribution-terms-title" class="micro text-fg-secondary">License terms</h2>
+        {% for group in credits.groups %}{% with info=group.info %}
+          <article class="credits-group" aria-labelledby="terms-{{ forloop.counter }}">
+            <header class="credits-group-head">
+              {% include "packs/partials/license_symbols.html" %}
+              <h3 id="terms-{{ forloop.counter }}" class="credits-group-title">{% if group.url %}<a href="{{ group.url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ group.label }}</a>{% else %}{{ group.label }}{% endif %} <span class="text-fg-muted font-normal">· {{ info.title }}</span></h3>
+              <span class="status-chip micro" data-credit="{{ info.credit }}">{{ info.credit_label }}</span>
+              <span class="micro text-fg-muted">{{ group.items|length }} item{{ group.items|length|pluralize }}</span>
+            </header>
+            <p class="text-sm text-fg-secondary">{{ info.summary }}</p>
+            {% include "packs/partials/license_uses.html" %}
+            {% include "packs/partials/license_terms.html" %}
+            <ul class="credits-items" aria-label="Items under {{ group.label }}">
+              {% for item in group.items %}<li><span class="credits-item-title">{{ item.asset.title }}</span><span class="credits-line">{% if group.needs_credit %}{{ item.credit }}{% else %}No credit required{% if item.asset.author %} · by {{ item.asset.author }}{% endif %}{% endif %}</span>{% if is_owner %}<a href="{% url 'packs:attribution_asset' item.saved_asset_id %}" class="entry-link text-xs">Asset attribution</a>{% endif %}</li>{% endfor %}
+            </ul>
+            <details class="credits-how">
+              <summary>How to meet it</summary>
+              <ol>{% for step in info.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+              <p class="text-xs"><a href="{% url 'packs:attribution' %}#{{ info.anchor }}" class="entry-link">More on {{ info.name }}</a>{% if info.deed_url %} · <a href="{{ info.deed_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">The license deed</a>{% endif %}</p>
+            </details>
+          </article>
+        {% endwith %}{% endfor %}
+      </section>
+
+      {% if credits.optional %}
+        <section class="builder-section" aria-labelledby="attribution-optional-title">
+          <h2 id="attribution-optional-title" class="micro text-fg-secondary">Optional acknowledgements</h2>
+          <p class="text-sm text-fg-secondary">These CC0 assets owe nothing. A thank-you to their creators is welcome but not required.</p>
+          <ul class="credits-items">{% for line in credits.optional %}<li><span class="credits-line">{{ line }}</span></li>{% endfor %}</ul>
+        </section>
+      {% endif %}
+    {% else %}
+      {% include "partials/empty_state.html" with title="This pack is empty." body="Its items' licenses and credits will be set out here." %}
+    {% endif %}
+  </section>
+{% endblock %}

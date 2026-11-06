@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}License guide · Attribution center{% endblock %}
+{% block breadcrumb %}{% url 'packs:attribution' as crumb_url %}{% include "partials/crumb.html" with href=crumb_url label="attribution" icon="license" current=True %}{% endblock %}
+{% block panel_title %}Attribution{% endblock %}
+{% block side_panel %}
+  {% include "packs/partials/attribution_nav.html" %}
+  <nav class="border-t border-line mt-3" aria-label="On this page">
+    <div class="h-11 flex items-center pl-5 pr-3"><span class="micro text-fg-secondary">On this page</span></div>
+    <ul class="flex flex-col gap-1 pb-3">
+      <li><a class="panel-row" href="#attribution-symbols"><span class="truncate">Symbols</span></a></li>
+      <li><a class="panel-row" href="#attribution-glance"><span class="truncate">At a glance</span></a></li>
+      {% for info in licenses %}<li><a class="panel-row" href="#{{ info.anchor }}"><span class="truncate">{{ info.name }}</span></a></li>{% endfor %}
+      <li><a class="panel-row" href="#attribution-how"><span class="truncate">How to credit</span></a></li>
+      <li><a class="panel-row" href="#attribution-optional"><span class="truncate">Optional credits</span></a></li>
+    </ul>
+  </nav>
+{% endblock %}
+
+{# The Attribution center's guide, /attribution/: every license an asset can carry, in   #}
+{# plain words (catalog.licenses), for everyone. Each card gives the formal terms (you   #}
+{# may, you must, you may not) and how to meet them. A member's own pack and asset       #}
+{# attribution are separate pages (packs/attribution.py). Monochrome throughout.         #}
+{% block content %}
+  <section class="attribution space-y-8">
+    {% include "partials/page_header.html" with label="Attribution center" heading="License guide" lead="What each license lets you do, what it asks in return, and what it forbids. A plain-language guide, not legal advice: the license itself is what counts." compact=True %}
+
+    {% if user.is_authenticated %}
+      <div class="attribution-links">
+        <a href="{% url 'packs:attribution_packs' %}" class="attribution-link">{% include "partials/icon.html" with name="pack" size=18 %}<span><strong>Pack attribution</strong><span>The licenses in each of your packs, and the notice to ship with them.</span></span></a>
+        <a href="{% url 'packs:attribution_assets' %}" class="attribution-link">{% include "partials/icon.html" with name="library" size=18 %}<span><strong>Asset attribution</strong><span>Any asset in your library, filtered by license and credit.</span></span></a>
+      </div>
+    {% else %}
+      <p class="form-alert attribution-visitor">{% include "partials/icon.html" with name="info" size=14 %}<span><a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="entry-link">Sign in</a> to see the licenses in your packs and look up the assets in your library. Every public pack's attribution is open to all from its page.</span></p>
+    {% endif %}
+
+    <section id="attribution-symbols" class="builder-section" aria-labelledby="attribution-symbols-title">
+      <h2 id="attribution-symbols-title" class="micro text-fg-secondary">Symbols</h2>
+      <p class="text-sm text-fg-secondary">Each license is built from these elements. The same symbols mark every license across the Toolbox.</p>
+      <ul class="symbol-legend">
+        {% for icon, name, meaning in symbols %}<li><span class="license-symbol is-large" aria-hidden="true">{% include "partials/icon.html" with name=icon size=22 %}</span><span><strong>{{ name }}</strong><span>{{ meaning }}</span></span></li>{% endfor %}
+      </ul>
+      <p class="micro text-fg-muted">Uses</p>
+      <ul class="symbol-legend">
+        {% for key, label, description, icon in uses %}<li><span class="license-symbol is-large" aria-hidden="true">{% include "partials/icon.html" with name=icon size=22 %}</span><span><strong>{{ label }}</strong><span>{{ description }}</span></span></li>{% endfor %}
+        <li class="symbol-legend-key"><span class="use-key">{% include "partials/icon.html" with name="check" size=14 %} Usable</span><span class="use-key">{% include "partials/icon.html" with name="alert" size=14 %} With conditions</span><span class="use-key">{% include "partials/icon.html" with name="close" size=14 %} Not usable</span></li>
+      </ul>
+    </section>
+
+    <section id="attribution-glance" class="builder-section" aria-labelledby="attribution-glance-title">
+      <h2 id="attribution-glance-title" class="micro text-fg-secondary">At a glance: can I use it?</h2>
+      <div class="attribution-table-wrap">
+        <table class="attribution-table">
+          <thead><tr><th scope="col">License</th><th scope="col">Credit</th>{% for key, label, description, icon in uses %}<th scope="col"><span class="th-icon">{% include "partials/icon.html" with name=icon size=14 %}{{ label }}</span></th>{% endfor %}<th scope="col">Changes</th><th scope="col">Share alike</th></tr></thead>
+          <tbody>
+            {% for info in licenses %}
+              <tr>
+                <th scope="row"><span class="th-license">{% include "packs/partials/license_symbols.html" %}<a href="#{{ info.anchor }}" class="entry-link">{{ info.name }}</a></span></th>
+                <td>{% if info.credit == "optional" %}Optional{% elif info.credit == "listed" %}Recommended{% else %}Required{% endif %}</td>
+                {% for verdict in info.uses %}<td class="use-td" data-status="{{ verdict.status }}" title="{{ verdict.note }}"><span>{% include "partials/icon.html" with name=verdict.status_icon size=14 %}{{ verdict.status_label }}</span></td>{% endfor %}
+                <td>{% if info.changes %}Yes{% elif info.changes is None %}Unknown{% else %}No{% endif %}</td>
+                <td>{% if info.share_alike %}Yes{% else %}No{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-fg-weak">ambientCG and Poly Haven are all CC0. Openverse sounds come in every license above, so check each one. Hover a verdict for why.</p>
+    </section>
+
+    <section id="attribution-guide" class="space-y-3" aria-labelledby="attribution-guide-title">
+      <h2 id="attribution-guide-title" class="micro text-fg-secondary">The licenses</h2>
+      <div class="license-cards">
+        {% for info in licenses %}
+          <article id="{{ info.anchor }}" class="license-card builder-section" aria-labelledby="{{ info.anchor }}-title">
+            <header class="license-card-head">
+              {% include "packs/partials/license_symbols.html" with large=True %}
+              <div class="min-w-0">
+                <h3 id="{{ info.anchor }}-title" class="credits-group-title">{{ info.name }}</h3>
+                <p class="micro text-fg-muted">{{ info.title }}</p>
+              </div>
+              <span class="status-chip micro" data-credit="{{ info.credit }}">{{ info.credit_label }}</span>
+            </header>
+            <p class="text-sm text-fg-secondary">{{ info.summary }}</p>
+            {% include "packs/partials/license_uses.html" %}
+            {% include "packs/partials/license_terms.html" %}
+            <div class="license-card-foot">
+              <details class="credits-how">
+                <summary>How to meet it</summary>
+                <ol>{% for step in info.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+              </details>
+              {% if info.deed_url %}<a href="{{ info.deed_url }}" target="_blank" rel="noopener noreferrer" class="entry-link text-xs">Read the license deed</a>{% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section id="attribution-how" class="builder-section" aria-labelledby="attribution-how-title">
+      <h2 id="attribution-how-title" class="micro text-fg-secondary">How to credit</h2>
+      <p class="text-sm text-fg-secondary">A good credit names four things: the <strong>title</strong>, the <strong>author</strong>, the <strong>source</strong> (where you found it) and the <strong>license</strong>, linked when you can. Say if you changed it.</p>
+      <pre class="credits-example">"Footsteps, Stones, A.wav" by InspectorJ (freesound.org), CC BY 4.0
+https://creativecommons.org/licenses/by/4.0/ · trimmed and layered</pre>
+      <ul class="attribution-list">
+        <li><strong>Where:</strong> the game's credits screen, its README or a CREDITS.txt beside it, and the store page. Anywhere a player could reasonably find it.</li>
+        <li><strong>The easy way:</strong> each pack's attribution page has a ready Attribution and License Notice to copy, and Download files puts the same text in CREDITS.txt. The manifest carries the credits too, in <code>credits</code>.</li>
+        <li><strong>Openverse's own line:</strong> Openverse writes an attribution for each sound, and the Toolbox uses it as it is.</li>
+      </ul>
+    </section>
+
+    <section id="attribution-optional" class="builder-section" aria-labelledby="attribution-optional-title">
+      <h2 id="attribution-optional-title" class="micro text-fg-secondary">Optional credits</h2>
+      <p class="text-sm text-fg-secondary">CC0 assets owe nothing, so these are up to you. A thank-you helps the people and sites that make free assets possible, and players like to know.</p>
+      <pre class="credits-example">Textures and HDRIs from Poly Haven (polyhaven.com) and ambientCG (ambientcg.com), CC0.
+"Red Brick 03" by Rob Tuytel, from polyhaven.com (CC0)</pre>
+      <p class="text-xs text-fg-weak">Each notice lists a thank-you line for every CC0 asset, under Optional acknowledgements.</p>
+    </section>
+  </section>
+{% endblock %}

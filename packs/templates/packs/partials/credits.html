@@ -1,0 +1,29 @@
+{# A pack page's credits, in brief (packs.credits.pack_credits): how many items need     #}
+{# credit, the restrictions in force, and each license with its credit rule and count,  #}
+{# linking to its card in the guide. The full terms, every item's credit and the notice  #}
+{# to copy are on the pack's attribution page (attribution_url). Monochrome.             #}
+{% url 'packs:attribution' as guide_url %}
+<section id="pack-page-credits" class="builder-section credits" aria-labelledby="pack-credits-title">
+  <div class="credits-head">
+    <h2 id="pack-credits-title" class="micro text-fg-secondary">Credits and licenses</h2>
+    <a href="{{ guide_url }}" class="entry-link text-xs">License guide</a>
+  </div>
+  {% if credits_needed %}
+    <p class="text-sm text-fg-secondary">{{ credits_needed }} item{{ credits_needed|pluralize }} need{{ credits_needed|pluralize:"s," }} credit in your game. The manifest lists each credit once.</p>
+  {% else %}
+    <p class="text-sm text-fg-secondary">Every item is CC0, so nothing needs credit.</p>
+  {% endif %}
+  {% if credits.warnings %}
+    <ul class="credits-warnings" aria-label="Restrictions in force">
+      {% for warning in credits.warnings %}<li>{% include "partials/icon.html" with name="alert" size=14 %}<span>{{ warning }}</span></li>{% endfor %}
+    </ul>
+  {% endif %}
+  {% if credits.groups %}
+    <ul class="credits-summary" aria-label="Licenses in this pack">
+      {% for group in credits.groups %}
+        <li>{% include "packs/partials/license_symbols.html" with info=group.info %}<a href="{{ guide_url }}#{{ group.info.anchor }}" class="license-chip">{{ group.label }} <span class="text-fg-muted">×{{ group.items|length }}</span></a><span class="status-chip micro" data-credit="{{ group.info.credit }}">{{ group.info.credit_label }}</span><span class="text-xs text-fg-secondary">{{ group.info.summary }}</span></li>
+      {% endfor %}
+    </ul>
+    <p><a href="{{ attribution_url }}" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="license" size=15 %}<span>Full attribution and license notice</span></a></p>
+  {% endif %}
+</section>

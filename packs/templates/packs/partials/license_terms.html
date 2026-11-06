@@ -1,0 +1,16 @@
+{# A license's formal terms (`info`, a catalog.licenses.LicenseInfo): what anyone using #}
+{# the asset may do, must do and may not do. The same lists as the notice to copy.    #}
+<div class="license-terms">
+  <div class="license-terms-col" data-terms="permits">
+    <p class="license-terms-head">{% include "partials/icon.html" with name="check" size=13 %}<span>You may</span></p>
+    {% if info.permits %}<ul>{% for term in info.permits %}<li>{{ term }}</li>{% endfor %}</ul>{% else %}<p class="text-fg-weak">Nothing until the license is confirmed.</p>{% endif %}
+  </div>
+  <div class="license-terms-col" data-terms="requires">
+    <p class="license-terms-head">{% include "partials/icon.html" with name="alert" size=13 %}<span>You must</span></p>
+    {% if info.requires %}<ul>{% for term in info.requires %}<li>{{ term }}</li>{% endfor %}</ul>{% else %}<p class="text-fg-weak">Nothing. No conditions apply.</p>{% endif %}
+  </div>
+  <div class="license-terms-col" data-terms="prohibits">
+    <p class="license-terms-head">{% include "partials/icon.html" with name="close" size=13 %}<span>You may not</span></p>
+    <ul>{% for term in info.prohibits %}<li>{{ term }}</li>{% endfor %}</ul>
+  </div>
+</div>

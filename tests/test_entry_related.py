@@ -53,12 +53,10 @@ def test_featured_in_lists_other_members_public_packs_only(member, make_asset, d
     other = django_user_model.objects.create_user("other_member")
     theirs = SavedAsset.objects.create(user=other, asset=entry.asset)
     public = Pack.objects.create_pack(other, "Dungeon Kit")
-    public.is_public = True
-    public.save()
+    public.set_visibility("public")
     private = Pack.objects.create_pack(other, "Secret Kit")
     mine = Pack.objects.create_pack(member, "My Public Kit")
-    mine.is_public = True
-    mine.save()
+    mine.set_visibility("public")
     for pack, saved in ((public, theirs), (private, theirs), (mine, entry)):
         add_to_pack(pack, saved)
     related = entry_related(member, entry)

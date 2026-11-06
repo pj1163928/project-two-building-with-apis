@@ -438,3 +438,13 @@ def test_the_tag_chips_show_the_most_used_and_keep_a_chosen_one_beyond_them():
     assert names == [f"tag {n:02}" for n in range(TAG_CHIP_LIMIT)] + [chosen]
     assert [chip.value for chip in group.chips if chip.checked] == [chosen]
     assert group.chips[0].count == 50
+
+
+def test_excluded_entries_are_left_out_before_paging(member, save):
+    """The pack builder hides what's already in the pack (user request, 2026-11-05)."""
+    entries = [save(title=f"Rock {n:02}", days_ago=n) for n in range(13)]
+    result = filter_library(member, {}, exclude_entries=[entries[0].pk])
+    assert result.page.paginator.count == 12 and result.page.paginator.num_pages == 1
+    assert "Rock 00" not in _titles(result)
+    # With nothing to exclude, it's the plain library.
+    assert filter_library(member, {}, exclude_entries=[]).page.paginator.count == 13

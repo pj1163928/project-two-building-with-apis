@@ -21,6 +21,7 @@ from providers import KINDS, PROVIDERS_BY_KEY
 
 from .discover import KIND_TILES, clean_query, discover_url
 from .files import Bundle
+from .licenses import CREDIT_LABELS, LICENSE_ORDER, LICENSES, license_info, license_key
 from .models import LIBRARY_SORTS, PROVIDER_CHOICES, Asset, SavedAsset, StatusChange, Tag
 from .tags import normalize_tag
 
@@ -369,7 +370,13 @@ def _known(given: list[str], allowed) -> tuple[str, ...]:
     return tuple(value for value in allowed if value in given)
 
 
-def filter_library(user, params: Mapping[str, Any]) -> LibraryPage:
+def filter_library(
+    user,
+    params: Mapping[str, Any],
+    *,
+    exclude_entries: Iterable[int] = (),
+    licenses: Iterable[str] | None = None,
+) -> LibraryPage:
     """One page of `user`'s library for the library's query parameters.
 
     The page and the API both use it. It searches the title, tags and notes
@@ -378,8 +385,11 @@ def filter_library(user, params: Mapping[str, Any]) -> LibraryPage:
     pages by PAGE_SIZE. Each entry carries its asset's community rating
     (SavedAsset.community). Bad values fall back to the
     defaults (see clean_library_params), and a page past the end is the last
-    page. Only `user`'s own entries are ever returned, and none for a
-    signed-out visitor.
+    page. `exclude_entries` leaves out those entry ids before paging (the pack
+    builder hides what's already in the pack). `licenses`, when given, keeps
+    only entries whose license is one of those strings, as the provider wrote
+    it (see license_filter(); an empty list matches nothing). Only `user`'s own
+    entries are ever returned, and none for a signed-out visitor.
     """
     cleaned = clean_library_params(params)
     entries = (
@@ -400,5 +410,85 @@ def filter_library(user, params: Mapping[str, Any]) -> LibraryPage:
         entries = entries.tagged(cleaned.tags)
     if cleaned.min_rating:
         entries = entries.filter(rating__gte=cleaned.min_rating)
+    if licenses is not None:
+        entries = entries.filter(asset__license__in=list(licenses))
+    exclude = list(exclude_entries)
+    if exclude:
+        entries = entries.exclude(pk__in=exclude)
     page = Paginator(entries.sorted_by(cleaned.sort), PAGE_SIZE).get_page(cleaned.page)
     return LibraryPage(page=page, params=replace(cleaned, page=page.number))
+
+
+# ------------------------------------------------- the Attribution center's license filters
+
+
+@dataclass(frozen=True)
+class LicenseChoice:
+    """One chip of the Attribution center's filters: a license type or a credit rule."""
+
+    value: str
+    label: str
+    count: int
+    chosen: bool
+
+
+def library_licenses(user) -> dict[str, int]:
+    """Each license in `user`'s library, as the providers wrote it, with its entry count."""
+    rows = (
+        SavedAsset.objects.for_user(user)
+        .values("asset__license")
+        .annotate(count=Count("id"))
+        .order_by()
+    )
+    return {row["asset__license"]: row["count"] for row in rows}
+
+
+def clean_license_params(params) -> tuple[list[str], list[str]]:
+    """The chosen license types (`license`, LICENSES keys) and credit rules (`credit`,
+    CREDIT_LABELS keys) from the query string, each once, unknown values dropped."""
+
+    def chosen(name: str, allowed) -> list[str]:
+        values = params.getlist(name) if hasattr(params, "getlist") else params.get(name, [])
+        return [value for value in dict.fromkeys(values) if value in allowed]
+
+    return chosen("license", LICENSES), chosen("credit", CREDIT_LABELS)
+
+
+def license_filter(user, keys: Iterable[str], credits: Iterable[str]) -> list[str] | None:
+    """The licenses in `user`'s library of one of the license types `keys` and one of
+    the credit rules `credits`, for filter_library(licenses=); None when neither is
+    chosen, so nothing is filtered. A type and a rule must both match when both are
+    chosen."""
+    keys, credits = set(keys), set(credits)
+    if not keys and not credits:
+        return None
+    return [
+        written
+        for written in library_licenses(user)
+        if (not keys or license_key(written) in keys)
+        and (not credits or license_info(written).credit in credits)
+    ]
+
+
+def license_choices(
+    user, keys: Iterable[str], credits: Iterable[str]
+) -> tuple[list[LicenseChoice], list[LicenseChoice]]:
+    """The filter chips for `user`'s library: each license type in it (in the guide's
+    order) and each credit rule, with how many entries have it."""
+    by_key: dict[str, int] = {}
+    by_credit: dict[str, int] = {}
+    for written, count in library_licenses(user).items():
+        info = license_info(written)
+        by_key[info.key] = by_key.get(info.key, 0) + count
+        by_credit[info.credit] = by_credit.get(info.credit, 0) + count
+    keys, credits = set(keys), set(credits)
+    types = [
+        LicenseChoice(key, LICENSES[key].name, by_key[key], key in keys)
+        for key in LICENSE_ORDER
+        if key in by_key
+    ]
+    rules = [
+        LicenseChoice(credit, label, by_credit.get(credit, 0), credit in credits)
+        for credit, label in CREDIT_LABELS.items()
+    ]
+    return types, rules

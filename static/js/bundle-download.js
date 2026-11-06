@@ -9,6 +9,14 @@
 // small ZIP writer below. A file the provider won't hand over (a network error,
 // or a host that refuses cross-origin reads) is listed in MISSING.txt instead,
 // so the rest still arrive; if none arrive, the member is told to use the links.
+//
+// A pack's Download files, and each pack item's Download (packs/downloads.py),
+// use the same button with data-bundle-url: the list is fetched from the
+// Toolbox when it's pressed, so it always follows the pack's latest variants
+// and import paths. That list may carry `extras` (files written into the zip
+// from text: CREDITS.txt and the manifest), `zip` (false: save the one file as
+// it is) and `error` (a message to show instead, such as over 2 GB). The status
+// line is the [data-bundle-status] inside the button's [data-bundle-box].
 (function () {
   // ---------- ZIP (stored, with CRC-32) ----------
   var CRC_TABLE = (function () {
@@ -134,11 +142,42 @@
     if (bar) bar.style.setProperty("--progress", progress == null ? 0 : progress);
   }
 
+  function boxFor(button) {
+    return button.closest("[data-bundle-box]") || button.closest("#entry-bundle") || button.parentElement;
+  }
+
   function download(button) {
-    var box = button.closest("#entry-bundle") || button.parentElement;
+    var box = boxFor(button);
+    if (box.dataset.bundleState === "working") return;
+    if (button.dataset.bundleUrl) {
+      button.disabled = true;
+      setState(box, "working", "Getting the file list…", 0);
+      fetch(button.dataset.bundleUrl, { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (response) {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.json();
+        })
+        .then(function (bundle) {
+          button.disabled = false;
+          if (bundle.error) {
+            setState(box, "error", bundle.error, 0);
+            return;
+          }
+          box.dataset.bundleState = "idle";
+          run(button, box, bundle);
+        })
+        .catch(function () {
+          button.disabled = false;
+          setState(box, "error", "The file list couldn't be loaded. Reload the page and try again.", 0);
+        });
+      return;
+    }
     var data = document.getElementById(button.dataset.bundleDownload);
-    if (!data || box.dataset.bundleState === "working") return;
-    var bundle = JSON.parse(data.textContent);
+    if (!data) return;
+    run(button, box, JSON.parse(data.textContent));
+  }
+
+  function run(button, box, bundle) {
     var files = bundle.files;
     var expected = files.reduce(function (total, file) { return total + (file.size || 0); }, 0);
     var received = 0;
@@ -169,23 +208,29 @@
 
     chain.then(function () {
       if (!entries.length) {
-        setState(box, "error", bundle.provider + " didn't hand the files over to this page. Use the file links below instead.", 0);
+        var fallback = bundle.fallback || "Use the file links below instead.";
+        setState(box, "error", bundle.provider + " didn't hand the files over to this page. " + fallback, 0);
         return;
       }
-      if (files.length === 1) {
+      var single = bundle.zip === false || (bundle.zip === undefined && files.length === 1);
+      if (single) {
         save(new Blob([entries[0].bytes]), baseName(entries[0].path));
       } else {
         var encoder = new TextEncoder();
+        // The entry's bundle keeps its files in one folder with CREDITS.txt in it;
+        // a pack's list names its own extra files (CREDITS.txt, the manifest).
         var folder = files[0].path.split("/")[0];
-        entries.push({ path: folder + "/CREDITS.txt", bytes: encoder.encode(bundle.credits) });
+        var extras = bundle.extras || [{ path: folder + "/CREDITS.txt", text: bundle.credits }];
+        extras.forEach(function (extra) { entries.push({ path: extra.path, bytes: encoder.encode(extra.text) }); });
         if (missing.length) {
           var lines = ["These files couldn't be fetched from " + bundle.provider + ". Download them from their links:", ""];
           missing.forEach(function (file) { lines.push(file.path + "  " + file.url); });
-          entries.push({ path: folder + "/MISSING.txt", bytes: encoder.encode(lines.join("\n") + "\n") });
+          var missingPath = bundle.extras ? "MISSING.txt" : folder + "/MISSING.txt";
+          entries.push({ path: missingPath, bytes: encoder.encode(lines.join("\n") + "\n") });
         }
         save(buildZip(entries), bundle.zip_name);
       }
-      var note = missing.length ? done + " of " + files.length + " files saved; MISSING.txt lists the rest." : "Saved " + (files.length === 1 ? baseName(files[0].path) : bundle.zip_name) + ".";
+      var note = missing.length ? done + " of " + files.length + " files saved; MISSING.txt lists the rest." : "Saved " + (single ? baseName(files[0].path) : bundle.zip_name) + ".";
       setState(box, missing.length ? "error" : "done", note, 1);
     }).catch(function () {
       setState(box, "error", "The bundle couldn't be built. Use the file links below instead.", 0);

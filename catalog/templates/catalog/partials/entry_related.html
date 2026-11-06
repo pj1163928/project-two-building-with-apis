@@ -26,7 +26,7 @@
     <h3 id="entry-featured-title" class="micro text-fg-secondary">Featured in public packs</h3>
     {% if related.public_packs %}
       <ul id="entry-featured" class="entry-packs">
-        {% for pack in related.public_packs %}<li><span class="entry-featured-title">{{ pack.title }}</span><span>{{ pack.owner.get_username }} · {{ pack.item_count }} item{{ pack.item_count|pluralize }}</span></li>{% endfor %}
+        {% for pack in related.public_packs %}<li><a href="{{ pack.get_public_url }}" class="entry-featured-title entry-link">{{ pack.title }}</a><span>{{ pack.owner.get_username }} · {{ pack.item_count }} item{{ pack.item_count|pluralize }}</span></li>{% endfor %}
       </ul>
     {% else %}
       <p class="text-sm text-fg-weak">No other member's public pack features it yet.</p>

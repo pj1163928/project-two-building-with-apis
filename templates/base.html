@@ -69,6 +69,7 @@
   <script src="{% versioned_static 'js/entry-drawer.js' %}" defer></script>
   <script src="{% versioned_static 'js/entry-files.js' %}" defer></script>
   <script src="{% versioned_static 'js/bundle-download.js' %}" defer></script>
+  <script src="{% versioned_static 'js/pack-sort.js' %}" defer></script>
   <script src="{% versioned_static 'js/ambient.js' %}" defer></script>
 </head>
 <body class="bg-app text-fg" hx-boost="true">
@@ -161,6 +162,8 @@
              {% if active_nav == "library" %}aria-current="page"{% endif %}><span class="act-icon">{% include "partials/icon.html" with name="library" size=20 %}</span><span class="act-label" aria-hidden="true">Library</span><span class="tip" aria-hidden="true">Library</span></a>
           <a href="{% url 'packs:list' %}" aria-label="Packs" class="act act-row"
              {% if active_nav == "packs" %}aria-current="page"{% endif %}><span class="act-icon">{% include "partials/icon.html" with name="pack" size=20 %}</span><span class="act-label" aria-hidden="true">Packs</span><span class="tip" aria-hidden="true">Packs</span></a>
+          <a href="{% url 'packs:attribution' %}" aria-label="Attribution" class="act act-row"
+             {% if active_nav == "attribution" %}aria-current="page"{% endif %}><span class="act-icon">{% include "partials/icon.html" with name="license" size=20 %}</span><span class="act-label" aria-hidden="true">Attribution</span><span class="tip" aria-hidden="true">Attribution</span></a>
         </div>
       </nav>
       {# The page's own panel, only while expanded. It scrolls on its own. #}

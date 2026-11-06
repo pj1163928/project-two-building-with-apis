@@ -1,0 +1,16 @@
+{# What an import path is, for owners and readers alike: a folded explainer with an     #}
+{# example project tree. The builder and the pack page both show it above the items.   #}
+<details class="import-help" id="import-path-help">
+  <summary>{% include "partials/icon.html" with name="info" size=14 %}<span>What's an import path?</span></summary>
+  <div class="import-help-body">
+    <p>It's the folder inside your game project where an item's files go. When the Axcenity Engine imports this pack's manifest, it downloads each item's files from the provider into its import path. <strong>Download files</strong> uses the same folders inside the zip, so unzipping it at the top of your project puts every file in the same place.</p>
+    <p>Left blank, an item goes to <code>&lt;type&gt;s/&lt;asset id&gt;/</code>, for example <code>textures/red_brick_03/</code>. Paths are relative to the project, use <code>/</code>, and can't climb out of it with <code>..</code>.</p>
+    <pre class="import-help-tree" aria-label="An example project after importing">my-game/
+├─ textures/red_brick_03/     <span>blank path: the default</span>
+│  ├─ red_brick_03_diff_2k.jpg
+│  └─ red_brick_03_nor_gl_2k.jpg
+├─ audio/ui/                  <span>a path you typed</span>
+│  └─ click.mp3
+└─ CREDITS.txt                <span>from Download files</span></pre>
+  </div>
+</details>

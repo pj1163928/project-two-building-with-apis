@@ -1,14 +1,34 @@
-{# The pack's items, in order. Adding, moving and removing an item each swap this whole list. #}
+{# The pack's items, in order. Adding, moving, dragging, sorting and removing an item each #}
+{# swap this whole list. Drag an item by its grip (static/js/pack-sort.js posts the new   #}
+{# order to packs:items_reorder); Move up and Move down do the same from the keyboard.    #}
+{# Auto sort posts on change to packs:items_sort.                                          #}
+{% url 'packs:items_reorder' pack.pk as reorder_url %}{% url 'packs:items_sort' pack.pk as sort_url %}
 <section id="pack-items" class="builder-section" aria-labelledby="pack-items-title">
-  <div class="flex items-center justify-between gap-3">
+  <div class="pack-items-head">
     <h2 id="pack-items-title" class="micro text-fg-secondary">Items</h2>
     <span id="pack-item-count" class="micro text-fg-muted">{{ items|length }} item{{ items|length|pluralize }}</span>
+    {% if items|length > 1 %}
+      <form class="pack-items-sort" method="post" action="{{ sort_url }}" hx-post="{{ sort_url }}" hx-trigger="change" hx-target="#pack-items" hx-swap="outerHTML transition:false">{% csrf_token %}
+        <label class="toolbar-field pack-item-field ax-select"><span class="micro text-fg-muted">Auto sort</span>
+          <select name="sort" aria-label="Auto sort the items">
+            <option value="" selected disabled>Choose…</option>
+            {% for value, label in item_sorts.items %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+          <span class="ax-select-chevron" aria-hidden="true">{% include "partials/icon.html" with name="chevron-down" size=14 %}</span>
+        </label>
+        <noscript><button type="submit" class="btn btn-quiet btn-xs">Sort</button></noscript>
+      </form>
+    {% endif %}
   </div>
+  {% if sorted_by %}<p class="pack-items-note text-xs text-fg-weak" role="status">{% include "partials/icon.html" with name="check" size=13 %} Sorted: {{ sorted_by }}. Drag items to fine-tune the order.</p>
+  {% elif items|length > 1 %}<p class="pack-items-note text-xs text-fg-weak">Drag an item by its grip to reorder, or use Move up and Move down.</p>{% endif %}
   {% if items %}
-    <ol class="pack-items" aria-label="Items in this pack">
+    <ol class="pack-items" aria-label="Items in this pack" data-sortable-list data-reorder-url="{{ reorder_url }}">
       {% for item in items %}{% include "packs/partials/item_row.html" %}{% endfor %}
     </ol>
   {% else %}
     <p class="picker-empty">This pack is empty. Add assets from your library, or from Discover with Add to pack.</p>
   {% endif %}
+  {# Checked again with every add, move or remove, since the list swaps whole. #}
+  {% if items %}{% include "packs/partials/compatibility.html" %}{% endif %}
 </section>

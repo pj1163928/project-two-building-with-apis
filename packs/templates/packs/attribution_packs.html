@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Pack attribution · Attribution center{% endblock %}
+{% block breadcrumb %}{% url 'packs:attribution' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="attribution" icon="license" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'packs:attribution_packs' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="packs" icon="pack" current=True %}{% endblock %}
+{% block panel_title %}Attribution{% endblock %}
+{% block side_panel %}{% include "packs/partials/attribution_nav.html" %}{% endblock %}
+
+{# Pack attribution, /attribution/packs/: the member's own packs, each with the licenses  #}
+{# in it (chips linking to the guide), how many items need credit, the restrictions in  #}
+{# force, and a link to its own attribution page. Monochrome.                            #}
+{% block content %}
+  <section class="attribution space-y-6">
+    {% include "partials/page_header.html" with label="Attribution center" heading="Pack attribution" lead="The licenses in each of your packs and what they ask. Open a pack for the full terms and the notice to ship with it." compact=True %}
+    {% if pack_credits %}
+      <ul id="attribution-packs" class="attribution-packs">
+        {% for pack, credits in pack_credits %}
+          <li class="attribution-pack">
+            <div class="attribution-pack-head">
+              <a href="{% url 'packs:attribution_pack' pack.slug %}" class="attribution-pack-title">{{ pack.title }}</a>
+              <span class="micro text-fg-muted">{{ pack.get_visibility_display }} · {{ pack.items.all|length }} item{{ pack.items.all|length|pluralize }}</span>
+            </div>
+            {% if credits.groups %}
+              <p class="attribution-licenses" aria-label="Licenses in {{ pack.title }}">
+                {% for group in credits.groups %}<a href="{% url 'packs:attribution' %}#{{ group.info.anchor }}" class="license-chip">{% include "packs/partials/license_symbols.html" with info=group.info %}{{ group.label }} <span class="text-fg-muted">×{{ group.items|length }}</span></a>{% endfor %}
+              </p>
+              <ul class="use-chips" aria-label="Can {{ pack.title }} be used?">
+                {% for check in credits.compatibility %}<li class="use-chip" data-status="{{ check.status }}">{% include "partials/icon.html" with name=check.status_icon size=13 %}<span>{{ check.label }}: {{ check.status_label|lower }}</span></li>{% endfor %}
+              </ul>
+              {% if credits.blocked_uses %}<p class="text-sm text-fg-strong">This pack may not be usable for {% for check in credits.blocked_uses %}{{ check.label|lower }}{% if not forloop.last %} or {% endif %}{% endfor %} use. <a href="{% url 'packs:builder' pack.pk %}" class="entry-link">Edit the pack</a> or see why on its page.</p>{% endif %}
+              <p class="text-sm text-fg-secondary">{% if credits.needing_credit %}{{ credits.needing_credit }} item{{ credits.needing_credit|pluralize }} need{{ credits.needing_credit|pluralize:"s," }} credit.{% else %}All CC0: nothing to credit, though a thank-you is welcome.{% endif %}</p>
+              {% if credits.warnings %}
+                <ul class="credits-warnings">{% for warning in credits.warnings %}<li>{% include "partials/icon.html" with name="alert" size=14 %}<span>{{ warning }}</span></li>{% endfor %}</ul>
+              {% endif %}
+              <p><a href="{% url 'packs:attribution_pack' pack.slug %}" class="entry-link text-sm">Terms and notice for {{ pack.title }}</a></p>
+            {% else %}
+              <p class="text-sm text-fg-weak">Empty. <a href="{% url 'packs:builder' pack.pk %}" class="entry-link">Add items</a> and their licenses show here.</p>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      {% url 'packs:create' as new_url %}
+      {% include "partials/empty_state.html" with title="You have no packs yet." body="Make one, and the licenses in it show here." link_url=new_url link_text="New pack" %}
+    {% endif %}
+  </section>
+{% endblock %}

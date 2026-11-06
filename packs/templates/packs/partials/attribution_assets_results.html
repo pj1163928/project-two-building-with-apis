@@ -1,0 +1,42 @@
+{# Asset attribution's results: one page of 12 of the member's own entries for the search #}
+{# and the chosen license types and credit rules, each with its license, credit rule,     #}
+{# credit line and a link to its attribution page. Previous and Next keep every filter    #}
+{# (state_query). Monochrome: no type colour here.                                        #}
+{% url 'packs:attribution_assets' as assets_url %}
+{% with page=results.page %}
+<div id="attribution-assets-results" class="space-y-3" aria-live="polite">
+  <p class="micro text-fg-muted">{{ page.paginator.count }} asset{{ page.paginator.count|pluralize }}{% if filtered or query %} match{{ page.paginator.count|pluralize:"es," }}{% endif %}{% if filtered or query %} · <a href="{{ assets_url }}" class="entry-link">Clear filters</a>{% endif %}</p>
+  {% if library_empty %}
+    <p class="picker-empty">Your library is empty.</p>
+  {% elif not entries %}
+    <p class="picker-empty">Nothing in your library matches{% if query %} “{{ query }}”{% endif %}{% if filtered %} with those filters{% endif %}.</p>
+  {% else %}
+    <ul class="lookup-list" aria-label="Your assets' licenses">
+      {% for entry in entries %}{% with asset=entry.asset info=entry.asset.license_info %}
+        <li class="lookup-item" id="lookup-{{ entry.pk }}">
+          <div class="lookup-thumb">
+            <span class="result-fallback" aria-hidden="true">{% include "partials/icon.html" with name=asset.tile.key size=16 %}</span>
+            {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+          </div>
+          <div class="lookup-main">
+            <div class="lookup-head">
+              <a href="{% url 'packs:attribution_asset' entry.pk %}" class="lookup-title">{{ asset.title }}</a>
+              <span class="status-chip micro" data-credit="{{ info.credit }}">{{ info.credit_label }}</span>
+            </div>
+            <p class="micro text-fg-muted">{{ asset.get_kind_display }} · {{ asset.get_provider_display }}{% if asset.author %} · by {{ asset.author }}{% endif %}</p>
+            <p class="text-sm lookup-license">{% include "packs/partials/license_symbols.html" %}<a href="{% url 'packs:attribution' %}#{{ info.anchor }}" class="entry-link">{{ asset.license }}</a> <span class="text-fg-secondary">· {{ info.summary }}</span></p>
+            {% if info.needs_credit %}<p class="lookup-credit"><span class="micro text-fg-muted">Credit</span><span>{{ entry.credit }}</span></p>{% endif %}
+          </div>
+        </li>
+      {% endwith %}{% endfor %}
+    </ul>
+    {% if page.has_other_pages %}
+      <nav class="pack-picks-pager" aria-label="Pages of your assets">
+        {% if page.has_previous %}<a class="card-action" aria-label="Previous page" href="{{ assets_url }}?{% if state_query %}{{ state_query }}&amp;{% endif %}page={{ page.previous_page_number }}" hx-get="{{ assets_url }}?{% if state_query %}{{ state_query }}&amp;{% endif %}page={{ page.previous_page_number }}" hx-target="#attribution-assets-results" hx-swap="outerHTML transition:false" hx-push-url="true">{% include "partials/icon.html" with name="chevron-left" size=16 %}</a>{% else %}<span class="card-action is-disabled" aria-hidden="true">{% include "partials/icon.html" with name="chevron-left" size=16 %}</span>{% endif %}
+        <span class="micro text-fg-muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a class="card-action" aria-label="Next page" href="{{ assets_url }}?{% if state_query %}{{ state_query }}&amp;{% endif %}page={{ page.next_page_number }}" hx-get="{{ assets_url }}?{% if state_query %}{{ state_query }}&amp;{% endif %}page={{ page.next_page_number }}" hx-target="#attribution-assets-results" hx-swap="outerHTML transition:false" hx-push-url="true">{% include "partials/icon.html" with name="chevron-right" size=16 %}</a>{% else %}<span class="card-action is-disabled" aria-hidden="true">{% include "partials/icon.html" with name="chevron-right" size=16 %}</span>{% endif %}
+      </nav>
+    {% endif %}
+  {% endif %}
+</div>
+{% endwith %}

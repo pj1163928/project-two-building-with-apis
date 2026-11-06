@@ -78,7 +78,9 @@ It's a throwaway prototype, so take its look, not its code.
   - a result's fallback type icon, inside the shelf fragments
   - a library card's type icon (`.library-type-icon`) and fallback icon
   - the same two icons in the library drawer and on an entry's page
-  - the same two icons on each item in the pack builder (Phase 7)
+  - the same two icons on each item in the pack builder (Phase 7) and on
+    a pack's page (Phase 8), and on each row of Add from my library
+    (2026-11-05)
 
   `test_shell.py` keeps them out of the chrome on every page, out of every
   other page's own content, and on library cards and pack items to those
@@ -157,7 +159,7 @@ this only matters on a full load or refresh.
 | Part | id | Notes |
 |---|---|---|
 | Title bar | `title-bar` | `h-12`. From the left: the wordmark (`h-8`, links home), a divider, **Home** (`#home-button`, the only Home chip), "TOOLBOX", the breadcrumb, then the account chips on the right. Every item is a square `h-8` chip (`.bar-item`, `.crumb`) with 16 px icons. The breadcrumb sits in `{% block breadcrumb_nav %}`. Home empties that block, because its Home chip already marks the page. Sign-out is a POST form |
-| Sidebar | `side-panel` (with `activity-bar` inside) | One column: the activity bar and the side panel merged (user request, 2026-11-05). From the top: an `h-14` slot with the panel toggle and `{% block panel_title %}` (`.sidebar-title`, "Explorer" by default); `nav#activity-bar` with Discover, Library and Packs (`pt-1`, `gap-1`); the page's own panel (`.side-panel-inner`, `{% block side_panel %}`: the Library filters, the Account pages' Profile, Settings and API token rows); and an Account nav at the foot with Account and Settings. Each entry is an `.act.act-row` (`h-11`): a 3.5 rem `.act-icon` cell holding its 20 px icon, its `.act-label`, and a `.tip` tooltip for the collapsed strip, instead of a `title`. The sidebar is `relative z-20` so tooltips sit over the content. A view sets `extra_context = {"active_nav": "<key>"}` to mark its entry with `aria-current="page"` |
+| Sidebar | `side-panel` (with `activity-bar` inside) | One column: the activity bar and the side panel merged (user request, 2026-11-05). From the top: an `h-14` slot with the panel toggle and `{% block panel_title %}` (`.sidebar-title`, "Explorer" by default); `nav#activity-bar` with Discover, Library, Packs and Attribution (`pt-1`, `gap-1`); the page's own panel (`.side-panel-inner`, `{% block side_panel %}`: the Library filters, the Account pages' Profile, Settings and API token rows); and an Account nav at the foot with Account and Settings. Each entry is an `.act.act-row` (`h-11`): a 3.5 rem `.act-icon` cell holding its 20 px icon, its `.act-label`, and a `.tip` tooltip for the collapsed strip, instead of a `title`. The sidebar is `relative z-20` so tooltips sit over the content. A view sets `extra_context = {"active_nav": "<key>"}` to mark its entry with `aria-current="page"` |
 | Content | `content` | `data-drop` = the page's `active_nav`. `.content-stage` holds the ambient glow, the mark, then `{% block content %}` in a `px-8 lg:px-12 pt-14 pb-12 space-y-8` wrapper, then the footer (`page-footer`): the `.brand-signature` row ("Built for Axcenity Engine", a small wordmark, "Axcenity Studios · 2026") |
 | Status bar | `status-bar` | Monochrome. Each provider's last known status (`partials/provider_status.html`, from `config.context_processors.shell`): a solid ink dot for OK, an alert icon for an error, a muted dot for unknown, with the words in `title` and screen-reader text. The saved count (`partials/saved_count.html`, `#saved-count`) appears only when signed in, counts only that member's entries, and is sent again out of band after each save |
 
@@ -367,7 +369,7 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
   per-page scripts block. Scripts listen on the `document` (delegation)
   rather than binding to elements a swap replaces, as `shell.js`,
   `password-toggle.js`, `sound-preview.js`, `card-actions.js`,
-  `entry-drawer.js`, `entry-files.js`, `bundle-download.js` and `ambient.js`
+  `entry-drawer.js`, `entry-files.js`, `bundle-download.js`, `pack-sort.js` and `ambient.js`
   do (the last sets itself up through `htmx.onLoad`).
 - **Preserved:** the title-bar logo link (`#brand-link`) is
   `hx-preserve`, so it isn't rebuilt on each swap. A rebuilt image left a
@@ -748,6 +750,154 @@ open pack current. With none: "The packs you create are listed here."
     "In pack".
 - All the builder's swaps say `transition:false`, so the page doesn't fade
   behind each save.
+- *(Phase 8)* The builder's toolbar has **View pack page** (`#pack-page-link`)
+  beside Delete pack, and each pack card has **View page**
+  (`.pack-card-page`), raised above the title's stretched link so it opens
+  the page rather than the builder. "Featured in public packs" in the drawer
+  and on an entry's page links each pack to its page.
+- **Private, Unlisted or Public** (user request, 2026-11-05): the builder's
+  switch (`#pack-visibility`, `packs/partials/visibility.html`) has three
+  chips; the whole block swaps on change. Its line reads "Only you can see
+  it.", "Anyone with the link can view and export it. It isn't listed
+  anywhere." or "Anyone can view and export it." While unlisted, the share
+  link box (`#pack-share`, `packs/partials/share_link.html`) sits below: the
+  link in a read-only mono field (`#pack-share-url`), **Copy link**
+  (`data-copy`, `card-actions.js`: the clipboard, or the text selected with
+  "Press Ctrl+C" where the clipboard isn't available) and **New link**, which
+  opens `#pack-rotate-dialog` ("Make a new link?", "The current link stops
+  working at once…"). Its form (`data-dialog-done`) swaps `#pack-share`,
+  which then says "New link made. The old one no longer works." The pack
+  card and the pack page's owner chip say Unlisted (`.status-chip
+  [data-visibility="unlisted"]`, outlined in `fg-secondary`).
+- **A pack's page** (`packs/pack_page.html`, `/packs/<slug>/`, Phase 8): a
+  work surface, `.pack-page` (60 rem). "Public pack", "Unlisted pack" or
+  "Private pack" over
+  the title (`#pack-page-title`), "By <owner> · N items · Changed …", the
+  intended use and the tags. Then a toolbar (`#pack-page-actions`) with
+  **Download manifest** (`btn-primary`, `hx-boost="false"` and `download`,
+  because a boosted link would swap the JSON into the page) and, for the
+  owner only, the Public, "Unlisted · link only" or "Private · only you"
+  chip and **Edit in builder**. The share link serves the same page; its
+  crumb and Download manifest use the link (`page_url`, `export_url`).
+  The items (`#pack-page-items`) are the builder's `.pack-item` rows made
+  read-only (`.pack-item-read`, no actions column): thumbnail over the type
+  icon, type and provider, title, author, then `.pack-item-facts` (License,
+  "no credit needed" for CC0 or the Credit line, Files as a `.file-badge` with
+  the count and size, the Import path in mono, and the Source). **Credits**
+  (`#pack-page-credits`) says how many items need credit. No forms and no
+  `hx-post` anywhere, for the owner too; nothing from anyone's library
+  (notes, ratings, statuses, the community rating). Members get their packs
+  in the side panel; a visitor gets "Shared pack" (`#pack-visitor-panel`)
+  with Sign up. Type colour: only the two type icons, as in the builder.
+- **Builder and pack page polish** (user request, 2026-11-05):
+  - **Add from my library** is a form (`#pack-library-form`): the search,
+    "Show ones already in this pack" (`show_in`) and a hidden `page`
+    (`#pack-library-page`, sent again out of band with each reply, so
+    `packItemsChanged` refreshes the same page). Typing or the checkbox
+    asks for page 1 (`hx-vals`). Rows (`.pack-pick`) show a 2.75 rem
+    thumbnail over the type icon, with an 11 rem preview to the left on
+    hover (`.pack-pick-zoom`, behind the hover gate), then the title, type,
+    provider and license. `.pack-picks-pager`: Previous and Next
+    `.card-action` arrows and "Page N of M · X assets".
+  - **Items** (`#pack-items`): an `.ax-select` **Auto sort** that posts on
+    change (shown with two or more items) and "Sorted: …" after it. Each
+    `.pack-item` starts with a grip (`.pack-item-grip`, `[data-drag-handle]`);
+    `static/js/pack-sort.js` makes the row draggable from its grip only,
+    moves it live while dragging (`[data-dragging]` dims it), puts it back on
+    Escape, and posts `order` through `htmx.ajax` (inheriting `#app`'s CSRF
+    header). Each row also has a hint under its import path and a
+    **Download** `.card-action`.
+  - **`.ax-select`**: the select loses its native arrow
+    (`appearance: none`), a `chevron-down` icon sits in its place, and
+    options use the elevated colours. The Variant options read
+    "2K JPG · 3 files · 24.1 MB".
+  - **Downloads**: buttons with `data-bundle-download` and `data-bundle-url`
+    fetch the list from `packs:files` when pressed, so it follows the latest
+    variants and paths; the status line is the `[data-bundle-status]` in the
+    nearest `[data-bundle-box]` (the toolbar's `#pack-downloads`, or the
+    item). The builder's toolbar has Download files and Download manifest;
+    the pack page has Download files (`btn-primary`) beside Download
+    manifest, and each item a Download (a plain link to the provider for
+    one file).
+  - **"What's an import path?"** (`packs/partials/import_path_help.html`,
+    `#import-path-help`): a `<details>` with an example tree, above the
+    items on both pages, outside `#pack-items` so a swap never closes it.
+    The pack page's "What's this?" opens it (`data-open-details`).
+  - **Credits** (`packs/partials/credits.html`, `#pack-page-credits`), in
+    brief: how many items need credit, the warnings (`.credits-warnings`, a
+    2 px ink edge), and one `.credits-summary` row per license (a
+    `.license-chip` to its guide card, a `.status-chip`: Credit required
+    inverted, recommended outlined, optional plain, and the summary), then
+    **Full attribution and license notice**, the pack's attribution page
+    (the share link's own when read by link).
+- **Attribution center** (user request 2026-11-05; split into pages the same
+  day): a sidebar entry after Packs (`license` icon,
+  `active_nav="attribution"`) and its own drop colours. Every page's side
+  panel is `packs/partials/attribution_nav.html`: License guide, and for
+  members Pack attribution and Asset attribution, the current one marked.
+  Monochrome throughout: no type colour on any of its pages.
+  - **License guide** (`packs/attribution.html`, `/attribution/`): for
+    members two `.attribution-link` cards to their pages, for visitors a
+    sign-in note; a table **At a glance**; a `.license-card` per license
+    (`#license-<key>`, outlined when targeted) with
+    `packs/partials/license_facts.html` (four facts with a check, a cross or
+    a dash, never colour alone) and `packs/partials/license_terms.html`
+    (**You may**, **You must**, **You may not**, three `.license-terms-col`s,
+    the last with an ink top edge), "How to meet it" folded; then **How to
+    credit** and **Optional credits**. The side panel adds "On this page".
+  - **Pack attribution** (`packs/attribution_packs.html`): the member's
+    packs, each with license chips and counts, what's owed, its warnings and
+    a link to its page.
+  - **A pack's attribution** (`packs/attribution_pack.html`): the title,
+    "Compiled by …", who owns the assets, View pack page (and Edit in
+    builder for the owner), **Restrictions in force**, the notice
+    (`packs/partials/notice_copy.html`, `#attribution-notice`: the full
+    notice in a `<pre>` with **Copy the notice** as the `btn-primary`, and
+    the credit lines alone with **Copy credit lines**; `data-copy` copies an
+    element's text and keeps each button's label), then **License terms**: a
+    `.credits-group` per license with the terms and every item's credit (the
+    owner also gets each asset's page), and the optional acknowledgements.
+    No form controls.
+  - **Asset attribution** (`packs/attribution_assets.html`): a form
+    (`#attribution-filters`) with the search and two rows of `.filter-chip`
+    checkboxes, **License** (only the types in the library) and **Credit**
+    (required, recommended, optional; disabled at 0), each with a count. It
+    swaps `#attribution-assets-results`
+    (`packs/partials/attribution_assets_results.html`) on change or typing,
+    with `hx-push-url`, and submits as a page without JavaScript. Results
+    say how many match, with Clear filters; Previous and Next are links that
+    keep the filters.
+  - **An asset's attribution** (`packs/attribution_asset.html`): the
+    thumbnail and title, Open in library and View on the provider, the
+    license with its facts and terms, the credit to show (or the optional
+    acknowledgement), the notice, and the member's packs holding it.
+  - The drawer's License row says the credit rule and links to its card.
+  - **Iconography and compatibility** (user request, 2026-11-05):
+    - `packs/partials/license_symbols.html`: a license's symbols (`lic-zero`,
+      `lic-pd`, `lic-by`, `lic-sa`, `lic-nc`, `lic-nd`, `lic-sampling`,
+      `lic-unknown`), named in `aria-label` and `title`; `large=True` boxes
+      them. Beside every license name: the guide's cards and table, the pack
+      page's summary, pack and asset attribution.
+    - `packs/partials/license_uses.html`: "Can I use it?", three `.use-cell`s
+      (Commercial `use-commercial`, Personal `use-personal`, Internal
+      `use-internal`), each with a check, a warning sign or a cross and the
+      verdict written out: usable plain, with conditions outlined, not usable
+      with an ink top edge, its icon inverted and its verdict underlined.
+    - `packs/partials/compatibility.html` (`#pack-compatibility`): when a use
+      is blocked, `.compat-warning` (a 4 px ink edge): "This pack may not be
+      usable for … use.", the reasons, then "edit the pack" (the owner) or
+      "contact the owner, <username>" (anyone else); otherwise a line saying
+      it's clear or has conditions. Then the pack's three `.use-cell`s with
+      their reasons. On the pack page (above the items), a pack's
+      attribution, and inside the builder's `#pack-items`, so each swap
+      rechecks it. Pack attribution shows `.use-chip`s per pack.
+    - The guide: **Symbols** (two `.symbol-legend`s: the elements and the
+      uses, with the verdict key), **At a glance: can I use it?** (symbols, and
+      each use's verdict with its icon), and **The licenses**, one card per
+      row (`.license-card-head` with large symbols, then the uses and the
+      terms).
+    - Every Attribution page is a centred column (`.attribution`, 64 rem,
+      `margin-inline: auto`).
 
 ## Home hero
 

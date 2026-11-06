@@ -1,0 +1,12 @@
+{# "Can I use it?" for one license (`info.uses`): Commercial, Personal and Internal, each #}
+{# with its icon, a check, a warning sign or a cross, the verdict in words and why.     #}
+{# Monochrome: the verdict is always written out, never shown by colour alone.          #}
+<ul class="use-grid" aria-label="Can I use it?">
+  {% for verdict in info.uses %}
+    <li class="use-cell" data-status="{{ verdict.status }}">
+      <span class="use-cell-head">{% include "partials/icon.html" with name=verdict.icon size=16 %}<span>{{ verdict.label }}</span><span class="use-status" aria-hidden="true">{% include "partials/icon.html" with name=verdict.status_icon size=14 %}</span></span>
+      <span class="use-verdict">{{ verdict.status_label }}</span>
+      <span class="use-note">{{ verdict.note }}</span>
+    </li>
+  {% endfor %}
+</ul>

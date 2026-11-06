@@ -1,0 +1,20 @@
+{# The text to copy: the formal Attribution and License Notice (`notice`, the same as    #}
+{# CREDITS.txt in Download files), and the credit lines alone (`credit_lines`) for a     #}
+{# game's credits screen, each with Copy. Plain <pre> blocks, so a read-only page stays  #}
+{# free of form controls; data-copy copies their text.                                   #}
+<section id="attribution-notice" class="builder-section notice-copy" aria-labelledby="attribution-notice-title">
+  <div class="credits-head">
+    <h2 id="attribution-notice-title" class="micro text-fg-secondary">Attribution and license notice</h2>
+  </div>
+  <p class="text-sm text-fg-secondary">Ship this notice with anything that uses these assets: in a CREDITS.txt, the README, or the documentation. It names the owners, the credits that must be shown, and exactly what each license lets anyone do, requires and forbids.</p>
+  <pre id="notice-full" class="credits-textarea notice-text" tabindex="0" aria-label="Attribution and license notice">{{ notice }}</pre>
+  <div class="flex flex-wrap items-center gap-2">
+    <button type="button" class="btn btn-primary btn-sm" data-copy="notice-full" data-copy-label="Copy the notice">Copy the notice</button>
+    <span class="text-xs text-fg-weak">The same text is CREDITS.txt in Download files.</span>
+  </div>
+  <div class="notice-lines">
+    <p class="micro text-fg-muted" id="notice-lines-label">Credit lines only, for a credits screen</p>
+    <pre id="notice-lines" class="credits-textarea" tabindex="0" aria-labelledby="notice-lines-label">{{ credit_lines }}</pre>
+    <div><button type="button" class="btn btn-quiet btn-sm" data-copy="notice-lines" data-copy-label="Copy credit lines">Copy credit lines</button></div>
+  </div>
+</section>

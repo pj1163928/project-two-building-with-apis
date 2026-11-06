@@ -1,19 +1,34 @@
-{# Add from my library: up to 12 of the owner's entries matching the search (filter_library), #}
-{# each with Add, or "In pack" once it's there. Add swaps the item list, and the list's    #}
-{# packItemsChanged event brings this back up to date.                                       #}
-{% url 'packs:add_item' pack.pk as add_url %}
+{# Add from my library: one page of 12 of the owner's entries matching the search          #}
+{# (filter_library), each with its thumbnail (a bigger preview on hover), type, provider  #}
+{# and license, and Add. Entries already in the pack are hidden unless "Show ones in this #}
+{# pack" is ticked, and then say "In pack". Previous and Next page through the rest. Add   #}
+{# swaps the item list, and its packItemsChanged event brings this back up to date on the  #}
+{# same page (#pack-library-page, sent out of band, keeps it).                             #}
+{% url 'packs:add_item' pack.pk as add_url %}{% url 'packs:library_search' pack.pk as search_url %}
+{% with page=results.page %}
 <div id="pack-library-results" aria-live="polite">
   {% if library_empty %}
     <p class="picker-empty">Your library is empty. <a href="{% url 'catalog:discover' %}" class="entry-link">Save assets from Discover</a> to add them here.</p>
-  {% elif not results.page.object_list %}
-    <p class="picker-empty">Nothing in your library matches “{{ query }}”.</p>
+  {% elif not page.object_list %}
+    {% if hidden %}
+      <p class="picker-empty">{% if query %}Everything matching “{{ query }}”{% else %}Everything in your library{% endif %} is already in this pack.</p>
+    {% else %}
+      <p class="picker-empty">Nothing in your library matches “{{ query }}”.</p>
+    {% endif %}
   {% else %}
     <ul class="pack-picks" aria-label="Your library">
-      {% for entry in results.page.object_list %}{% with asset=entry.asset %}
-        <li class="pack-pick" id="pick-{{ entry.pk }}">
+      {% for entry in page.object_list %}{% with asset=entry.asset %}{% with tile=asset.tile %}
+        <li class="pack-pick" id="pick-{{ entry.pk }}" data-kind="{{ asset.kind }}">
+          <div class="pack-pick-thumb">
+            <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=16 %}</span>
+            {% if asset.thumbnail_url %}
+              <img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>
+              <span class="pack-pick-zoom" aria-hidden="true"><img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>
+            {% endif %}
+          </div>
           <div class="min-w-0">
-            <p class="pack-pick-title">{{ asset.title }}</p>
-            <p class="micro text-fg-muted">{{ asset.get_kind_display }} · {{ asset.get_provider_display }}</p>
+            <p class="pack-pick-title" title="{{ asset.title }}">{{ asset.title }}</p>
+            <p class="pack-pick-meta micro text-fg-muted"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=11 %}</span>{{ asset.get_kind_display }} · {{ asset.get_provider_display }} · {{ asset.license }}</p>
           </div>
           {% if entry.pk in in_pack %}
             <span class="pack-pick-in micro">{% include "partials/icon.html" with name="check" size=13 %}In pack</span>
@@ -21,8 +36,17 @@
             <form method="post" action="{{ add_url }}" hx-post="{{ add_url }}" hx-target="#pack-items" hx-swap="outerHTML transition:false" hx-disabled-elt="find button">{% csrf_token %}<input type="hidden" name="entry" value="{{ entry.pk }}"><button type="submit" class="btn btn-quiet btn-xs" aria-label="Add {{ asset.title }} to this pack">Add</button></form>
           {% endif %}
         </li>
-      {% endwith %}{% endfor %}
+      {% endwith %}{% endwith %}{% endfor %}
     </ul>
-    {% if results.page.paginator.count > results.page.object_list|length %}<p class="text-xs text-fg-weak">Showing {{ results.page.object_list|length }} of {{ results.page.paginator.count }}. Type to narrow it down.</p>{% endif %}
+    {% if page.has_other_pages %}
+      <nav class="pack-picks-pager" aria-label="Pages of your library">
+        <button type="button" class="card-action" aria-label="Previous page"{% if page.has_previous %} hx-get="{{ search_url }}" hx-include="#pack-library-form" hx-vals='{"page": "{{ page.previous_page_number }}"}' hx-target="#pack-library-results" hx-swap="outerHTML transition:false"{% else %} disabled{% endif %}>{% include "partials/icon.html" with name="chevron-left" size=16 %}</button>
+        <span class="micro text-fg-muted">Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} asset{{ page.paginator.count|pluralize }}</span>
+        <button type="button" class="card-action" aria-label="Next page"{% if page.has_next %} hx-get="{{ search_url }}" hx-include="#pack-library-form" hx-vals='{"page": "{{ page.next_page_number }}"}' hx-target="#pack-library-results" hx-swap="outerHTML transition:false"{% else %} disabled{% endif %}>{% include "partials/icon.html" with name="chevron-right" size=16 %}</button>
+      </nav>
+    {% endif %}
   {% endif %}
+  {% if hidden %}<p class="text-xs text-fg-weak">{{ hidden }} already in this pack {{ hidden|pluralize:"is,are" }} hidden.</p>{% endif %}
 </div>
+<input type="hidden" name="page" id="pack-library-page" value="{{ page.number|default:1 }}" form="pack-library-form" hx-swap-oob="true">
+{% endwith %}

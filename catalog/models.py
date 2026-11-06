@@ -21,6 +21,7 @@ from providers import KINDS, PROVIDERS, AssetRecord
 
 from .discover import TILES_BY_KIND, KindTile
 from .files import FileFilters, VariantInfo, describe_variants, file_filters
+from .licenses import LicenseInfo, license_info
 from .tags import MAX_TAG_LENGTH, normalize_tag
 
 PROVIDER_CHOICES = [(provider.KEY, provider.NAME) for provider in PROVIDERS]
@@ -148,6 +149,11 @@ class Asset(models.Model):
     def file_filters(self) -> FileFilters:
         """The resolutions and formats its files come in, for the drawer's filters."""
         return file_filters(self.file_variants)
+
+    @property
+    def license_info(self) -> LicenseInfo:
+        """What its license lets you do and asks in return (catalog.licenses)."""
+        return license_info(self.license)
 
 
 # The library's sorts, by their URL value; "newest" is the default. Each ends

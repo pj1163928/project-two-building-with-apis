@@ -15,13 +15,17 @@
         {% for pack in packs %}
           <li class="pack-card">
             <div class="flex items-center justify-between gap-3">
-              <span class="status-chip micro" data-visibility="{% if pack.is_public %}public{% else %}private{% endif %}">{% if pack.is_public %}Public{% else %}Private{% endif %}</span>
+              <span class="status-chip micro" data-visibility="{{ pack.visibility }}">{{ pack.get_visibility_display }}</span>
               <span class="micro text-fg-muted">{{ pack.item_count }} item{{ pack.item_count|pluralize }}</span>
             </div>
             <h2 class="pack-card-title"><a href="{% url 'packs:builder' pack.pk %}" class="pack-card-link">{{ pack.title }}</a></h2>
             {% if pack.description %}<p class="pack-card-description">{{ pack.description }}</p>{% endif %}
             {% with tags=pack.tags.all %}{% if tags %}<p class="pack-card-tags">{% for tag in tags %}<span>{{ tag.name }}</span>{% endfor %}</p>{% endif %}{% endwith %}
-            <p class="micro text-fg-muted mt-auto">Changed <time datetime="{{ pack.updated_at|date:'c' }}">{{ pack.updated_at|date:"j M Y" }}</time></p>
+            <div class="mt-auto flex items-center justify-between gap-3">
+              <p class="micro text-fg-muted">Changed <time datetime="{{ pack.updated_at|date:'c' }}">{{ pack.updated_at|date:"j M Y" }}</time></p>
+              {# Above the title's stretched link, so it opens the pack's page, not the builder. #}
+              <a href="{{ pack.reader_url }}" class="pack-card-page micro" aria-label="View the page for {{ pack.title }}">View page</a>
+            </div>
           </li>
         {% endfor %}
       </ul>

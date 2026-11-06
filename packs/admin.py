@@ -12,8 +12,8 @@ class PackItemInline(admin.TabularInline):
 
 @admin.register(Pack)
 class PackAdmin(admin.ModelAdmin):
-    list_display = ["title", "owner", "is_public", "updated_at"]
-    list_filter = ["is_public"]
+    list_display = ["title", "owner", "visibility", "updated_at"]
+    list_filter = ["visibility"]
     search_fields = ["title", "slug", "owner__username"]
     readonly_fields = ["slug", "created_at", "updated_at"]
     filter_horizontal = ["tags"]

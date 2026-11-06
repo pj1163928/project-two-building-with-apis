@@ -1,0 +1,10 @@
+{# An unlisted pack's share link: the address to send, Copy link, and New link, which opens #}
+{# the builder's confirm (#pack-rotate-dialog). New link's reply swaps this box.           #}
+<div id="pack-share" class="share-link">
+  <label class="toolbar-field share-link-field"><span class="micro text-fg-muted">Share link</span>
+    <input id="pack-share-url" type="text" value="{{ share_link }}" readonly spellcheck="false" autocomplete="off" aria-describedby="pack-share-note">
+  </label>
+  <button type="button" class="btn btn-quiet btn-sm" data-copy="pack-share-url">Copy link</button>
+  <button type="button" class="btn btn-quiet btn-sm" data-dialog-open="pack-rotate-dialog" aria-haspopup="dialog">New link</button>
+  <p id="pack-share-note" class="share-link-note text-xs text-fg-weak" role="status">{% if rotated %}{% include "partials/icon.html" with name="check" size=13 %} New link made. The old one no longer works.{% else %}Anyone with this link can view and export the pack. If it reached the wrong people, make a new one.{% endif %}</p>
+</div>

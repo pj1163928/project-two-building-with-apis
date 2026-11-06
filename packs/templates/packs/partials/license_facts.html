@@ -1,0 +1,8 @@
+{# What one license (`info`, a catalog.licenses.LicenseInfo) allows, as four short facts. #}
+{# Monochrome: a check, a cross or a dash, with the words, never colour alone.            #}
+<dl class="license-facts">
+  <div data-fact="{{ info.commercial|yesno:'yes,no,partly' }}"><dt>Commercial use</dt><dd>{% if info.commercial %}{% include "partials/icon.html" with name="check" size=13 %}Yes{% elif info.commercial is None %}<span aria-hidden="true">–</span>{% if info.key == "unknown" %}Unknown{% else %}Only remixed{% endif %}{% else %}{% include "partials/icon.html" with name="close" size=13 %}No{% endif %}</dd></div>
+  <div data-fact="{{ info.changes|yesno:'yes,no,partly' }}"><dt>Changes</dt><dd>{% if info.changes %}{% include "partials/icon.html" with name="check" size=13 %}Allowed{% elif info.changes is None %}<span aria-hidden="true">–</span>Unknown{% else %}{% include "partials/icon.html" with name="close" size=13 %}Not allowed{% endif %}</dd></div>
+  <div data-fact="{{ info.share_alike|yesno:'partly,yes' }}"><dt>Share alike</dt><dd>{% if info.share_alike %}<span aria-hidden="true">–</span>Changed versions too{% else %}{% include "partials/icon.html" with name="check" size=13 %}Not needed{% endif %}</dd></div>
+  <div data-fact="{% if info.needs_credit %}partly{% else %}yes{% endif %}"><dt>Credit</dt><dd>{% if info.credit == "optional" %}{% include "partials/icon.html" with name="check" size=13 %}Optional{% elif info.credit == "listed" %}<span aria-hidden="true">–</span>Recommended{% else %}<span aria-hidden="true">–</span>Required{% endif %}</dd></div>
+</dl>

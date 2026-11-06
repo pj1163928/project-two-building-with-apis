@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Asset attribution · Attribution center{% endblock %}
+{% block breadcrumb %}{% url 'packs:attribution' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="attribution" icon="license" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'packs:attribution_assets' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="assets" icon="library" current=True %}{% endblock %}
+{% block panel_title %}Attribution{% endblock %}
+{% block side_panel %}{% include "packs/partials/attribution_nav.html" %}{% endblock %}
+
+{# Asset attribution, /attribution/assets/: the member's own library with each asset's   #}
+{# license, what it asks and its credit line. The search and the License and Credit chips #}
+{# swap the results (HTMX, the address kept with hx-push-url); without JavaScript the    #}
+{# form submits as a page. Each chip shows how many of the member's assets have it.      #}
+{% block content %}
+  {% url 'packs:attribution_assets' as assets_url %}
+  <section class="attribution space-y-6">
+    {% include "partials/page_header.html" with label="Attribution center" heading="Asset attribution" lead="Every asset in your library with its license, what it asks, and the credit line to use. Filter by license type and by what credit it needs." compact=True %}
+
+    {% if library_empty %}
+      {% url 'catalog:discover' as discover_url %}
+      {% include "partials/empty_state.html" with title="Your library is empty." body="Save assets from Discover and their licenses show here." link_url=discover_url link_text="Go to Discover" %}
+    {% else %}
+      <form id="attribution-filters" class="attribution-filters" method="get" action="{{ assets_url }}"
+            hx-get="{{ assets_url }}" hx-trigger="change, submit, input changed delay:300ms from:#attribution-search" hx-target="#attribution-assets-results" hx-swap="outerHTML transition:false" hx-push-url="true" hx-sync="this:replace">
+        <label class="toolbar-search builder-search">
+          <span class="sr-only">Search your library</span>
+          {% include "partials/icon.html" with name="search" size=16 %}
+          <input type="search" id="attribution-search" name="q" value="{{ query }}" placeholder="Search titles, tags and notes" autocomplete="off">
+        </label>
+        <fieldset class="attribution-filter">
+          <legend class="micro text-fg-muted">License</legend>
+          <div class="attribution-chips">
+            {% for choice in license_types %}<label class="filter-chip"><input type="checkbox" class="sr-only" name="license" value="{{ choice.value }}"{% if choice.chosen %} checked{% endif %}><span>{{ choice.label }} <span class="filter-chip-count">{{ choice.count }}</span></span></label>{% endfor %}
+          </div>
+        </fieldset>
+        <fieldset class="attribution-filter">
+          <legend class="micro text-fg-muted">Credit</legend>
+          <div class="attribution-chips">
+            {% for choice in credit_rules %}<label class="filter-chip"><input type="checkbox" class="sr-only" name="credit" value="{{ choice.value }}"{% if choice.chosen %} checked{% endif %}{% if not choice.count and not choice.chosen %} disabled{% endif %}><span>{{ choice.label }} <span class="filter-chip-count">{{ choice.count }}</span></span></label>{% endfor %}
+          </div>
+        </fieldset>
+        <noscript><button type="submit" class="btn btn-quiet btn-sm">Filter</button></noscript>
+      </form>
+      {% include "packs/partials/attribution_assets_results.html" %}
+    {% endif %}
+  </section>
+{% endblock %}

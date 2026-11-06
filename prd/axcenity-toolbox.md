@@ -199,6 +199,27 @@ asset catalog and pack creator for the engine.
 103. As a visitor or member, I want to choose light, dark or my computer's setting myself, from the title bar or Settings, so that the Toolbox looks the way I work. **[T1]**
 104. As a visitor, I want the background drops big and moving like water, and no giant wordmark half hidden behind the content, so that the decoration stays calm and clean. **[T1]**
 
+### Added 2026-11-05 (at the user's request, after Phase 8)
+
+105. As a pack owner, I want to make a pack unlisted, so that only people I send its link to can view and export it, and it's listed nowhere. **[T1]**
+106. As a pack owner, I want to replace an unlisted pack's link with a new one, so that a link that reached the wrong people stops working at once. **[T1]**
+
+### Added 2026-11-05 (at the user's request, after the Phase 8 polish)
+
+107. As a pack owner, I want Add from my library to hide what's already in the pack (with a switch to show it), show each asset's thumbnail, and page through my library with arrows, so that I see at a glance what's left to add. **[T1]**
+108. As a pack owner, I want to drag items into order, and to auto sort them by type, title, provider or license, so that ordering a big pack is quick. **[T1]**
+109. As a pack owner, I want the variant dropdown styled like the rest of the site, with each variant's file count and size, so that I can choose without guessing. **[T1]**
+110. As anyone who can read a pack, I want to download its files in one zip, laid out by import path with the credits and the manifest, and to download a single item, so that I can use the pack without the engine. My browser fetches the files from the providers; the Toolbox never touches them. **[T1]**
+111. As anyone who can read a pack, I want its credits explained license by license (what each allows, what it asks and how to meet it), with the lines to paste and optional thank-yous for CC0 items, so that I credit creators correctly. **[T1]**
+112. As a visitor or member, I want an Attribution center that explains each license and, for members, shows the licenses in each of my packs and lets me look up any asset in my library, so that I know what I owe before I ship. **[T1]**
+113. As anyone, I want to be told what an import path is, so that the builder and the pack page make sense. **[T1]**
+114. As a visitor or member, I want the Attribution center split into pages: the license guide, the attribution for each pack, and the attribution for each asset, so that each answers one question. **[T1]**
+115. As anyone who uses a pack or an asset, I want a formal attribution and license notice to copy, stating who owns the assets and exactly what I may do, must do and may not do with each, so that I can ship it with my game and stay within every license. **[T1]**
+116. As a member, I want to filter my assets' attribution by license type and by credit requirement, so that I can find, say, every non-commercial or credit-required asset at once. **[T1]**
+117. As anyone reading a pack, I want to see whether it can be used for a commercial, personal or internal project, and to be warned when it can't, with the items that stop it and what to do (edit the pack if it's mine, otherwise contact the owner), so that I don't build on assets I can't ship. **[T1]**
+118. As a visitor or member, I want each license shown with its symbols, a legend, and a "Can I use it?" verdict for each use, so that I can read a license at a glance. **[T1]**
+119. As a visitor or member, I want the license guide to list one license per row and the Attribution pages centred, so that they're easy to read. **[T1]**
+
 ### Requirement traceability
 
 | Graded requirement | User stories |
@@ -247,7 +268,9 @@ asset catalog and pack creator for the engine.
     Testing, Approved, Rejected), and a saved timestamp for sorting.
   - Unique per (user, asset).
 - **Pack:** owner, title, slug, description ("intended use"), tags
-  (many-to-many to Tag), `is_public` (default False), `copied_from` (a
+  (many-to-many to Tag), `visibility` (private by default, unlisted or
+  public; *changed 2026-11-05 from `is_public`, user request*), `share_token`
+  (an unlisted pack's link, made when it's first unlisted), `copied_from` (a
   nullable link to the original Pack), and created/updated timestamps.
 - **PackItem:** links a Pack to one of the owner's SavedAssets.
   - Fields: `preferred_variant`, `import_path`, `position`.
@@ -367,6 +390,10 @@ asset catalog and pack creator for the engine.
   - Each item has a variant dropdown, an import path field and Remove.
     Each control saves on change through HTMX.
   - "Add from my library" searches as you type and calls `add_to_pack()`.
+    *(Added 2026-11-05 at the user's request.)* It hides what's already in
+    the pack unless asked, shows thumbnails, and pages 12 at a time with
+    arrows. Items can be dragged into order or auto sorted (type, title,
+    provider, license). Each variant option shows its file count and size.
   - **[T2] Suggested for this pack:** local Assets ranked by tag overlap
     (an annotated count of shared tags), excluding assets already in the
     pack. Adding one that isn't in the library first creates a SavedAsset
@@ -376,6 +403,23 @@ asset catalog and pack creator for the engine.
 - **Public pack page**
   - Readable and exportable by anyone, including signed-out visitors.
   - Shows only PackItem and Asset data.
+  - *(Added 2026-11-05 at the user's request.)* **Download files** (the
+    whole pack, zipped in the browser under each item's import path with
+    CREDITS.txt and the manifest) and **Download** for one item. The
+    credits are grouped by license with what each asks and how to meet it.
+    "What's an import path?" explains the field.
+- *(Added 2026-11-05 at the user's request.)* **Attribution center**,
+  in separate pages: the license guide (`/attribution/`, open to everyone);
+  each pack's attribution (the pack page's reader rule) with the formal
+  Attribution and License Notice to copy; and, for members, their packs and
+  their assets, filtered by license type and credit requirement. The notice
+  is also the CREDITS.txt in every download.
+- *(Added 2026-11-05 at the user's request.)* **License compatibility:** the
+  pack page, the pack's attribution and the builder say whether the pack can
+  be used for commercial, personal and internal projects (usable, with
+  conditions, or not usable), and warn when an item's license rules a use
+  out, listing those items: "edit the pack" for the owner, "contact the
+  owner" for everyone else. The notice states the permitted uses too.
   - **[T2] Save single items:** signed-in members can save one item to
     their library.
   - **[T2] Copy pack** (website only), in one database transaction:
@@ -448,6 +492,13 @@ These rules apply to the website **and** the API, and each one has a test.
 | List the library | Website: sent to sign in. API: refused. | Sees only their own | Sees only their own |
 | View or export a **private** pack | **404** | **404** | Allowed |
 | View or export a **public** pack | Allowed | Allowed | Allowed |
+| View or export an **unlisted** pack by its share link *(added 2026-11-05)* | Allowed | Allowed | Allowed |
+| View or export an **unlisted** pack by slug or id, or list it *(added 2026-11-05)* | **404** (never listed) | **404** (never listed) | Allowed |
+| Make a new share link *(added 2026-11-05)* | Sent to sign in | **404** | Allowed |
+| Download a pack's files *(added 2026-11-05)* | As viewing that pack | As viewing that pack | Allowed |
+| Reorder or sort a pack's items *(added 2026-11-05)* | Sent to sign in | **404** | Allowed |
+| View a pack's attribution *(added 2026-11-05)* | As viewing that pack | As viewing that pack | Allowed |
+| List pack or asset attribution, or view an asset's *(added 2026-11-05)* | Sent to sign in | Sees only their own (**404** for another's asset) | Sees only their own |
 | Edit a pack, or open its builder | Sent to sign in | **404** | Allowed |
 | Save an item from, or copy, a public pack | Sent to sign in | Allowed | Allowed |
 | Create or edit packs through the API | Not available | Not available | Not available |
@@ -613,7 +664,7 @@ so any change to the shape fails the tests.
 - **Tier 3 stretch items:** a "Popular assets" row, a light theme, and a sample Rust or Lua manifest loader in the
   docs. They're built only if Tier 1 and Tier 2 are finished.
 - Downloading, hosting or proxying asset files or thumbnails. The Toolbox
-  stores and links to provider URLs only. (Story 97's bundle is built in the
+  stores and links to provider URLs only. (Story 97's bundle and story 110's pack and item downloads are built in the
   member's browser from the provider's URLs, so this still holds.)
 - Creating, editing, deleting or copying packs through the API.
 - Users deleting shared Asset records, and soft delete or undo for

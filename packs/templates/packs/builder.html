@@ -4,10 +4,11 @@
 {% block side_panel %}{% include "packs/partials/pack_nav.html" %}{% endblock %}
 
 {# The pack builder, for the owner only. Every control saves on its own through HTMX:    #}
-{# the details on leaving each field, the public/private switch at once, and each item's #}
-{# variant and import path on change. There's no Save button. Moving, removing and       #}
-{# adding items swap the item list (#pack-items), and Add from my library refreshes      #}
-{# itself after each (the packItemsChanged event).                                       #}
+{# the details on leaving each field, the visibility switch at once, and each item's     #}
+{# variant and import path on change. There's no Save button. Moving, dragging, sorting, #}
+{# removing and adding items swap the item list (#pack-items), and Add from my library   #}
+{# refreshes itself after each (the packItemsChanged event). Download files and each     #}
+{# item's Download are zipped in the browser from the providers' URLs (packs:files).     #}
 {% block content %}
   {% url 'packs:details' pack.pk as details_url %}{% url 'packs:library_search' pack.pk as search_url %}
   <section class="space-y-5">
@@ -16,9 +17,15 @@
       {% include "packs/partials/pack_title.html" %}
     </div>
 
-    <div class="work-toolbar justify-between">
+    <div class="work-toolbar justify-between items-start">
       {% include "packs/partials/visibility.html" %}
-      <button type="button" class="btn btn-quiet btn-sm gap-1.5" data-dialog-open="pack-delete-dialog" aria-haspopup="dialog">{% include "partials/icon.html" with name="trash" size=15 %}<span>Delete pack</span></button>
+      <div class="flex flex-wrap items-center gap-2" id="pack-downloads" data-bundle-box data-bundle-state="idle">
+        <button type="button" class="btn btn-quiet btn-sm gap-1.5" data-bundle-download data-bundle-url="{% url 'packs:files' pack.slug %}">{% include "partials/icon.html" with name="download" size=15 %}<span>Download files</span></button>
+        <a href="{% url 'packs:export' pack.slug %}" class="btn btn-quiet btn-sm gap-1.5" hx-boost="false" download="{{ pack.slug }}.axcenity-pack.json">{% include "partials/icon.html" with name="download" size=15 %}<span>Download manifest</span></a>
+        <a id="pack-page-link" href="{{ pack.reader_url }}" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="eye" size=15 %}<span>View pack page</span></a>
+        <button type="button" class="btn btn-quiet btn-sm gap-1.5" data-dialog-open="pack-delete-dialog" aria-haspopup="dialog">{% include "partials/icon.html" with name="trash" size=15 %}<span>Delete pack</span></button>
+        <p class="pack-downloads-status text-xs text-fg-weak" data-bundle-status role="status"></p>
+      </div>
     </div>
 
     <div class="builder-grid">
@@ -39,17 +46,28 @@
           {% include "packs/partials/save_status.html" with state="idle" %}
         </section>
 
+        {% include "packs/partials/import_path_help.html" %}
         {% include "packs/partials/items.html" %}
       </div>
 
       <section class="builder-section builder-aside" aria-labelledby="pack-add-title">
         <h2 id="pack-add-title" class="micro text-fg-secondary">Add from my library</h2>
-        <label class="toolbar-search builder-search">
-          <span class="sr-only">Search your library</span>
-          {% include "partials/icon.html" with name="search" size=16 %}
-          <input type="search" id="pack-library-search" name="q" placeholder="Search titles, tags and notes" autocomplete="off"
-                 hx-get="{{ search_url }}" hx-trigger="load, input changed delay:300ms, packItemsChanged from:body" hx-target="#pack-library-results" hx-swap="outerHTML transition:false" hx-sync="this:replace">
-        </label>
+        {# The form refreshes the list on packItemsChanged, on the page it's on; typing or  #}
+        {# ticking the box goes back to page 1. Enter searches in place too.                #}
+        <form id="pack-library-form" class="pack-library-form" action="{{ search_url }}" hx-get="{{ search_url }}" hx-trigger="submit, packItemsChanged from:body" hx-target="#pack-library-results" hx-swap="outerHTML transition:false" hx-sync="this:replace">
+          <label class="toolbar-search builder-search">
+            <span class="sr-only">Search your library</span>
+            {% include "partials/icon.html" with name="search" size=16 %}
+            <input type="search" id="pack-library-search" name="q" placeholder="Search titles, tags and notes" autocomplete="off"
+                   hx-get="{{ search_url }}" hx-trigger="load, input changed delay:300ms" hx-include="#pack-library-form" hx-vals='{"page": "1"}' hx-target="#pack-library-results" hx-swap="outerHTML transition:false" hx-sync="#pack-library-form:replace">
+          </label>
+          <label class="pack-library-show">
+            <input type="checkbox" id="pack-library-show" name="show_in" value="1" class="checkbox checkbox-xs"
+                   hx-get="{{ search_url }}" hx-trigger="change" hx-include="#pack-library-form" hx-vals='{"page": "1"}' hx-target="#pack-library-results" hx-swap="outerHTML transition:false" hx-sync="#pack-library-form:replace">
+            <span class="text-xs text-fg-secondary">Show ones already in this pack</span>
+          </label>
+          <input type="hidden" name="page" id="pack-library-page" value="1">
+        </form>
         <div id="pack-library-results" aria-live="polite"><p class="picker-empty">Loading your library…</p></div>
       </section>
     </div>
@@ -69,6 +87,25 @@
       <footer class="picker-foot gap-2">
         <form method="dialog"><button type="submit" value="close" class="btn btn-quiet btn-sm">Cancel</button></form>
         <form method="post" action="{% url 'packs:delete' pack.pk %}">{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Delete pack</button></form>
+      </footer>
+    </div>
+  </dialog>
+
+  {# New link: replaces the share link, after this confirm. The reply swaps #pack-share. #}
+  {% url 'packs:rotate_link' pack.pk as rotate_url %}
+  <dialog id="pack-rotate-dialog" class="picker-dialog" aria-labelledby="pack-rotate-title">
+    <div class="picker-panel">
+      <header class="picker-head">
+        <div class="min-w-0 space-y-1"><p class="micro text-fg-muted">Share link</p><h2 id="pack-rotate-title" class="picker-title">Make a new link?</h2></div>
+        <form method="dialog"><button type="submit" value="close" class="picker-close" aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button></form>
+      </header>
+      <div class="picker-body">
+        <p class="text-sm text-fg">The current link stops working at once. Anyone you shared it with will need the new one.</p>
+        <p class="picker-note">{% include "partials/icon.html" with name="info" size=14 %}<span>The pack stays unlisted, and nothing in it changes.</span></p>
+      </div>
+      <footer class="picker-foot gap-2">
+        <form method="dialog"><button type="submit" value="close" class="btn btn-quiet btn-sm">Cancel</button></form>
+        <form method="post" action="{{ rotate_url }}" hx-post="{{ rotate_url }}" hx-target="#pack-share" hx-swap="outerHTML transition:false" data-dialog-done>{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Make a new link</button></form>
       </footer>
     </div>
   </dialog>

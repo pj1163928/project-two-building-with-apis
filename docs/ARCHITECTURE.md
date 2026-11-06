@@ -14,7 +14,7 @@ phases add.
 | `providers` | API clients for ambientCG, Poly Haven and Openverse (plain Python, not a Django app) | — |
 | `accounts` | Sign-up, sign-in, sign-out, profile, settings, and the API token page | `accounts:` |
 | `catalog` | Discover and the library; Asset, Tag and SavedAsset; saving; the library API | `catalog:` |
-| `packs` | Home; Pack and PackItem, the member's packs, the builder and the Add to pack picker; the public gallery, export and the pack API *(planned)* | `packs:` |
+| `packs` | Home; Pack and PackItem, the member's packs, the builder and the Add to pack picker; each pack's page, its export and the pack API; the public gallery *(planned)* | `packs:` |
 
 `config/urls.py` mounts `accounts.urls` at `/accounts/`, and mounts
 `catalog.urls` and `packs.urls` at the root.
@@ -36,12 +36,25 @@ phases add.
 | `packs:list` | `/packs/` | Members: their own packs |
 | `packs:create` | `/packs/new/` | Members; POST with CSRF creates a private pack and opens its builder |
 | `packs:builder` | `/packs/<id>/edit/` | The owner only (**404** otherwise) |
-| `packs:details`, `packs:visibility`, `packs:delete` | `/packs/<id>/details/`, `…/visibility/`, `…/delete/` | The owner only; POST only, with CSRF. Details saves whichever of `title`, `description`, `tags` is posted; visibility takes `public` or `private` |
+| `packs:details`, `packs:visibility`, `packs:delete` | `/packs/<id>/details/`, `…/visibility/`, `…/delete/` | The owner only; POST only, with CSRF. Details saves whichever of `title`, `description`, `tags` is posted; visibility takes `private`, `unlisted` or `public` |
 | `packs:library_search` | `/packs/<id>/library/?q=` | The owner only; the builder's Add from my library fragment (any other request goes to the builder) |
 | `packs:add_item` | `/packs/<id>/items/` | The owner only; POST `entry` (their own, **404** otherwise), with CSRF |
 | `packs:item_update`, `packs:item_move`, `packs:item_remove` | `/packs/<id>/items/<item>/`, `…/move/`, `…/remove/` | The owner only; POST only, with CSRF. Update saves whichever of `preferred_variant`, `import_path` is posted; move takes `direction` `up` or `down` |
 | `packs:picker` | `/packs/picker/?entry=<id>` or `?provider=&external_id=` | Members; the Add to pack picker's list of their own packs |
 | `packs:picker_add` | `/packs/<id>/add/` | The owner only; POST `entry`, or `provider` and `external_id` (a Discover result), with CSRF |
+| `packs:public` | `/packs/<slug>/` | Everyone for a public pack; the owner only for a private or unlisted one (**404** otherwise). Read-only; the owner also gets Edit in builder |
+| `packs:export` | `/packs/<slug>/export/` | As `packs:public`. GET only: the manifest as a download, `<slug>.axcenity-pack.json` |
+| `packs:shared`, `packs:shared_export` | `/packs/link/<token>/`, `…/export/` | Anyone holding an unlisted pack's share link (a public pack's link redirects to its page). A replaced token, a private pack's or an unknown one is a **404**. `X-Robots-Tag: noindex, nofollow` |
+| `packs:rotate_link` | `/packs/<id>/link/` | The owner only; POST only, with CSRF. New link: replaces the share token, so every older link is a **404** |
+| `packs:items_reorder`, `packs:items_sort` | `/packs/<id>/items/order/`, `…/items/sort/` | The owner only; POST only, with CSRF. Reorder takes `order` (every item's id once, comma-separated; anything else is a **400** that changes nothing); sort takes `type`, `title`, `provider` or `license` |
+| `packs:files`, `packs:shared_files` | `/packs/<slug>/files/`, `/packs/link/<token>/files/` | As `packs:public` and `packs:shared`. GET only: the JSON list Download files zips in the browser (`?item=<id>` for one item; another pack's item is a **404**) |
+| `packs:attribution` | `/attribution/` | Everyone: the license guide |
+| `packs:attribution_packs` | `/attribution/packs/` | Members: their own packs' licenses |
+| `packs:attribution_pack`, `packs:shared_attribution` | `/attribution/packs/<slug>/`, `/packs/link/<token>/attribution/` | As `packs:public` and `packs:shared`: one pack's license terms, credits and notice (a public pack's link redirects; noindex by link) |
+| `packs:attribution_assets` | `/attribution/assets/?q=&license=&credit=&page=` | Members: their own library by license; `license` (repeatable, a `LICENSES` key) and `credit` (`required`, `listed`, `optional`); unknown values ignored. The filters' HTMX requests get the results fragment |
+| `packs:attribution_asset` | `/attribution/assets/<id>/` | Members, own entries only (**404** otherwise): one asset's license terms, credit and notice |
+| `packs:api_packs` | `/api/packs/?mine=&page=` | API, anyone: public packs plus the caller's own, 12 to a page. `?mine=1` lists only the caller's and needs sign-in (**401** otherwise). Read-only (**405** for writes) |
+| `packs:api_pack`, `packs:api_pack_export` | `/api/packs/<id>/`, `/api/packs/<id>/export/` | API: anyone for a public pack, the owner only for a private one (**404** otherwise). Read-only (**405** for writes) |
 | `accounts:signup` | `/accounts/signup/` | Everyone (members are sent home) |
 | `accounts:login` | `/accounts/login/` | Everyone |
 | `accounts:logout` | `/accounts/logout/` | POST only, with CSRF |
@@ -51,9 +64,10 @@ phases add.
 | `accounts:download_preferences` | `/accounts/settings/downloads/` | Members; POST only, with CSRF. Saves whichever download defaults are posted (HTMX gets the status line, a plain POST goes back to Settings) |
 | `accounts:token` | `/accounts/token/` | Members; creates the member's API token on the first visit, never cached |
 
-Planned additions: `/packs/<slug>/` (Phase 8, the public page; slugs are
-unique site-wide, which is why the owner's pages use the pk), and
-`/api/packs/` and `/api/packs/{id}/export/`.
+The owner's pack pages use the pk (`/packs/<id>/edit/`), and a pack's own
+page uses its slug (`/packs/<slug>/`), which is unique site-wide and never
+changes on a rename. `new`, `picker` and `link` are pages under `/packs/`, so
+no pack is given those slugs (`RESERVED_SLUGS`; a pack titled "New" is `new-2`).
 
 ## Discover
 
@@ -259,9 +273,8 @@ unique site-wide, which is why the owner's pages use the pk), and
     Discover's shelves the same figures, keyed by external ID. Like
     "In library", they're looked up on every shelf request, not cached.
   - A count of 1 shows that one member's rating, but never whose. The user
-    chose to show it from the first rating, not from 3. Phase 8's sentinel
-    test (no rating ever shows through a pack) should keep community
-    ratings off the public pack pages, or allow for them.
+    chose to show it from the first rating, not from 3. Pack pages and the
+    pack API never show it (Phase 8's sentinel test checks).
 - **Saved count:** `config.context_processors.shell` adds `saved_count`
   (the member's own entries) for signed-in members only. It also adds the
   colour scheme for every page: `theme_choice` (from the `ax-theme`
@@ -329,7 +342,7 @@ unique site-wide, which is why the owner's pages use the pk), and
   newest, up to 6, each with `shared_tags`), `public_packs`
   (`Pack.objects.public_featuring(asset, exclude_owner=user)`: other
   members' public packs holding the asset through anyone's entry, never a
-  private one) and `find_more_url` (Discover for the kind and the asset's two
+  private one; each links to its page) and `find_more_url` (Discover for the kind and the asset's two
   most widely used tags, or its title). `EntryView` adds it, with the
   member's `preferences`, `bundle` and `bundle_manifest`, to the drawer and
   the page alike.
@@ -341,7 +354,9 @@ workflows), `packs/forms.py` and `packs/views.py`.
 
 - **Models:**
   - `Pack`: `owner`, `title` (up to 120), `slug`, `description` ("intended
-    use", up to 2,000), `tags` (to `Tag`), `is_public` (False),
+    use", up to 2,000), `tags` (to `Tag`), `visibility` (`private` by
+    default, `unlisted` or `public`; `is_public` and `is_unlisted` read it),
+    `share_token` (see "Unlisted packs"),
     `copied_from` (nullable, for Phase 11) and created/updated timestamps.
     `Pack.objects.create_pack(owner, title, description, tags)` writes the
     pack, a free slug and its tags in **one transaction**. The slug is the
@@ -355,11 +370,41 @@ workflows), `packs/forms.py` and `packs/views.py`.
     `default_import_path` is `<kind>s/<external_id>/`.
   - Tags typed as text go through `tags_from_text()`: split on commas, then
     `Tag.objects.from_names()` (so `normalize_tag()`).
+  - *(Phase 8)* `Pack.objects.visible_to(user)` is who may **read** a pack:
+    every public pack plus the caller's own (private ones included), public
+    packs only for a visitor. The pack page, its download and every pack API
+    view read through it, so another member's private pack is a 404.
+    `owned_by()` is still who may **change** one. `Pack.get_public_url()` is
+    `/packs/<slug>/`; `get_absolute_url()` stays the builder.
+    `Pack.objects.public()` is public packs only, for anything that lists
+    packs to other people (`public_featuring()`, the Phase 9 gallery).
+- **Unlisted packs** *(user request, 2026-11-05)*: readable by anyone holding
+  the share link, and listed nowhere.
+  - `share_token`: `secrets.token_urlsafe(16)` (128 bits, 22 characters),
+    unique, stored as is so the owner can see the link again.
+    `set_visibility(choice)` makes it the first time a pack is unlisted and
+    keeps it through later changes, so unlisting again brings the same link
+    back. `rotate_share_token()` (New link) replaces it; the old link is a
+    404 at once.
+  - `Pack.objects.shared_by_link(token)` finds an unlisted or public pack by
+    its token, never a private one. `get_share_url()` is
+    `/packs/link/<token>/`; `reader_url` is the share link while unlisted,
+    otherwise the slug page, and is what the manifest's `source_url`, the
+    API's `page_url`, the builder's View pack page and the pack cards use.
+  - `visible_to()` leaves unlisted packs out for everyone but the owner, so
+    the slug page, its download, the API's list, detail and export treat an
+    unlisted pack like a private one. Slugs come from titles and pks count
+    up, so neither may open an unlisted pack.
+  - `PackSharedView` and `PackSharedExportView` serve the same page and
+    download by link; a public pack's link redirects to its slug page. Their
+    replies carry `X-Robots-Tag: noindex, nofollow`, and the site's
+    `Referrer-Policy: same-origin` (SecurityMiddleware) keeps the token out
+    of Referer headers to provider sites.
 - **`default_variant(kind, variants)`:** the label of a 2K JPG (an MP3 for
   sounds) when the asset has one, otherwise the first variant, or "".
   Labels are compared ignoring case and hyphens (`squeeze_label()`), so
   ambientCG's "2K-JPG" counts; the label is stored as the provider wrote it,
-  for Phase 8's export to look up.
+  for the export to look up (`chosen_variant()`).
 - **Services** (`packs/services.py`), each in **one transaction**:
   - `add_to_pack(pack, saved_asset)` returns `(item, created)`. It raises
     `NotYourEntryError` (writing nothing) unless the entry is the pack
@@ -373,6 +418,13 @@ workflows), `packs/forms.py` and `packs/views.py`.
   - `move_item(item, step)` swaps an item with its neighbour (`-1` up, `1`
     down) and rewrites the positions 0, 1, 2…, closing any gaps a Remove
     left. It returns False, writing nothing, at either end.
+  - *(User request, 2026-11-05)* `reorder_items(pack, item_ids)` (drag and
+    drop) rewrites the positions in the given order. It raises
+    `ReorderError`, writing nothing, unless the ids are every item of the
+    pack exactly once, so a stale page can't lose or duplicate an item.
+    `sort_items(pack, sort)` sorts by one of `ITEM_SORTS`: `type` (the
+    Discover order), `title`, `provider`, or `license` (what needs no credit
+    first), ties by title then id.
 - **Forms:** `NewPackForm` (title, intended use, tags). `PackDetailsForm`
   and `PackItemForm` bind only the posted fields, like `ReviewForm`, so each
   autosaving field writes only itself. A variant must be one of the asset's
@@ -391,8 +443,10 @@ workflows), `packs/forms.py` and `packs/views.py`.
     (`packs/partials/items.html`) and `HX-Trigger: packItemsChanged`, which
     refreshes Add from my library. Details, variant and import path reply
     with a status line. Any non-HTMX POST redirects to the builder.
-  - Add from my library is `filter_library(user, {"q": q})`: the first 12
-    matches, those already in the pack marked "In pack".
+  - Add from my library is `filter_library(user, {"q": q, "page": page},
+    exclude_entries=<the pack's entries>)`: one page of 12, with what's in
+    the pack left out before paging (user request, 2026-11-05). `show_in=1`
+    includes them, marked "In pack". It reports how many are hidden.
   - The picker (`PickerView`) takes the member's `entry`, or a `provider`
     and `external_id`, checked before any provider is called (**400**
     otherwise). It lists `owned_by()` packs with their item counts and
@@ -400,7 +454,128 @@ workflows), `packs/forms.py` and `packs/views.py`.
     replies with the list again, "Added to …", and (for Discover) the saved
     count out of band, or the `ProviderError` message with nothing saved.
 - **Side panel:** every packs page lists the member's packs
-  (`packs/partials/pack_nav.html`, `my_packs`), with New.
+  (`packs/partials/pack_nav.html`, `my_packs`), with New. The pack page shows
+  a visitor a short "Shared pack" note with Sign up instead.
+- **The pack page** *(Phase 8)*: `PackPageView` at `/packs/<slug>/`, open to
+  everyone (no login mixin) and read through `visible_to()`. It shows the pack
+  (title, owner, intended use, tags) and each item in position order: the
+  stored Asset's thumbnail, type, provider, title, author, license, credit
+  (for non-CC0 items), the chosen variant with its file count and size, the
+  import path and the source link. Those come from `manifest_item()`, so the
+  page shows what the export will hold. It never reads anything from a
+  library entry: no notes, rating, status or community rating. Only the
+  owner sees Edit in builder (and a Private chip); there are no forms.
+  `PackExportView` (`/packs/<slug>/export/`) serves `manifest_for()` as an
+  indented JSON download.
+
+## Downloads
+
+*(User request, 2026-11-05.)* `packs/downloads.py`. The Toolbox never
+downloads, hosts or proxies a file. `pack_download()` and `item_download()`
+only list the providers' URLs, each with its path in the zip, for
+`static/js/bundle-download.js` to fetch and zip in the browser (as the
+library's bundle does).
+
+- **Paths:** each item's chosen variant's files (from `manifest_item()`, so
+  the same files as the export) go under its import path, run through
+  `safe_path()`; a repeated name gets `-2`, `-3`…. Unzipped at the top of a
+  project, every file lands where the manifest says.
+- **The pack:** always a zip, `<slug>.zip`, with `CREDITS.txt` and
+  `<slug>.axcenity-pack.json` (`manifest_for()`) at the top.
+- **One item:** a single file is saved as it is (`zip: false`); several are
+  zipped with the item's own CREDITS.txt in its folder.
+- **Limits:** no files, or over `BUNDLE_MAX_BYTES` (2 GB), returns
+  `{"error": …}`, which the page shows.
+- **Who:** `PackFilesView` reads through `visible_to()` and
+  `PackSharedFilesView` through `shared_by_link()` (noindex), like the page
+  and its manifest.
+
+## Licenses and credits
+
+*(User request, 2026-11-05.)*
+
+- `catalog/licenses.py`: `license_key()` reads a license as the providers
+  write it ("CC0 1.0", "CC BY-NC-SA 3.0", "Public Domain Mark", "CC
+  SAMPLING+ 1.0"…, ignoring case, spacing, "CC" and the version) and
+  `license_info()` returns its `LicenseInfo`: name, plain summary, credit
+  (`required`, `listed` for the Public Domain Mark, or `optional` for CC0),
+  commercial use and changes (yes, no, or `None` for partly or unknown),
+  share-alike, the steps to meet it, and the deed URL. Anything else is
+  `unknown`. `Asset.license_info` reads it. Not legal advice; each card
+  links to the deed.
+- `packs/credits.py`: `pack_credits(items)` groups a pack's items by license
+  (those needing credit first), with `required` exactly the manifest's
+  `credits`, `optional` thank-you lines for CC0 items, and warnings for
+  non-commercial, no-changes, share-alike, Sampling+ and unknown licenses.
+  It reads only PackItems and Assets (anything with `.asset` works, so a
+  library entry gets the same treatment).
+- **The notice** (user request, 2026-11-05: formal, for everyone):
+  `PackCredits.notice(subject, *, compiled_by, source_url, prepared)` is the
+  Attribution and License Notice, wrapped at 78 columns: who it covers and
+  who compiled it, a statement that the assets belong to their creators,
+  then 1. Required attribution, 2. License terms (per license: the deed, the
+  items it applies to, and `LicenseInfo.permits`, `.requires` and
+  `.prohibits` as You may / You must / You may not), 3. Restrictions in
+  force (the warnings), 4. Optional acknowledgements, and a disclaimer. It's
+  the CREDITS.txt in every download and the text the attribution pages
+  offer to copy; `pack_notice(pack, credits, source_url)` fills it in for a
+  pack. `credit_lines()` is the short version for a credits screen.
+- **Uses and compatibility** (user request, 2026-11-05): `USES` is
+  commercial, personal and internal. `LicenseInfo.use_status(use)` returns
+  (`ok`, `caution` or `blocked`, a note): non-commercial licenses block
+  commercial use and limit internal use to private testing, ND and SA add
+  conditions, Sampling+ allows commercial use only remixed, and an unknown
+  license blocks both public uses. `.uses` lists the three `UseVerdict`s and
+  `.symbols` the license's `SYMBOLS` (icon, name, meaning).
+  `packs.credits.compatibility(groups)` gives a pack's `UseCheck` per use:
+  the most restrictive status (`worse()`) and one reason per limiting
+  license, blocking ones first; `PackCredits.compatibility`,
+  `.blocked_uses` and `.has_conditions` read it, and the notice's section 3,
+  "Permitted uses", states it. The builder's item list carries the pack's
+  credits, so the check follows every add, move or remove.
+- **The Attribution center** (`packs/attribution.py`, its own views module):
+  - `AttributionGuideView` (`/attribution/`, everyone): the license guide.
+  - `AttributionPacksView` (members): `pack_credits()` for each of their own
+    packs (`owned_by()`).
+  - `PackAttributionView` (`/attribution/packs/<slug>/`): one pack's
+    attribution through `visible_to()`, the pack page's reader rule;
+    `SharedPackAttributionView` serves it by share link (noindex; a public
+    pack's link redirects).
+  - `AttributionAssetsView` (members): their library through
+    `filter_library(..., licenses=license_filter(user, keys, credits))`.
+    `license_filter()` turns the chosen license types and credit rules into
+    the license strings in that library that match both (None when nothing is
+    chosen); `license_choices()` gives the chips with counts;
+    `clean_license_params()` drops unknown values. All in
+    `catalog/library.py`.
+  - `AssetAttributionView` (`/attribution/assets/<id>/`): the member's own
+    entry only, a **404** otherwise.
+
+## Export manifest
+
+*(Phase 8.)* `packs/manifest.py`. `build_manifest(pack, *, source_url,
+exported_at=None)` is the one builder; `packs.views.manifest_for(request,
+pack)` calls it with the absolute URL of the pack's page, for the website
+download and the API export alike, so both return the same document. The
+shape is the PRD's Option A, locked by `tests/golden/pack_manifest.json`.
+
+- **Top level:** `format` (`"axcenity-pack"`), `version` (1), `exported_at`
+  (ISO 8601, UTC, to the second), `pack` (`title`, `slug`, `author` the
+  owner's username, `description`, `tags` A–Z, `source_url`), `items` in
+  position order, and `credits`.
+- **Each item** (`manifest_item()`): `name`, `kind`, `provider`,
+  `external_id`, `variant`, `files` (each `url`, `filename`, `size`),
+  `total_size`, `license`, `license_url`, `author`, `attribution`,
+  `source_url` and `import_path` (the owner's, or `<kind>s/<external_id>/`).
+- **The variant** (`chosen_variant()`): the item's `preferred_variant`
+  looked up by its exact label in `Asset.variants`. A label the Asset doesn't
+  list falls back to `default_variant()`. An asset with no variants gives
+  `variant: null`, `files: []`, `total_size: null`. A size the provider
+  didn't give stays `null`.
+- **Credits:** every item whose license isn't CC0 (`is_cc0()`: it starts
+  with "CC0", ignoring case) gives `credit_line()`: its attribution, or
+  `"<title>" by <author>, <license>` when it has none. Each line appears once,
+  in item order.
 
 ## Library API
 
@@ -443,8 +618,33 @@ views are thin: they call the same `filter_library()` and
   `status_reason` alone explains the current status. Create passes it to
   `save_to_library()` for the first record. Its rules match `ReviewForm`: notes up to
   10,000 characters, kept as typed with line breaks stored as LF; rating 1
-  to 5 or null; one of the four statuses. Phase 8's public pack serializer
-  can reuse `AssetSerializer`, which holds no member's fields.
+  to 5 or null; one of the four statuses. The pack API's public serializers
+  reuse `AssetSerializer`, which holds no member's fields.
+
+## Pack API
+
+*(Phase 8.)* `packs/api.py` and `packs/serializers.py`. Read-only: each view
+defines only GET, so POST, PUT, PATCH and DELETE are a **405** (packs are
+made and changed on the website only). Each sets `permission_classes =
+[AllowAny]` over the project's sign-in-by-default, and reads packs through
+`visible_to()`.
+
+- **List** (`GET /api/packs/`): public packs plus the caller's own, newest
+  change first, 12 to a page, in the library API's shape (`count`, `page`,
+  `num_pages`, `next`, `previous`, `results`; a bad page is the first, one
+  past the end the last). `?mine=1` (or `true`, `yes`) lists only the
+  caller's and keeps itself in the page links; signed out it's a **401**
+  (`NotAuthenticated`, `WWW-Authenticate: Token`).
+- **Detail** (`GET /api/packs/<id>/`): the list's fields plus `items`.
+- **Export** (`GET /api/packs/<id>/export/`): the manifest.
+- **The public serializers:** `PackSerializer` (`id`, `slug`, `title`,
+  `author`, `description`, `tags`, `visibility`, `item_count`, `created_at`,
+  `updated_at`, and the absolute `url`, `export_url` and `page_url`).
+  `PackDetailSerializer` adds `items`, each a `PackItemSerializer` (`id`,
+  `position`, `preferred_variant`, `import_path`, `default_import_path` and
+  the nested `asset`, `catalog.serializers.AssetSerializer`). Only Pack,
+  PackItem and Asset fields: nothing from a library entry, and no community
+  rating.
 
 ## Authentication
 
@@ -485,15 +685,17 @@ Every rule has a test (see [TESTING.md](TESTING.md)).
 ## Shared functions
 
 Each of these has exactly one implementation, used by both the pages and
-the API. `normalize_tag()`, `filter_library()`, `add_to_pack()`, `search_records()` and `fetch_record()` are built; the rest are *(planned)*:
+the API. all but `filter_public_packs()` are built:
 
 | Function | Purpose |
 |---|---|
 | `normalize_tag()` | Built (Phase 3), `catalog/tags.py`. The one way to tidy tag names: lowercase, trimmed, single spaces; number-only tags dropped; a plural "s" stripped from the last word unless it ends in "ss". Returns `None` for a dropped tag |
 | `filter_library(user, params)` | Built (Phase 4), `catalog/library.py`. Library search (title, tags, notes), filters (type, provider, status, tags, minimum rating), sorts and pages of 12, for the caller's own entries only (see "Library and saving") |
-| `filter_public_packs(params)` | Gallery search, type filter, sorts, pages of 12 |
+| `filter_public_packs(params)` | *(planned)* Gallery search, type filter, sorts, pages of 12 |
+| `pack_credits(items)` | Built (user request, 2026-11-05), `packs/credits.py`. A pack's licenses, required and optional credits and warnings, and the formal notice (see "Licenses and credits") |
+| `license_info(name)` | Built (user request, 2026-11-05), `catalog/licenses.py`. What a license allows and asks |
 | `add_to_pack(pack, saved_asset)` | Built (Phase 7), `packs/services.py`. Adds an item at the end on the default variant, once per entry, and refuses another member's entry (see "Packs") |
-| Manifest builder | The Option A export shape, locked by a golden file |
+| `build_manifest(pack, *, source_url, exported_at=None)` | Built (Phase 8), `packs/manifest.py`. The Option A export, locked by a golden file (see "Export manifest") |
 | `search_records()` | Built (Phase 2a). Returns `AssetRecord`s (`providers/records.py`), next to the console's `search()` |
 | `fetch_record()` | Built (Phase 3). One asset's full `AssetRecord` with its `variants`, next to the console's `get_details()`. ambientCG: one variant per download zip. Poly Haven: `_cached_info()` plus `/files`, keeping every URL; loose maps grouped by resolution and format ("2K JPG"), and each bundle (glTF, Blend…) its own variant with its included files. Openverse: the main file, then one per other file type. An ID that isn't a plain slug is refused before any request |
 

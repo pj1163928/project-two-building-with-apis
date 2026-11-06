@@ -14,8 +14,10 @@ from django.urls import reverse
 
 pytestmark = pytest.mark.django_db
 
-PUBLIC_PAGES = ["packs:home", "catalog:discover", "accounts:login", "accounts:signup"]
+PUBLIC_PAGES = ["packs:home", "catalog:discover", "packs:attribution", "accounts:login"]
+PUBLIC_PAGES += ["accounts:signup"]
 MEMBER_PAGES = ["packs:home", "catalog:discover", "catalog:library", "packs:list", "packs:create"]
+MEMBER_PAGES += ["packs:attribution", "packs:attribution_packs", "packs:attribution_assets"]
 MEMBER_PAGES += ["accounts:profile", "accounts:settings", "accounts:token"]
 
 TYPE_HEXES = ["#F2A15A", "#6C8CFF", "#4CC38A", "#A48AFF"]
@@ -351,6 +353,7 @@ def test_glow_colours_come_only_from_the_page_drop_tokens():
         ("packs:list", "packs"),
         ("accounts:profile", "account"),
         ("accounts:settings", "settings"),
+        ("packs:attribution", "attribution"),
         ("accounts:login", "account"),
     ],
 )
@@ -376,7 +379,7 @@ def test_activity_bar_entries_in_order(client):
     html = client.get(reverse("packs:home")).content.decode()
     sidebar = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
     labels = re.findall(r'<a [^>]*aria-label="([^"]+)"', sidebar)
-    assert labels == ["Discover", "Library", "Packs", "Account", "Settings"]
+    assert labels == ["Discover", "Library", "Packs", "Attribution", "Account", "Settings"]
     # Account and Settings sit at the foot, after the page's own panel.
     assert sidebar.index("side-panel-inner") < sidebar.index('aria-label="Account"')
 
@@ -387,6 +390,7 @@ def test_activity_bar_entries_in_order(client):
         ("catalog:discover", "Discover"),
         ("catalog:library", "Library"),
         ("packs:list", "Packs"),
+        ("packs:attribution", "Attribution"),
         ("accounts:profile", "Account"),
         ("accounts:settings", "Settings"),
     ],
@@ -605,7 +609,7 @@ def test_content_has_breathing_room_without_spreading_out(client):
     assert 'mx-auto px-8 lg:px-12 pt-14 pb-12 space-y-8">' in content
 
 
-ICON_LABELS = ["Discover", "Library", "Packs", "Account", "Settings"]
+ICON_LABELS = ["Discover", "Library", "Packs", "Attribution", "Account", "Settings"]
 
 
 def test_activity_bar_icons_show_tooltips(client):
@@ -966,3 +970,28 @@ def test_account_pages_are_centred_at_one_width(member_client, name):
     """They sat to the left of the content area (user report, 2026-11-05)."""
     html = member_client.get(reverse(name)).content.decode()
     assert '<div class="account-page max-w-3xl mx-auto w-full space-y-8">' in html
+
+
+@pytest.mark.parametrize("signed_in", [False, True])
+def test_pack_page_uses_type_colour_only_for_the_assets_type(client, member, make_asset, signed_in):
+    from catalog.models import SavedAsset
+    from packs.models import Pack
+    from packs.services import add_to_pack
+
+    pack = Pack.objects.create_pack(member, "Every Kind")
+    for kind in KIND_KEYS:
+        add_to_pack(
+            pack,
+            SavedAsset.objects.create(user=member, asset=make_asset(external_id=kind, kind=kind)),
+        )
+    Pack.objects.filter(pk=pack.pk).update(visibility="public")
+    if signed_in:
+        client.force_login(member)
+    html = client.get(reverse("packs:public", args=[pack.slug])).content.decode()
+    content = html.split('id="content"', 1)[1].split('id="page-footer"', 1)[0]
+    coloured = re.findall(
+        r'class="([^"]*\b(?:text|bg)-(?:texture|hdri|model|sound)\b[^"]*)"', content
+    )
+    assert {classes.split()[0] for classes in coloured} == {"library-type-icon", "result-fallback"}
+    chrome = html.split('id="content"', 1)[0] + html.split('id="status-bar"', 1)[1]
+    assert not TYPE_TOKEN.search(_classes(chrome))

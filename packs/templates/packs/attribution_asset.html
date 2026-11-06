@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ asset.title }} · Attribution{% endblock %}
+{% block breadcrumb %}{% url 'packs:attribution' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="attribution" icon="license" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'packs:attribution_asset' entry.pk as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="asset" icon="library" current=True %}{% endblock %}
+{% block panel_title %}Attribution{% endblock %}
+{% block side_panel %}{% include "packs/partials/attribution_nav.html" %}{% endblock %}
+
+{# One asset's attribution, the member's own entry only: its license with the formal     #}
+{# terms, the credit it needs, the notice to copy, and the member's packs it's in (each  #}
+{# linking to that pack's attribution). Monochrome: no type colour here.                 #}
+{% block content %}
+  {% with info=group.info %}
+  <section class="attribution space-y-6">
+    <header class="attribution-asset-head">
+      <div class="lookup-thumb attribution-asset-thumb">
+        <span class="result-fallback" aria-hidden="true">{% include "partials/icon.html" with name=asset.tile.key size=24 %}</span>
+        {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+      </div>
+      <div class="space-y-2 min-w-0">
+        <div class="micro text-fg-secondary flex items-center gap-2"><i class="mark w-3" aria-hidden="true"></i>Asset attribution</div>
+        <h1 id="attribution-asset-title" class="headline text-[1.75rem] md:text-[2rem] text-fg-strong">{{ asset.title }}</h1>
+        <p class="micro text-fg-muted">{{ asset.get_kind_display }} · {{ asset.get_provider_display }}{% if asset.author %} · by {{ asset.author }}{% endif %}</p>
+      </div>
+    </header>
+
+    <div class="work-toolbar justify-between">
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="{% url 'catalog:entry' entry.pk %}" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="library" size=15 %}<span>Open in library</span></a>
+        {% if asset.source_url %}<a href="{{ asset.source_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="eye" size=15 %}<span>View on {{ asset.get_provider_display }}</span></a>{% endif %}
+      </div>
+      <span class="status-chip micro" data-credit="{{ info.credit }}">{{ info.credit_label }}</span>
+    </div>
+
+    <article class="credits-group" aria-labelledby="attribution-asset-license">
+      <header class="credits-group-head">
+        {% include "packs/partials/license_symbols.html" with large=True %}
+        <h2 id="attribution-asset-license" class="credits-group-title">{% if group.url %}<a href="{{ group.url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ group.label }}</a>{% else %}{{ group.label }}{% endif %} <span class="text-fg-muted font-normal">· {{ info.title }}</span></h2>
+        <a href="{% url 'packs:attribution' %}#{{ info.anchor }}" class="entry-link text-xs">In the guide</a>
+      </header>
+      <p class="text-sm text-fg-secondary">{{ info.summary }}</p>
+      {% include "packs/partials/license_uses.html" %}
+      {% include "packs/partials/license_terms.html" %}
+      <div class="lookup-credit"><span class="micro text-fg-muted">{% if info.needs_credit %}Credit to show{% else %}Optional acknowledgement{% endif %}</span><span>{% if info.needs_credit %}{{ entry.credit }}{% else %}{{ credits.optional.0 }}{% endif %}</span></div>
+      {% if credits.warnings %}<ul class="credits-warnings">{% for warning in credits.warnings %}<li>{% include "partials/icon.html" with name="alert" size=14 %}<span>{{ warning }}</span></li>{% endfor %}</ul>{% endif %}
+      <details class="credits-how">
+        <summary>How to meet it</summary>
+        <ol>{% for step in info.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+      </details>
+    </article>
+
+    {% include "packs/partials/notice_copy.html" %}
+
+    <section class="builder-section" aria-labelledby="attribution-asset-packs">
+      <h2 id="attribution-asset-packs" class="micro text-fg-secondary">In your packs</h2>
+      {% if packs %}
+        <ul class="attribution-licenses">{% for pack in packs %}<li><a href="{% url 'packs:attribution_pack' pack.slug %}" class="license-chip">{{ pack.title }}</a></li>{% endfor %}</ul>
+      {% else %}
+        <p class="text-sm text-fg-weak">It isn't in any of your packs yet.</p>
+      {% endif %}
+    </section>
+  </section>
+  {% endwith %}
+{% endblock %}

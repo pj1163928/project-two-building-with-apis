@@ -238,7 +238,12 @@ def test_add_from_my_library_filters_as_you_type_and_marks_whats_in(
         user=member, asset=make_asset(external_id="moss", title="Mossy Ground")
     )
     url = reverse("packs:library_search", args=[pack.pk])
+    # What's already in the pack is hidden by default (user request, 2026-11-05)…
     html = member_client.get(url, headers=HTMX).content.decode()
+    assert "Mossy Ground" in html and "Red Brick 03" not in html
+    assert "1 already in this pack is hidden." in html
+    # …and shown, marked "In pack", when the owner asks for it.
+    html = member_client.get(url, {"show_in": "1"}, headers=HTMX).content.decode()
     assert "Mossy Ground" in html and "Red Brick 03" in html
     assert f'id="pick-{item.saved_asset_id}"' in html and "In pack" in html
     html = member_client.get(url, {"q": "moss"}, headers=HTMX).content.decode()
@@ -408,3 +413,191 @@ def test_the_drawer_lists_the_packs_its_entry_is_in(member_client, item):
     packs = html.content.decode().split('id="entry-packs"', 1)[1].split("</ul>", 1)[0]
     assert "Medieval Village" in packs and "2K JPG" in packs
     assert reverse("packs:builder", args=[item.pack_id]) in packs
+
+
+# ---------------------------------------------------------------- builder polish (2026-11-05)
+# User request: Add from my library hides what's in the pack, pages with arrows and
+# shows thumbnails; items drag and drop and auto sort; the variant dropdown is styled
+# and shows each variant's files and size; the import path is explained.
+
+
+def _library(member, make_asset, count):
+    return [
+        SavedAsset.objects.create(
+            user=member, asset=make_asset(external_id=f"rock_{n:02}", title=f"Rock {n:02}")
+        )
+        for n in range(count)
+    ]
+
+
+def test_add_from_my_library_pages_with_arrows(member_client, pack, member, make_asset):
+    _library(member, make_asset, 14)
+    url = reverse("packs:library_search", args=[pack.pk])
+    html = member_client.get(url, headers=HTMX).content.decode()
+    assert html.count('class="pack-pick"') == 12
+    assert "Page 1 of 2 · 14 assets" in html
+    assert 'aria-label="Previous page" disabled' in html
+    assert 'aria-label="Next page" hx-get=' in html and '"page": "2"' in html
+    # The form remembers the page (out of band), so an Add refreshes this same page.
+    assert '<input type="hidden" name="page" id="pack-library-page" value="1"' in html
+    html = member_client.get(url, {"page": "2"}, headers=HTMX).content.decode()
+    assert html.count('class="pack-pick"') == 2 and "Page 2 of 2" in html
+    assert 'id="pack-library-page" value="2"' in html
+
+
+def test_hidden_entries_never_count_towards_a_page(member_client, pack, member, make_asset):
+    entries = _library(member, make_asset, 13)
+    add_to_pack(pack, entries[0])
+    url = reverse("packs:library_search", args=[pack.pk])
+    html = member_client.get(url, headers=HTMX).content.decode()
+    # 12 left to add fit on one page; the one in the pack is hidden, and said to be.
+    assert html.count('class="pack-pick"') == 12 and "Page 1 of" not in html
+    assert f'id="pick-{entries[0].pk}"' not in html
+    assert "1 already in this pack is hidden." in html
+
+
+def test_a_pack_holding_everything_says_so(member_client, pack, item):
+    url = reverse("packs:library_search", args=[pack.pk])
+    html = member_client.get(url, headers=HTMX).content.decode()
+    assert "Everything in your library is already in this pack." in html
+    html = member_client.get(url, {"q": "brick"}, headers=HTMX).content.decode()
+    assert "Everything matching “brick” is already in this pack." in html
+
+
+def test_each_pick_shows_its_thumbnail_and_license(member_client, pack, entry):
+    html = member_client.get(reverse("packs:library_search", args=[pack.pk]), headers=HTMX)
+    html = html.content.decode()
+    thumb = entry.asset.thumbnail_url
+    # The small thumbnail and the bigger preview on hover, both the provider's URL.
+    assert html.count(f'src="{thumb}"') == 2 and 'class="pack-pick-zoom"' in html
+    assert "Texture · Poly Haven · CC0" in _text(html)
+
+
+def test_the_builder_has_the_show_in_pack_toggle(member_client, pack):
+    html = member_client.get(reverse("packs:builder", args=[pack.pk])).content.decode()
+    assert 'id="pack-library-form"' in html and 'name="show_in" value="1"' in html
+    assert "Show ones already in this pack" in html
+    assert 'hx-trigger="submit, packItemsChanged from:body"' in html
+
+
+def _three(pack, member, make_asset):
+    kinds = [("zeta", "sound", "openverse", "CC BY 4.0"), ("alpha", "model", "ambientcg", "CC0")]
+    kinds.append(("mid", "texture", "polyhaven", "CC0"))
+    items = []
+    for title, kind, provider, license in kinds:
+        asset = make_asset(
+            provider=provider, external_id=title, kind=kind, title=title.title(), license=license
+        )
+        items.append(add_to_pack(pack, SavedAsset.objects.create(user=member, asset=asset))[0])
+    return items
+
+
+def _order(pack):
+    return [item.asset.title for item in pack.ordered_items()]
+
+
+def test_dragging_saves_the_new_order(member_client, pack, member, make_asset):
+    zeta, alpha, mid = _three(pack, member, make_asset)
+    url = reverse("packs:items_reorder", args=[pack.pk])
+    order = f"{mid.pk},{zeta.pk},{alpha.pk}"
+    response = member_client.post(url, {"order": order}, headers=HTMX)
+    assert response.status_code == 200 and "packItemsChanged" in response["HX-Trigger"]
+    assert _order(pack) == ["Mid", "Zeta", "Alpha"]
+    assert list(pack.items.order_by("position").values_list("position", flat=True)) == [0, 1, 2]
+    # The list it swaps in can be dragged again.
+    html = response.content.decode()
+    assert f'data-reorder-url="{url}"' in html and "data-drag-handle" in html
+
+
+@pytest.mark.parametrize(
+    "order",
+    ["", "x,y", "{a}", "{a},{b}", "{a},{b},{c},{c}", "{a},{b},999999"],
+)
+def test_a_stale_or_bad_order_is_a_400_and_changes_nothing(
+    member_client, pack, member, make_asset, order
+):
+    a, b, c = _three(pack, member, make_asset)
+    before = _order(pack)
+    order = order.format(a=a.pk, b=b.pk, c=c.pk)
+    url = reverse("packs:items_reorder", args=[pack.pk])
+    assert member_client.post(url, {"order": order}, headers=HTMX).status_code == 400
+    assert _order(pack) == before
+
+
+def test_an_order_naming_another_packs_item_is_refused(member_client, pack, member, make_asset):
+    a, b, c = _three(pack, member, make_asset)
+    other_pack = Pack.objects.create_pack(member, "Other")
+    stray = add_to_pack(other_pack, a.saved_asset)[0]
+    url = reverse("packs:items_reorder", args=[pack.pk])
+    response = member_client.post(url, {"order": f"{b.pk},{c.pk},{stray.pk}"}, headers=HTMX)
+    assert response.status_code == 400 and _order(pack) == ["Zeta", "Alpha", "Mid"]
+
+
+@pytest.mark.parametrize(
+    ("sort", "expected"),
+    [
+        ("type", ["Mid", "Alpha", "Zeta"]),  # texture, model, sound
+        ("title", ["Alpha", "Mid", "Zeta"]),
+        ("provider", ["Alpha", "Zeta", "Mid"]),  # ambientCG, Openverse, Poly Haven
+        ("license", ["Alpha", "Mid", "Zeta"]),  # no credit needed first
+    ],
+)
+def test_auto_sort_orders_the_items(member_client, pack, member, make_asset, sort, expected):
+    _three(pack, member, make_asset)
+    url = reverse("packs:items_sort", args=[pack.pk])
+    response = member_client.post(url, {"sort": sort}, headers=HTMX)
+    assert response.status_code == 200 and "packItemsChanged" in response["HX-Trigger"]
+    assert _order(pack) == expected
+    assert "Sorted:" in response.content.decode()
+
+
+def test_an_unknown_sort_is_a_400_and_changes_nothing(member_client, pack, member, make_asset):
+    _three(pack, member, make_asset)
+    url = reverse("packs:items_sort", args=[pack.pk])
+    for sort in ("", "rating", "notes"):
+        assert member_client.post(url, {"sort": sort}, headers=HTMX).status_code == 400
+    assert _order(pack) == ["Zeta", "Alpha", "Mid"]
+    # Without HTMX, a good sort goes back to the builder.
+    builder = reverse("packs:builder", args=[pack.pk])
+    assert member_client.post(url, {"sort": "title"}).url == builder
+
+
+def test_the_builder_offers_drag_and_auto_sort_with_more_than_one_item(
+    member_client, pack, member, make_asset
+):
+    html = member_client.get(reverse("packs:builder", args=[pack.pk])).content.decode()
+    assert 'name="sort"' not in html  # nothing to sort yet
+    _three(pack, member, make_asset)
+    html = member_client.get(reverse("packs:builder", args=[pack.pk])).content.decode()
+    assert html.count("data-drag-handle") == 3 and "data-sortable-list" in html
+    assert 'name="sort"' in html
+    for label in ("Type", "Title A–Z", "Provider", "License"):
+        assert f">{label}</option>" in html
+    assert "js/pack-sort.js" in html
+
+
+def test_the_variant_dropdown_is_styled_and_shows_files_and_sizes(
+    member_client, pack, member, make_asset
+):
+    one = [{"url": "https://x/a.jpg", "filename": "a.jpg", "size": 1}]
+    variants = [
+        {"label": "1K JPG", "files": one, "total_size": 2048},
+        {"label": "2K JPG", "files": one * 3, "total_size": None},
+    ]
+    entry = SavedAsset.objects.create(
+        user=member, asset=make_asset(external_id="styled", variants=variants)
+    )
+    add_to_pack(pack, entry)
+    html = member_client.get(reverse("packs:builder", args=[pack.pk])).content.decode()
+    assert '<label class="toolbar-field pack-item-field ax-select">' in html
+    assert 'class="ax-select-chevron"' in html
+    assert '<option value="1K JPG">1K JPG · 1 file · 2.0\xa0KB</option>' in html
+    assert '<option value="2K JPG" selected>2K JPG · 3 files</option>' in html
+
+
+def test_the_import_path_is_explained(member_client, pack, item):
+    html = member_client.get(reverse("packs:builder", args=[pack.pk])).content.decode()
+    assert 'id="import-path-help"' in html and "What's an import path?" in html
+    hint = f'id="item-{item.pk}-path-hint"'
+    assert f'aria-describedby="item-{item.pk}-path-hint"' in html and hint in html
+    assert "Blank means <code>textures/red_brick_03/</code>" in html
