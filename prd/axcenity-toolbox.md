@@ -220,6 +220,15 @@ asset catalog and pack creator for the engine.
 118. As a visitor or member, I want each license shown with its symbols, a legend, and a "Can I use it?" verdict for each use, so that I can read a license at a glance. **[T1]**
 119. As a visitor or member, I want the license guide to list one license per row and the Attribution pages centred, so that they're easy to read. **[T1]**
 
+### Added 2026-11-06 (at the user's request, a third round of Phase 8 polish)
+
+120. As anyone, I want every page laid out consistently, a pack's page centred like the rest, and the pack page's and builder's thumbnails, grips and type lines on one top edge, so that the site reads as one piece. **[T1]**
+121. As a visitor or member, I want the license guide's "On this page" to fold its licenses away and every sidebar menu to show an icon per row, so that the side panel stays short and scannable. **[T1]**
+122. As anyone browsing Discover, I want each result's license shown as its symbols, and to filter results by license and by whether commercial use is allowed, so that I only see assets I can use. **[T1]**
+123. As anyone browsing Discover, I want a result to open in a drawer like the library's, with its license, uses and downloads, and still be one click from the site it came from, so that I can judge it before saving it. **[T1]**
+124. As a member, I want to lay out my packs as a grid or as a list, and have the Toolbox remember which, so that a long list of packs is easy to scan. **[T1]**
+125. As a member, I want to play a sound from my library, its drawer, the pack builder and a pack's page, not only from Discover, so that I can check it where I use it. **[T1]**
+
 ### Requirement traceability
 
 | Graded requirement | User stories |

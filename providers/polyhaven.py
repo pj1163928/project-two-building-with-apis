@@ -141,6 +141,8 @@ HOME_URL = "https://polyhaven.com"
 
 # The Toolbox's kinds mapped to Poly Haven's `t` filter (the PRD's mapping).
 KIND_FILTERS = {"texture": "textures", "hdri": "hdris", "model": "models"}
+# Every Poly Haven asset is CC0, so Discover's license filters need no request to rule it in or out.
+LICENSES = ("cc0",)
 
 # How long an asset's /info answer is reused (the PRD: 12 hours).
 INFO_CACHE_SECONDS = 12 * 60 * 60

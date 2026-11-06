@@ -609,3 +609,26 @@ def test_the_attribution_pages_are_centred(member_client, golden_pack):
         reverse("packs:attribution_assets"),
     ):
         assert '<section class="attribution ' in member_client.get(url).content.decode()
+
+
+def test_the_verdict_key_keeps_each_icon_beside_its_word(client):
+    """ "Not usable" was the last span in the key, so the legend's stacked layout
+    caught it and put its icon above the word (user report, 2026-11-06)."""
+    css = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    assert ".symbol-legend li:not(.symbol-legend-key) > span:last-child { display: grid;" in css
+    assert ".symbol-legend li > span:last-child" not in css
+    html = client.get(reverse("packs:attribution")).content.decode()
+    key = re.search(r'<li class="symbol-legend-key">(.*?)</li>', html, re.S).group(1)
+    assert key.count('<span class="use-key">') == 3
+
+
+def test_on_this_page_folds_the_licenses_away(client):
+    html = client.get(reverse("packs:attribution")).content.decode()
+    toc = html.split('id="attribution-toc"', 1)[1].split("</nav>", 1)[0]
+    fold = re.search(r'<details id="attribution-toc-licenses"[^>]*>', toc).group(0)
+    assert "data-remember" in fold and " open" not in fold  # closed until opened
+    licenses = toc.split(fold, 1)[1].split("</details>", 1)[0]
+    assert licenses.count('class="panel-row" href="#license-') == 11
+    # Outside the fold: Symbols, At a glance, How to credit, Optional credits.
+    outside = toc.replace(licenses, "")
+    assert outside.count('class="panel-row" href="#attribution-') == 4

@@ -13,7 +13,7 @@ phases add.
 | `config` | Settings, root URLs, the shell's context processor | — |
 | `providers` | API clients for ambientCG, Poly Haven and Openverse (plain Python, not a Django app) | — |
 | `accounts` | Sign-up, sign-in, sign-out, profile, settings, and the API token page | `accounts:` |
-| `catalog` | Discover and the library; Asset, Tag and SavedAsset; saving; the library API | `catalog:` |
+| `catalog` | Discover (its shelves, license filters and drawer) and the library; Asset, Tag and SavedAsset; saving; the library API | `catalog:` |
 | `packs` | Home; Pack and PackItem, the member's packs, the builder and the Add to pack picker; each pack's page, its export and the pack API; the public gallery *(planned)* | `packs:` |
 
 `config/urls.py` mounts `accounts.urls` at `/accounts/`, and mounts
@@ -24,8 +24,9 @@ phases add.
 | Name | Path | Access |
 |---|---|---|
 | `packs:home` | `/` | Everyone |
-| `catalog:discover` | `/discover/?type=<kind>&q=<query>` | Everyone |
-| `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>&page=<n>` | Everyone (an HTMX fragment; `page` is optional, 1 to 20) |
+| `catalog:discover` | `/discover/?type=<kind>&q=<query>&license=<key>&commercial=1` | Everyone (`license` repeats; both filters are optional) |
+| `catalog:discover_shelf` | `/discover/<kind>/<provider>/?q=<query>&page=<n>&license=&commercial=` | Everyone (an HTMX fragment; `page` is optional, 1 to 20; the filters as on the page) |
+| `catalog:discover_asset` | `/discover/asset/<provider>/<external_id>/` | Everyone (Discover's drawer for HTMX, a page otherwise; never writes) |
 | `catalog:library` | `/library/?q=&type=&provider=&status=&tag=&min_rating=&sort=&page=` | Members (the controls' HTMX requests get the results fragment) |
 | `catalog:save` | `/library/save/` | Members; POST only, with CSRF (an HTMX fragment) |
 | `catalog:entry` | `/library/<id>/` | Members, own entries only (anything else is **404**). The library's HTMX request gets the drawer; any other request gets the full page |
@@ -33,7 +34,7 @@ phases add.
 | `catalog:remove` | `/library/<id>/remove/` | Members, own entries only (anything else is **404**). GET is the confirm listing the packs it will leave (the library's dialog for HTMX, a page otherwise); POST removes it, with CSRF (HTMX gets the results fragment) |
 | `catalog:api_library` | `/api/library/` | API: signed in by token or session (401 otherwise). GET lists the caller's entries; POST saves one |
 | `catalog:api_entry` | `/api/library/<id>/` | API: the caller's own entries only (**404** otherwise). GET, PATCH, PUT, DELETE |
-| `packs:list` | `/packs/` | Members: their own packs |
+| `packs:list` | `/packs/?layout=grid\|list` | Members: their own packs (`layout` is optional and remembered in the session) |
 | `packs:create` | `/packs/new/` | Members; POST with CSRF creates a private pack and opens its builder |
 | `packs:builder` | `/packs/<id>/edit/` | The owner only (**404** otherwise) |
 | `packs:details`, `packs:visibility`, `packs:delete` | `/packs/<id>/details/`, `…/visibility/`, `…/delete/` | The owner only; POST only, with CSRF. Details saves whichever of `title`, `description`, `tags` is posted; visibility takes `private`, `unlisted` or `public` |
@@ -108,7 +109,9 @@ no pack is given those slugs (`RESERVED_SLUGS`; a pack titled "New" is `new-2`).
 - **Sound previews:** `AssetRecord.preview_url` is Openverse's audio `url`
   (often a Freesound preview MP3). The browser streams it from the
   provider; the Toolbox never downloads or proxies it. Other kinds leave
-  it blank.
+  it blank. A stored sound's `Asset.preview_url` is its first stored file
+  (Openverse lists the main audio first), so the library and packs play it
+  too (user request, 2026-11-06). No migration: it reads `variants`.
 - `catalog/discover.py` holds this logic: `clean_query()`, `clean_kind()`,
   `shelf_provider()`, `pending_shelves()` and `load_shelf()`. `load_shelf()`
   catches only `ProviderError`, so any other exception still surfaces as a
@@ -122,6 +125,37 @@ no pack is given those slugs (`RESERVED_SLUGS`; a pack titled "New" is `new-2`).
   shelf also sends its provider's status out of band (see FRONTEND.md).
 - **Credits:** each provider module has a `CREDIT` line and a `HOME_URL`,
   which every shelf shows.
+- **License filters** (user request, 2026-11-06): `clean_filters()` reads
+  `license` (any of `FILTER_LICENSES`: every guide license but "unknown")
+  and `commercial=1` into a `DiscoverFilters`. `.allowed` is the set of
+  license keys a result may carry: the chosen ones (or all), narrowed by
+  Commercial use to licenses whose `LicenseInfo.commercial` is `True`. The
+  filters ride on every Discover link (`discover_url()`, `shelf_url()`,
+  `shuffle_url()`, `Shelf.page_url`). In `load_shelf()`:
+  - A provider whose assets all carry one license declares it
+    (`LICENSES = ("cc0",)`: ambientCG and Poly Haven). It's searched as
+    usual when that license is allowed, and otherwise not asked at all: the
+    shelf is `filtered_out`.
+  - A provider with mixed licenses declares `LICENSES = None` (Openverse);
+    its `search_records(..., licenses=keys)` sends Openverse's `license=`
+    parameter (the Toolbox's keys are Openverse's codes). An empty allowed
+    set asks nobody.
+  - The cache key gains the allowed licenses for such a provider
+    (`DiscoverFilters.cache_part`), so each set is cached apart.
+  `discover_filter_groups()` builds the side panel's chips with the
+  library's `FilterChip` / `FilterGroup` (`catalog/filters.py`).
+- **Discover's drawer** (user request, 2026-11-06): `DiscoverAssetView`
+  (`catalog:discover_asset`) checks the provider and ID first
+  (`valid_asset_ref()`: a known provider, an ID of 1 to 200 characters, the
+  save view's rule), a **400** otherwise, before any provider call. Then
+  `catalog/preview.py`'s `asset_preview()` gives an `AssetPreview`: the
+  stored `Asset` when anyone has saved it (no request), else the provider's
+  `fetch_record()`, cached 1 h per (provider, hashed ID). It stores nothing.
+  A `ProviderError` renders its message with Retry. The HTMX request gets
+  the drawer, anything else the full page. "In your library" comes from the
+  caller's own entries only. Save from the drawer posts `slot=drawer` to
+  `catalog:save`, which answers with the drawer's own button
+  (`preview_save.html`) instead of the card's corner square.
 
 ## Library and saving
 
@@ -696,7 +730,9 @@ the API. all but `filter_public_packs()` are built:
 | `license_info(name)` | Built (user request, 2026-11-05), `catalog/licenses.py`. What a license allows and asks |
 | `add_to_pack(pack, saved_asset)` | Built (Phase 7), `packs/services.py`. Adds an item at the end on the default variant, once per entry, and refuses another member's entry (see "Packs") |
 | `build_manifest(pack, *, source_url, exported_at=None)` | Built (Phase 8), `packs/manifest.py`. The Option A export, locked by a golden file (see "Export manifest") |
-| `search_records()` | Built (Phase 2a). Returns `AssetRecord`s (`providers/records.py`), next to the console's `search()` |
+| `search_records()` | Built (Phase 2a). Returns `AssetRecord`s (`providers/records.py`), next to the console's `search()`. Openverse's also takes `licenses=` (user request, 2026-11-06) |
+| `load_shelf(provider, kind, query, page, filters)` | Built (Phase 2a; filters 2026-11-06), `catalog/discover.py`. One page of one shelf, cached, with the license filters applied (see "Discover") |
+| `asset_preview(provider_key, external_id)` | Built (user request, 2026-11-06), `catalog/preview.py`. One Discover result in full for its drawer, from the stored Asset or a cached `fetch_record()`; never stores anything |
 | `fetch_record()` | Built (Phase 3). One asset's full `AssetRecord` with its `variants`, next to the console's `get_details()`. ambientCG: one variant per download zip. Poly Haven: `_cached_info()` plus `/files`, keeping every URL; loose maps grouped by resolution and format ("2K JPG"), and each bundle (glTF, Blend…) its own variant with its included files. Openverse: the main file, then one per other file type. An ID that isn't a plain slug is refused before any request |
 
 ## Provider errors
@@ -732,6 +768,12 @@ Django's local-memory cache (`CACHES` in settings):
   `polyhaven._cached_info()`, while the console's `search()` and
   `get_details()` keep calling `_info()` directly. `fetch_record()` uses
   `_cached_info()` too; its `/files` request isn't cached.
+- **Filtered searches** (Openverse with license filters) are cached apart,
+  the allowed licenses added to the key. A CC0-only provider's search is the
+  same with or without filters, so it shares the unfiltered entry.
+- **Discover's drawer** caches each fetched record for 1 h
+  (`preview.PREVIEW_CACHE_SECONDS`, `preview_cache_key()`). A stored Asset
+  needs no cache.
 - **Provider status** is kept for 1 h (see Discover).
 - **Failures are never cached:** a `ProviderError` returns before anything
   is stored, so Retry always reaches the provider again.

@@ -1,0 +1,18 @@
+{# Discover's drawer contents, swapped into discover.html's <dialog id="discover-drawer">   #}
+{# by a result's title (static/js/entry-drawer.js opens it, as for the library's). Like  #}
+{# the library drawer: a sticky head with "Discover result", View on <provider> (the     #}
+{# source site, in a new tab), Open as page and Close, then the body. A faint cropped    #}
+{# mark sits in the panel's lower corner, behind it all.                                 #}
+{% url 'catalog:discover_asset' provider_key external_id as asset_url %}
+<div class="drawer-panel">
+  <header class="drawer-head">
+    <p class="micro text-fg-muted">Discover result</p>
+    <div class="flex items-center gap-1">
+      {% if preview.source_url %}<a href="{{ preview.source_url }}" target="_blank" rel="noopener noreferrer" class="picker-close" aria-label="View on {{ provider_name }} (opens in a new tab)" title="View on {{ provider_name }}">{% include "partials/icon.html" with name="external" size=16 %}</a>{% endif %}
+      <a href="{{ asset_url }}" class="picker-close" aria-label="Open as a page" title="Open as a page">{% include "partials/icon.html" with name="expand" size=16 %}</a>
+      <button type="button" class="picker-close" data-drawer-close aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button>
+    </div>
+  </header>
+  <div class="drawer-body">{% include "catalog/partials/discover_detail.html" %}</div>
+  <i class="mark drawer-mark" aria-hidden="true"></i>
+</div>

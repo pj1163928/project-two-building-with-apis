@@ -1,0 +1,10 @@
+{# A sound's play button and its progress line, inside a positioned thumbnail. Its card  #}
+{# (any element with data-sound-card: a Discover result, a library card, the drawer's   #}
+{# entry, a pack item) takes the playing state. static/js/sound-preview.js plays `url`  #}
+{# (the provider's audio, streamed, never copied), one sound at a time. `small` centres #}
+{# a smaller button, for a pack item's square thumbnail.                                #}
+<button type="button" class="sound-play{% if small %} is-small{% endif %}" data-sound-preview="{{ url }}" aria-pressed="false" aria-label="Play a preview of {{ title }}">
+  <span class="sound-play-icon when-paused">{% if small %}{% include "partials/icon.html" with name="play" size=15 %}{% else %}{% include "partials/icon.html" with name="play" size=18 %}{% endif %}</span>
+  <span class="sound-play-icon when-playing">{% if small %}{% include "partials/icon.html" with name="pause" size=15 %}{% else %}{% include "partials/icon.html" with name="pause" size=18 %}{% endif %}</span>
+</button>
+<span class="sound-progress" aria-hidden="true"></span>

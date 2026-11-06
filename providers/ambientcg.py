@@ -81,6 +81,8 @@ HOME_URL = "https://ambientcg.com"
 
 # The Toolbox's kinds mapped to ambientCG's `type` filter (the PRD's mapping).
 KIND_FILTERS = {"texture": "material", "hdri": "hdri", "model": "3d-model"}
+# Every ambientCG asset is CC0, so Discover's license filters need no request to rule it in or out.
+LICENSES = ("cc0",)
 
 _RECORD_INCLUDE = "title,url,tags,type,thumbnails"
 # Thumbnail sizes in order of preference: big enough for a card, small to load.

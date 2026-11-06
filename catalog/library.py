@@ -21,6 +21,7 @@ from providers import KINDS, PROVIDERS_BY_KEY
 
 from .discover import KIND_TILES, clean_query, discover_url
 from .files import Bundle
+from .filters import FilterChip, FilterGroup
 from .licenses import CREDIT_LABELS, LICENSE_ORDER, LICENSES, license_info, license_key
 from .models import LIBRARY_SORTS, PROVIDER_CHOICES, Asset, SavedAsset, StatusChange, Tag
 from .tags import normalize_tag
@@ -244,45 +245,6 @@ class LibraryPage:
     @property
     def next_url(self) -> str:
         return self.params.url(self.page.next_page_number()) if self.page.has_next() else ""
-
-
-@dataclass(frozen=True)
-class FilterChip:
-    value: str
-    label: str
-    checked: bool
-    count: int | None = None
-
-
-@dataclass(frozen=True)
-class FilterGroup:
-    """One group of the side panel's filter chips. `multiple` groups are
-    checkboxes (any number on); the others are radios (exactly one).
-
-    A group with a `fold` shows its first `fold` chips and folds the rest
-    behind "Show N more" (the Tags group).
-    """
-
-    name: str
-    title: str
-    multiple: bool
-    chips: list[FilterChip]
-    fold: int = 0
-
-    @property
-    def lead_chips(self) -> list[FilterChip]:
-        """The chips always shown."""
-        return self.chips[: self.fold] if self.fold else self.chips
-
-    @property
-    def more_chips(self) -> list[FilterChip]:
-        """The chips folded away until "Show N more" is opened."""
-        return self.chips[self.fold :] if self.fold else []
-
-    @property
-    def more_open(self) -> bool:
-        """Whether the fold starts open: a chosen chip is never hidden."""
-        return any(chip.checked for chip in self.more_chips)
 
 
 def filter_groups(params: LibraryParams, tags: Iterable[Tag] = ()) -> list[FilterGroup]:

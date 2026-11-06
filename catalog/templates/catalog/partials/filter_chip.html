@@ -1,3 +1,5 @@
-{# One side-panel filter chip (library.html): a <label> around a hidden checkbox or radio #}
-{# that belongs to the toolbar's form. Tags carry how many of the member's entries use it. #}
-<label class="filter-chip"><input type="{% if group.multiple %}checkbox{% else %}radio{% endif %}" class="library-control sr-only" form="library-toolbar" name="{{ group.name }}" value="{{ chip.value }}"{% if chip.checked %} checked{% endif %}><span>{{ chip.label }}</span>{% if chip.count %}<span class="filter-chip-count">{{ chip.count }}</span>{% endif %}</label>
+{# One side-panel filter chip: a <label> around a hidden checkbox or radio that belongs to #}
+{# the page's form, `form_id` (the library's toolbar by default; Discover's command bar). #}
+{# `control` is the class its form listens for. Tags carry how many of the member's       #}
+{# entries use them; Discover's license chips carry the license's symbols.               #}
+<label class="filter-chip{% if chip.icons %} has-icons{% endif %}"><input type="{% if group.multiple %}checkbox{% else %}radio{% endif %}" class="{{ control|default:'library-control' }} sr-only" form="{{ form_id|default:'library-toolbar' }}" name="{{ group.name }}" value="{{ chip.value }}"{% if chip.checked %} checked{% endif %}{% if autosubmit %} data-autosubmit{% endif %}>{% if chip.icons %}<span class="filter-chip-icons" aria-hidden="true">{% for icon in chip.icons %}{% include "partials/icon.html" with name=icon size=13 %}{% endfor %}</span>{% endif %}<span>{{ chip.label }}</span>{% if chip.count %}<span class="filter-chip-count">{{ chip.count }}</span>{% endif %}</label>

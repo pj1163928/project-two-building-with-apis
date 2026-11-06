@@ -628,8 +628,15 @@ def test_icons_share_one_size_per_bar(member_client):
     html = member_client.get(reverse("catalog:discover")).content.decode()
     title_bar = html.split('id="title-bar"', 1)[1].split("</header>", 1)[0]
     sidebar = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
+    activity = sidebar.split('<div class="side-panel-inner', 1)[0]
+    account = sidebar.split('<nav aria-label="Account"', 1)[1]
     assert set(re.findall(r'<svg width="(\d+)"', title_bar)) == {"16"}
-    assert set(re.findall(r'<svg width="(\d+)"', sidebar)) == {"20"}
+    assert set(re.findall(r'<svg width="(\d+)"', activity + account)) == {"20"}
+    # The page's own panel (Discover's filters) has smaller icons beside its labels.
+    panel = sidebar.split('<div class="side-panel-inner', 1)[1].split('<nav aria-label="Account"')[
+        0
+    ]
+    assert set(re.findall(r'<svg width="(\d+)"', panel)) <= {"13", "14", "16"}
     # Each group of entries starts 4px below its border.
     assert '<div class="flex flex-col gap-1 pt-1">' in sidebar
     assert '<nav aria-label="Account" class="shrink-0 flex flex-col gap-1 pt-1 ' in sidebar
@@ -642,7 +649,9 @@ def test_current_page_is_marked_in_the_sidebar_and_the_title_bar(member_client):
     assert re.search(r'aria-label="Library"[^>]*aria-current="page"', nav)
     # The account pages' own rows still mark theirs (Profile, Settings).
     profile = member_client.get(reverse("accounts:profile")).content.decode()
-    assert re.search(r'class="panel-row"[^>]*aria-current="page">Profile<', profile)
+    assert re.search(
+        r'class="panel-row"[^>]*aria-current="page">(?:(?!</a>).)*>Profile<', profile, re.S
+    )
     assert re.search(
         r'class="crumb chip-swap"[^>]*aria-current="page"><span class="chip-label">library<',
         title_bar,
@@ -995,3 +1004,64 @@ def test_pack_page_uses_type_colour_only_for_the_assets_type(client, member, mak
     assert {classes.split()[0] for classes in coloured} == {"library-type-icon", "result-fallback"}
     chrome = html.split('id="content"', 1)[0] + html.split('id="status-bar"', 1)[1]
     assert not TYPE_TOKEN.search(_classes(chrome))
+
+
+def test_every_column_page_is_centred_like_the_rest():
+    """A page narrower than the content is a centred column, never pinned left
+    (the pack page was, user report 2026-11-06)."""
+    css = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    for selector in (
+        ".pack-page",
+        ".attribution",
+        ".entry-layout",
+        ".remove-page",
+        ".discover-asset-page",
+    ):
+        rule = re.search(re.escape(selector) + r" \{([^}]*)\}", css).group(1)
+        assert "margin-inline: auto" in rule and "width: 100%" in rule, selector
+
+
+def test_new_pack_is_a_centred_column(member_client):
+    html = member_client.get(reverse("packs:create")).content.decode()
+    assert '<section class="pack-new-page max-w-3xl mx-auto w-full space-y-5">' in html
+
+
+@pytest.mark.parametrize(
+    "url_name",
+    [
+        "accounts:profile",
+        "accounts:settings",
+        "accounts:token",
+        "packs:list",
+        "packs:attribution",
+        "packs:attribution_packs",
+        "packs:attribution_assets",
+    ],
+)
+def test_every_side_panel_row_has_an_icon(member_client, member, url_name):
+    """User request, 2026-11-06: iconography in every sidebar menu."""
+    from packs.models import Pack
+
+    Pack.objects.create_pack(member, "Forest Kit")
+    html = member_client.get(reverse(url_name)).content.decode()
+    rows = re.findall(r'<(?:a|summary) [^>]*class="panel-row".*?</(?:a|summary)>', html, re.S)
+    assert rows, url_name
+    for row in rows:
+        assert '<span class="panel-row-icon" aria-hidden="true">' in row, row
+
+
+def test_filter_groups_have_icons(member_client):
+    html = member_client.get(reverse("catalog:library")).content.decode()
+    titles = re.findall(r'<p class="filter-group-title micro text-fg-muted">(.*?)</p>', html, re.S)
+    assert len(titles) == 5 and all("<svg" in title for title in titles)
+
+
+def test_a_newer_stylesheet_or_script_loads_the_page_in_full():
+    """A boosted swap keeps the old <head>, so a style fix stayed invisible until a
+    hard reload (user report, 2026-11-06). shell.js compares the arriving page's
+    versioned asset URLs with the loaded ones and loads it in full when they differ."""
+    script = (settings.BASE_DIR / "static" / "js" / "shell.js").read_text(encoding="utf-8")
+    assert 'document.addEventListener("htmx:beforeSwap"' in script
+    assert "arriving === loadedAssets()" in script
+    assert "detail.shouldSwap = false;" in script
+    assert 'detail.requestConfig.verb !== "get"' in script

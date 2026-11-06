@@ -157,6 +157,23 @@
   .panel-row[aria-current="page"] { color: var(--color-fg-strong); font-weight: 600; background: var(--color-control); }
   .panel-row[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--color-ink); }
   html[data-pointer] .panel-row:hover, .panel-row:focus-visible { color: var(--color-on-ink); background: var(--color-ink); }
+  /* A row's icon (user request, 2026-11-06): 16 px, muted, and inverted with the row. */
+  .panel-row { gap: 0.7rem; }
+  .panel-row-icon { display: grid; flex: none; color: var(--color-fg-muted); transition: color 0.15s; }
+  .panel-row[aria-current="page"] .panel-row-icon { color: var(--color-fg-strong); }
+  html[data-pointer] .panel-row:hover .panel-row-icon, .panel-row:focus-visible .panel-row-icon { color: inherit; }
+  .panel-row-count { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-fg-muted); }
+  html[data-pointer] .panel-row:hover .panel-row-count, .panel-row:focus-visible .panel-row-count { color: inherit; }
+  /* A folding group of rows (the guide's licenses): the summary is a row with a chevron. */
+  .panel-fold > summary { list-style: none; cursor: pointer; }
+  .panel-fold > summary::-webkit-details-marker { display: none; }
+  .panel-fold-chevron { display: grid; color: var(--color-fg-muted); transition: transform 0.2s; }
+  .panel-fold[open] .panel-fold-chevron { transform: rotate(180deg); }
+  html[data-pointer] .panel-fold > summary:hover .panel-fold-chevron, .panel-fold > summary:focus-visible .panel-fold-chevron { color: inherit; }
+  .panel-fold-rows .panel-row { height: 2.25rem; padding-left: 2.25rem; font-size: 13.5px; }
+  .panel-fold-rows { padding-bottom: 0.25rem; }
+  /* A filter group's label, with its icon. */
+  .filter-group-title { display: flex; align-items: center; gap: 0.4rem; }
 
   /* Title-bar chips: one height (h-8) and line-height 1, so the labels, icons
      and wordmark share a centre line. */
@@ -390,13 +407,38 @@
   .sound-play:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
   .sound-play:disabled { opacity: 0.45; cursor: not-allowed; }
   .sound-play-icon { display: grid; }
-  .sound-play .when-playing, .result-card[data-sound="playing"] .when-paused,
-  .result-card[data-sound="loading"] .when-paused { display: none; }
-  .result-card[data-sound="playing"] .when-playing, .result-card[data-sound="loading"] .when-playing { display: grid; }
-  .result-card[data-sound="loading"] .sound-play { animation: shelf-pulse 1s ease-in-out infinite; }
+  .sound-play .when-playing, [data-sound-card][data-sound="playing"] .when-paused,
+  [data-sound-card][data-sound="loading"] .when-paused { display: none; }
+  [data-sound-card][data-sound="playing"] .when-playing, [data-sound-card][data-sound="loading"] .when-playing { display: grid; }
+  [data-sound-card][data-sound="loading"] .sound-play { animation: shelf-pulse 1s ease-in-out infinite; }
   .sound-progress { position: absolute; inset: auto 0 0; z-index: 2; height: 2px; background: var(--color-ink);
     transform: scaleX(var(--progress, 0)); transform-origin: left; }
-  .result-card:not([data-sound="playing"]):not([data-sound="paused"]) .sound-progress { display: none; }
+  [data-sound-card]:not([data-sound="playing"]):not([data-sound="paused"]) .sound-progress { display: none; }
+  /* In a pack item's small square thumbnail, the button sits in the middle, a size down. */
+  .sound-play.is-small { top: 50%; left: 50%; width: 2rem; height: 2rem; transform: translate(-50%, -50%); }
+  html[data-pointer] .sound-play.is-small:hover, .sound-play.is-small:focus-visible { transform: translate(-50%, -50%) scale(1.06); }
+
+  /* A result's license: its symbols beside its name (user request, 2026-11-06). */
+  .result-license { display: inline-flex; flex: none; align-items: center; gap: 0.3rem; color: var(--color-fg-muted); }
+  .license-symbols.is-small { gap: 0.1rem; color: var(--color-fg-secondary); }
+  /* Discover's license filters: the note over the shelves while any is on, and a
+     chip's icons (a license's symbols) before its label. */
+  .discover-filter-note { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.55rem 0.8rem;
+    font-size: 13px; color: var(--color-fg-secondary); background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+  .discover-filter-note strong { color: var(--color-fg-strong); }
+  .filter-chip-icons { display: inline-flex; gap: 0.1rem; margin-right: 0.35rem; }
+  /* Discover's drawer and result page (catalog/partials/discover_detail.html). */
+  .preview-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; }
+  .preview-save { display: grid; gap: 0.35rem; }
+  .preview-save form { display: contents; }
+  .preview-save .is-saved { color: var(--color-on-ink); background: var(--color-ink); }
+  .preview-license { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+  .preview-license > .status-chip { margin-left: auto; }
+  .preview-variants { display: grid; gap: 0.35rem; }
+  .preview-variants li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; padding: 0.45rem 0.7rem; font-size: 13px;
+    background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); }
+  .preview-variant-meta { margin-left: auto; font-size: 12px; color: var(--color-fg-weak); }
+  .discover-asset-page { width: 100%; max-width: 48rem; margin-inline: auto; }
 
   /* Load more: a full-width square button under the grid, and the end note. */
   .shelf-more { display: grid; }
@@ -667,7 +709,7 @@
   .remove-packs li { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.75rem; font-size: 13px;
     color: var(--color-fg-strong); background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); }
   .remove-packs svg { flex: none; color: var(--color-fg-muted); }
-  .remove-page { max-width: 30rem; background: var(--color-panel); border: 1px solid var(--color-line-strong); }
+  .remove-page { width: 100%; max-width: 30rem; margin-inline: auto; background: var(--color-panel); border: 1px solid var(--color-line-strong); }
 
   /* Packs: the side panel's New, the member's pack cards, and the builder. */
   .panel-action { display: inline-flex; align-items: center; gap: 0.3rem; height: 1.75rem; padding: 0 0.5rem;
@@ -688,9 +730,32 @@
     box-shadow: inset 0 0 0 1px var(--color-line-strong); }
   .pack-card-page { position: relative; z-index: 1; color: var(--color-fg-secondary); text-decoration: underline; text-underline-offset: 2px; }
   html[data-pointer] .pack-card-page:hover, .pack-card-page:focus-visible { color: var(--color-fg-strong); outline: none; }
+  /* Your packs as a list (user request, 2026-11-06): one row per pack, the same facts as a
+     card, the title's link stretched over the row. The toolbar's Grid / List switch is
+     two square options, the current one inverted. */
+  .layout-switch { display: inline-flex; box-shadow: inset 0 0 0 1px var(--color-line-strong); }
+  .layout-option { display: inline-flex; align-items: center; gap: 0.35rem; height: 2rem; padding: 0 0.65rem; font-size: 12.5px;
+    color: var(--color-fg-secondary); transition: color 0.15s, background-color 0.15s; }
+  .layout-option[aria-current="true"] { color: var(--color-on-ink); background: var(--color-ink); }
+  html[data-pointer] .layout-option:hover, .layout-option:focus-visible { color: var(--color-on-ink); background: var(--color-ink); outline: none; }
+  .pack-rows { display: grid; gap: 0.5rem; }
+  .pack-row { position: relative; display: grid; grid-template-columns: 6rem minmax(0, 1fr) auto; gap: 0.5rem 1rem;
+    align-items: center; padding: 0.8rem 1rem; background: var(--color-surface); box-shadow: inset 0 0 0 1px var(--color-line);
+    transition: box-shadow 0.15s; }
+  .pack-row > .status-chip { justify-self: start; }
+  html[data-pointer] .pack-row:hover, .pack-row:has(:focus-visible) { box-shadow: inset 0 0 0 1px var(--color-ink); }
+  .pack-row-main { display: grid; gap: 0.3rem; min-width: 0; }
+  .pack-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display);
+    font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; color: var(--color-fg-strong); }
+  .pack-row-description { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--color-fg-weak); }
+  .pack-row-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.4rem 1rem; }
+  @media (max-width: 40rem) {
+    .pack-row { grid-template-columns: minmax(0, 1fr); }
+    .pack-row-meta { justify-content: flex-start; }
+  }
   .status-chip[data-visibility="public"] { color: var(--color-on-ink); background: var(--color-ink); box-shadow: none; }
   .status-chip[data-visibility="unlisted"] { color: var(--color-fg-strong); box-shadow: inset 0 0 0 1px var(--color-fg-secondary); }
-  .pack-form { max-width: 36rem; }
+  .pack-form { width: 100%; }
   .visibility-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-left: 0.25rem; }
   .visibility-switch [role="status"] { display: inline-flex; align-items: center; gap: 0.3rem; }
   /* The switch, and below it while unlisted, the share link with Copy link and New link. */
@@ -729,7 +794,8 @@
   .pack-item-actions .card-action:disabled { cursor: not-allowed; opacity: 0.35; }
   .pack-item-actions .card-tip { top: calc(100% + 0.3rem); }
   /* A pack's own page: the same item rows, read-only (no actions column). */
-  .pack-page { max-width: 60rem; }
+  /* Centred like every other column page (entry, attribution, account): user report, 2026-11-06. */
+  .pack-page { width: 100%; max-width: 60rem; margin-inline: auto; }
   .pack-item-read { grid-template-columns: 4.5rem minmax(0, 1fr); }
   @media (min-width: 40rem) { .pack-item-read { grid-template-columns: 6rem minmax(0, 1fr); } }
   .pack-item-facts { gap: 0.35rem; font-size: 12.5px; }
@@ -762,6 +828,21 @@
   .pack-item-grip { display: grid; place-items: center; align-self: stretch; color: var(--color-fg-muted); cursor: grab;
     touch-action: none; }
   html[data-pointer] .pack-item-grip:hover { color: var(--color-fg-strong); }
+  /* Thumbnails sit in the middle of their row (user reports, 2026-11-06), as in every
+     other list with thumbnails (Add from my library, Similar in your library). Pinned to
+     the top, they looked misaligned beside the taller text; the grip used to stretch the
+     row's height and now sits beside its thumbnail. The type line is line-height 1 and the
+     actions stay on the title's line, at the top. An idle status line is hidden, so it no
+     longer leaves an empty band under the fields. */
+  .pack-item-thumb, .pack-item-grip { align-self: center; }
+  .pack-item-grip { height: 4.5rem; }
+  .pack-item .library-type { line-height: 1; min-height: 0.75rem; }
+  .pack-item-actions { align-self: start; }
+  .pack-item-status[data-save-status="idle"] { display: none; }
+  .lookup-item { align-items: center; }
+  /* The type icon fills a thumbnail with no image (or a sound's) evenly: it's a grid, so no
+     line box nudges it off centre. */
+  .pack-item-thumb > .result-fallback { display: grid; }
   .pack-item[data-dragging] { opacity: 0.45; box-shadow: inset 0 0 0 1px var(--color-ink); }
   [data-sorting] .pack-item { transition: none; }
   [data-sorting] .pack-item-grip { cursor: grabbing; }
@@ -873,6 +954,12 @@
   .lookup-thumb { position: relative; display: grid; place-items: center; aspect-ratio: 1 / 1; overflow: hidden;
     background: var(--color-inset); box-shadow: inset 0 0 0 1px var(--color-line); }
   .lookup-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  /* A thumbnail's frame sits above its image, as a real border: the image used to cover
+     the inset shadow that drew it, so a frame lost an edge or two, worse once centring put
+     it on a half pixel. The play button stays above the frame. */
+  .pack-item-thumb, .lookup-thumb { box-shadow: none; }
+  .pack-item-thumb::after, .lookup-thumb::after { content: ""; position: absolute; inset: 0; z-index: 2;
+    border: 1px solid var(--color-line); pointer-events: none; }
   .lookup-main { display: grid; gap: 0.3rem; min-width: 0; }
   .lookup-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
   .lookup-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;
@@ -926,7 +1013,7 @@
   @media (min-width: 48rem) { .symbol-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 72rem) { .symbol-legend { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   .symbol-legend li { display: flex; align-items: center; gap: 0.65rem; font-size: 12.5px; color: var(--color-fg-secondary); }
-  .symbol-legend li > span:last-child { display: grid; gap: 0.05rem; }
+  .symbol-legend li:not(.symbol-legend-key) > span:last-child { display: grid; gap: 0.05rem; }
   .symbol-legend strong { font-size: 13px; color: var(--color-fg-strong); }
   .symbol-legend-key { flex-wrap: wrap; gap: 0.4rem 1rem !important; }
   .use-key { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--color-fg-strong); }
@@ -961,6 +1048,12 @@
   .use-chip[data-status="caution"] { color: var(--color-fg-strong); box-shadow: inset 0 0 0 1px var(--color-fg-secondary); }
   .use-chip[data-status="blocked"] { color: var(--color-on-ink); background: var(--color-ink); box-shadow: none; }
   .th-icon, .th-license, .use-td > span, .lookup-license { display: inline-flex; align-items: center; gap: 0.35rem; }
+  /* An asset's license line reads as one paragraph: the symbols and the license name stay
+     together, and the summary wraps under them, not into a column of its own (where
+     "CC0 1.0" broke onto two lines). User report, 2026-11-06. */
+  .lookup-license { display: block; }
+  .lookup-license > .license-symbols { vertical-align: -0.2em; margin-right: 0.35rem; }
+  .lookup-license > a { white-space: nowrap; }
   .use-td[data-status="blocked"] { color: var(--color-fg-strong); font-weight: 600; }
   .use-td[data-status="caution"] { color: var(--color-fg-strong); }
 
@@ -1169,13 +1262,14 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .result-skeleton { animation: none; }
   .type-tile-bar { transition: none; }
   .result-details, .sound-play { transition: none; }
-  .result-card[data-sound="loading"] .sound-play { animation: none; }
+  [data-sound-card][data-sound="loading"] .sound-play { animation: none; }
   .card-action, .card-tip, .picker-close, .picker-pack, .pack-card, .panel-action { transition: none; }
   .card-actions .htmx-request .card-action, .card-actions .htmx-request.card-action { animation: none; }
   .drawer-dialog[open] { animation: none; }
   .rate-star, .entry-notes, .entry-link { transition: none; }
   .entry-similar-link, .filter-more-toggle, .filter-more-toggle > svg, .entry-bundle-progress, .entry-bundle-progress > span, .entry-reason input { transition: none; }
   .pack-pick-zoom, .license-chip, .attribution-link { transition: none; }
+  .panel-row-icon, .panel-fold-chevron, .layout-option, .pack-row { transition: none; }
 }
 
 /* ---------- Light mode ----------

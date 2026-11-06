@@ -89,7 +89,9 @@ def test_every_account_page_lists_the_token_page_and_marks_its_own_row(
     html = member_client.get(reverse(name)).content.decode()
 
     assert f'href="{reverse("accounts:token")}"' in html
-    assert re.search(rf'class="panel-row"[^>]*aria-current="page">{current}<', html)
+    assert re.search(
+        rf'class="panel-row"[^>]*aria-current="page">(?:(?!</a>).)*>{current}<', html, re.S
+    )
     assert len(re.findall(r'class="panel-row"[^>]*aria-current="page"', html)) == 1
 
 

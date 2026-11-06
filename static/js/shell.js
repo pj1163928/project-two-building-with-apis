@@ -163,6 +163,47 @@
   );
   if (window.htmx) htmx.onLoad(restoreFolds);
 
+  // ---------- Filters that apply as they change ----------
+  // A [data-autosubmit] input (Discover's license chips, in the side panel)
+  // submits its form at once. The input names its form with form="…", and
+  // requestSubmit() goes through htmx's boost like any other submit.
+  document.addEventListener("change", function (event) {
+    var input = event.target;
+    if (!input.matches || !input.matches("[data-autosubmit]") || !input.form) return;
+    if (input.form.requestSubmit) input.form.requestSubmit();
+    else input.form.submit();
+  });
+
+  // ---------- A newer stylesheet or script ----------
+  // A boosted swap replaces only <body>, so the page would go on using the
+  // stylesheet and scripts it first loaded, however often they change: a style
+  // fix looked unfixed until a hard reload (user report, 2026-11-06). Each one's
+  // URL carries its version (?v=, versioned_static), so when a page arriving by
+  // a GET names different ones, it's loaded in full instead of swapped in.
+  var ASSET_URL = /(?:href|src)="([^"]*\/static\/[^"]*\?v=\d+)"/g;
+  function assetsIn(html) {
+    var head = html.split(/<body[\s>]/i)[0], found = [], match;
+    ASSET_URL.lastIndex = 0;
+    while ((match = ASSET_URL.exec(head))) found.push(match[1]);
+    return found.sort().join(" ");
+  }
+  function loadedAssets() {
+    var found = [];
+    document.querySelectorAll('head link[href*="?v="], head script[src*="?v="]').forEach(function (node) {
+      found.push(node.getAttribute("href") || node.getAttribute("src"));
+    });
+    return found.sort().join(" ");
+  }
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var detail = event.detail, html = detail.serverResponse;
+    if (!detail.boosted && !(detail.requestConfig && detail.requestConfig.boosted)) return;
+    if (!detail.requestConfig || detail.requestConfig.verb !== "get" || typeof html !== "string") return;
+    var arriving = assetsIn(html);
+    if (!arriving || arriving === loadedAssets()) return;
+    detail.shouldSwap = false;
+    window.location.assign(detail.xhr.responseURL || detail.requestConfig.path);
+  });
+
   // ---------- After every boosted swap ----------
   document.addEventListener("htmx:afterSwap", function (event) {
     if (event.detail.boosted) {

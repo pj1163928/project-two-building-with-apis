@@ -981,6 +981,43 @@ credits") and docs/FRONTEND.md ("Packs", "Attribution center").
 - [x] Standard gate (see top). Access rules: unchanged; the warning names the
   owner's username only, as the pack page already does.
 
+### Phase 8 polish, third request (2026-11-06, at the user's request)
+
+Added after the phase, out of plan order. The PRD records it as stories
+120–125. See docs/FRONTEND.md ("Page widths", "Packs", "Discover",
+"Attribution center") and docs/ARCHITECTURE.md ("Discover's drawer and
+filters").
+
+- [x] **Consistent layout:** the pack page, New pack and the Remove confirm are
+  centred columns like the entry, Attribution and Account pages; the rule is
+  written down in docs/FRONTEND.md ("Page widths") for every page to come.
+  Thumbnails sit in the middle of their rows on the pack page, the builder
+  and Asset attribution, as in the other thumbnail lists, with whole frames
+  (the grip beside its thumbnail, no empty status band).
+- [x] **License guide:** the verdict key's "Not usable" sits on one line like
+  the others; "On this page" folds the eleven licenses into one "Licenses" row
+  (remembered); every side-panel row and filter group has an icon.
+- [x] **Discover licenses:** each card shows its license's symbols and, in its
+  details, whether commercial use is allowed. The side panel filters by
+  license and by commercial use (`DiscoverFilters`, `clean_filters()`),
+  carried on every shelf, tile and Shuffle link and cached apart. CC0-only
+  providers (`LICENSES = ("cc0",)`) are kept or dropped with no request;
+  Openverse is asked for the allowed licenses (`search_records(licenses=)`).
+- [x] **Discover drawer:** a result's title opens `catalog:discover_asset` in a
+  drawer (a page without HTMX): View on <provider> as the primary action,
+  Save (`slot=drawer`), Add to pack, the license with "Can I use it?", tags
+  and the provider's downloads. It reads the stored Asset when anyone saved it,
+  else `fetch_record()` cached for an hour (`catalog/preview.py`), and saves
+  nothing. Each card also keeps View on <provider> in its corner.
+- [x] **Packs as a list:** a Grid / List switch on Your packs, remembered in
+  the session (`pack_layout()`).
+- [x] **Sounds everywhere:** library cards, the library drawer, builder items
+  and pack page items play a sound's first stored file (`Asset.preview_url`),
+  through the same player as Discover (`[data-sound-card]`).
+- [x] Standard gate (see top). Access rules: the drawer is open to visitors
+  like Discover, a bad provider or ID is a 400 before any provider call, it
+  never writes, and "In your library" reflects only the caller's own library.
+
 ---
 
 ## Phase 9: Main page, public gallery and demo data

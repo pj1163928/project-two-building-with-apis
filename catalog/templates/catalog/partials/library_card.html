@@ -7,12 +7,15 @@
 {# change in the drawer. The corner actions: Add to pack (its                          #}
 {# picker is the interface only until Phase 7), Details and Remove.                    #}
 {# The details panel works as on Discover, with the asset's tags from its provider.    #}
+{# A sound plays from its card (its first stored file, Asset.preview_url), as on       #}
+{# Discover (user request, 2026-11-06).                                                 #}
 {# Under the status and stars: the community rating, once any member has rated it.     #}
 {% with asset=entry.asset %}{% with tile=asset.tile %}
-<li class="result-card library-card" id="entry-{{ entry.pk }}" data-kind="{{ asset.kind }}"{% if oob %} hx-swap-oob="true"{% endif %}>
+<li class="result-card library-card" id="entry-{{ entry.pk }}" data-kind="{{ asset.kind }}"{% if asset.preview_url %} data-sound-card{% endif %}{% if oob %} hx-swap-oob="true"{% endif %}>
   <div class="result-thumb">
     <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=28 %}</span>
     {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+    {% if asset.preview_url %}{% include "catalog/partials/sound_play.html" with url=asset.preview_url title=asset.title %}{% endif %}
   </div>
   <div class="result-body">
     <p class="library-type"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=12 %}</span><span class="micro">{{ asset.get_kind_display }}</span></p>

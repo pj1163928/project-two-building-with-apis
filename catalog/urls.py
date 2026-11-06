@@ -12,6 +12,12 @@ urlpatterns = [
         views.DiscoverShelfView.as_view(),
         name="discover_shelf",
     ),
+    # One result in full: Discover's drawer for HTMX, a page otherwise. Nothing is saved.
+    path(
+        "discover/asset/<slug:provider>/<path:external_id>/",
+        views.DiscoverAssetView.as_view(),
+        name="discover_asset",
+    ),
     path("library/", views.LibraryView.as_view(), name="library"),
     # POST only: saves one provider asset (provider, external_id) to the member's library.
     path("library/save/", views.SaveAssetView.as_view(), name="save"),

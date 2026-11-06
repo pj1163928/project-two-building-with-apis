@@ -318,6 +318,17 @@ positioned in the side panel needs a positioned parent inside it.
   - Pass `forgot_url` to put "Forgot password?" beside the `password`
     label.
 - `partials/icon.html` takes `name` and `size`.
+- **Side-panel rows** (user request, 2026-11-06): every `.panel-row` starts
+  with a 16 px `.panel-row-icon` (muted, strong when current, inverted with
+  the row on hover): Account pages (user, gear, key), Attribution center
+  (license, pack, library), each pack (pack), and "On this page". A row may
+  end in a `.panel-row-count`. A group of rows can fold: `<details
+  class="panel-fold" data-remember="…">` with a `.panel-row` summary and a
+  `.panel-fold-chevron`, its rows (`.panel-fold-rows`) shorter and indented.
+  Each `.filter-group` label (`.filter-group-title`) has a 13 px icon too
+  (`FilterGroup.icon`: type shapes, provider globe, status check, rating
+  star, tags tag, license, commercial use), as does each panel's "Filters"
+  title. `test_every_side_panel_row_has_an_icon` checks the rows.
 - `partials/crumb.html` is a breadcrumb chip that swaps to an icon on
   hover. It takes `href`, `label`, `icon` and `current`.
 - `partials/auth_brand.html` is the branding panel to the right of the
@@ -364,6 +375,12 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
   `?v=<the file's last change>`. A member once clicked the new light/dark
   chips while their browser still ran the old cached `shell.js`, and nothing
   happened (2026-11-05). Now every change is a new URL.
+- **A newer version loads the page in full** (user report, 2026-11-06): a
+  boosted swap replaces only `<body>`, so a tab kept the stylesheet and
+  scripts it first loaded, and a style fix (centred pack thumbnails) looked
+  unfixed until a hard reload. On `htmx:beforeSwap`, `shell.js` compares the
+  `?v=` URLs in the arriving page's `<head>` with the loaded ones; for a GET
+  that names different ones it cancels the swap and loads the URL in full.
 - **Scripts:** every script loads once, in `base.html`'s `<head>`, for
   every page. A swap doesn't run a new page's `<head>`, so there's no
   per-page scripts block. Scripts listen on the `document` (delegation)
@@ -395,6 +412,31 @@ in the htmx config.
   motion turns every transition animation off. The user asked for this on
   2026-10-31, ahead of Phase 13, which lists "View Transitions on HTMX
   swaps".
+
+## Page widths (keep every page consistent)
+
+The user asked, on 2026-11-06, that every page from now on keep to the same
+layout rules. Two shapes only:
+
+- **Full width** (inside the shell's `max-w-[1500px]` wrapper): pages that
+  browse a collection or work on one: Discover, the library, Your packs,
+  the builder.
+- **A centred column** for everything narrower: `width: 100%`, a
+  `max-width`, and `margin-inline: auto`, never pinned to the left. Today:
+  `.entry-layout` (76 rem), `.attribution` (64 rem), `.pack-page` (60 rem,
+  pinned left until the user reported it, 2026-11-06),
+  `.discover-asset-page` (48 rem), the Account pages and New pack
+  (`max-w-3xl mx-auto w-full`), `.remove-page` (30 rem).
+  `test_every_column_page_is_centred_like_the_rest` checks the CSS ones;
+  add a new column page's class there.
+
+Within a page, reuse what exists before inventing: `.work-toolbar` for a
+page's controls, `.builder-section` for a titled box, `.panel-row` (with its
+`.panel-row-icon`) for a side-panel menu row, `.filter-group` /
+`.filter-chip` for filters, `.status-chip`, `.file-badge`, `.card-action`,
+`btn btn-quiet btn-sm rounded-none` for secondary actions and one
+`btn-primary` per area. Rows of an item (`.pack-item`) start their
+thumbnail, first text line and actions on one top edge.
 
 ## Two moods: showcase and work
 
@@ -460,6 +502,10 @@ library is empty.
   search (`#library-search`, `q`) and the sort select (the PRD's four
   sorts). The grid/list toggle from the Phase 1 polish was removed in
   Phase 4, because the PRD describes only a card grid.
+- The chips are `FilterChip`s in `FilterGroup`s (`catalog/filters.py`, shared
+  with Discover), rendered by `catalog/partials/filter_chip.html`, which
+  takes `form_id` and `control` (the library's toolbar and `.library-control`
+  by default), `autosubmit`, and shows a chip's `icons` before its label.
 - `#library-filters` is the library's own panel in the sidebar, under its
   navigation rows, because the PRD puts the filters there. It shows while
   the sidebar is open. It has `.filter-group`s of
@@ -519,6 +565,10 @@ textures), stretched title link, corner actions and details panel (see
   or "Not rated". Never call it `.rating`: that's DaisyUI's rating
   component, whose `.rating *` rule painted each star as a grey 24 px block
   (fixed 2026-11-05).
+- **Sounds** (user request, 2026-11-06): a sound's card has the play button
+  (`catalog/partials/sound_play.html`) on its thumbnail and `data-sound-card`
+  on the `<li>`, playing `Asset.preview_url` (its first stored file). The
+  drawer's thumbnail has the same button.
 - **Corner actions:** Add to pack, Details and Remove.
   - Add to pack opens the page's pack picker (below) for this entry.
   - Remove (`catalog/partials/remove_button.html`, Phase 7) is a link to
@@ -715,12 +765,20 @@ refused: "Choose at least one map type."). The library drawer's bundle and
 open pack current. With none: "The packs you create are listed here."
 
 - **Your packs** (`packs/pack_list.html`): the header, a `.work-toolbar`
-  with the count and **New pack** (`btn-primary`), then `#pack-list`, a
+  with the count, the **Grid / List** switch (`#pack-layout`, a
+  `.layout-switch` of two `.layout-option` links, `?layout=grid|list`, the
+  current one inverted with `aria-current="true"`; remembered in the session
+  by `packs.views.pack_layout()`, user request 2026-11-06) and **New pack**
+  (`btn-primary`). In a list, `#pack-list` is `.pack-rows` of `.pack-row`s:
+  the visibility chip, the title (stretched `.pack-card-link` to the
+  builder), the intended use on one line and the tags, then the item count,
+  the date and View page; one column on a phone. In a grid, `#pack-list` is a
   `.pack-grid` of `.pack-card`s: Private or Public (a `.status-chip`,
   Public inverted), the item count, the title (its link stretched over the
   card), the intended use (two lines), the tags and the date it changed.
   Empty: "You have no packs yet." with New pack.
-- **New pack** (`packs/pack_new.html`): a `novalidate` form through
+- **New pack** (`packs/pack_new.html`, a centred `max-w-3xl` column like the
+  Account pages): a `novalidate` form through
   `partials/form_fields.html` (title, intended use, tags with their tidying
   rule as help), **Create pack** and Cancel.
 - **The builder** (`packs/builder.html`): "Pack builder" over the title
@@ -770,7 +828,8 @@ open pack current. With none: "The packs you create are listed here."
   card and the pack page's owner chip say Unlisted (`.status-chip
   [data-visibility="unlisted"]`, outlined in `fg-secondary`).
 - **A pack's page** (`packs/pack_page.html`, `/packs/<slug>/`, Phase 8): a
-  work surface, `.pack-page` (60 rem). "Public pack", "Unlisted pack" or
+  work surface, `.pack-page`, a centred 60 rem column (it sat to the left
+  until the user reported it, 2026-11-06; see "Page widths"). "Public pack", "Unlisted pack" or
   "Private pack" over
   the title (`#pack-page-title`), "By <owner> · N items · Changed …", the
   intended use and the tags. Then a toolbar (`#pack-page-actions`) with
@@ -789,6 +848,20 @@ open pack current. With none: "The packs you create are listed here."
   (notes, ratings, statuses, the community rating). Members get their packs
   in the side panel; a visitor gets "Shared pack" (`#pack-visitor-panel`)
   with Sign up. Type colour: only the two type icons, as in the builder.
+- **Item alignment and sounds** (user reports and request, 2026-11-06): on
+  the builder, the pack page and Asset attribution (`.lookup-item`), a
+  thumbnail sits in the middle of its row, as in every other thumbnail list
+  (Add from my library, Similar in your library). Pinned to the top it looked
+  misaligned beside the taller text, which the user reported twice. The
+  builder's grip has the thumbnail's height beside it (it used to stretch
+  the row), the actions stay at the top on the title's line, and an idle
+  status line is hidden so it leaves no empty band. A thumbnail's frame is a
+  1 px border on a `::after` above the image (the image used to cover the
+  inset shadow, so frames lost edges). An asset's license line in Asset
+  attribution reads as one paragraph (`.lookup-license`), so "CC0 1.0" no
+  longer breaks. The type icon in a thumbnail with no image is 24 px. A
+  sound's item has `data-sound-card` and a centred, smaller play button
+  (`sound_play.html` with `small`, `.sound-play.is-small`) on its thumbnail.
 - **Builder and pack page polish** (user request, 2026-11-05):
   - **Add from my library** is a form (`#pack-library-form`): the search,
     "Show ones already in this pack" (`show_in`) and a hidden `page`
@@ -896,6 +969,16 @@ open pack current. With none: "The packs you create are listed here."
       each use's verdict with its icon), and **The licenses**, one card per
       row (`.license-card-head` with large symbols, then the uses and the
       terms).
+    - **Legend fix** (user report, 2026-11-06): the legend's stacked
+      name-over-meaning rule is `.symbol-legend li:not(.symbol-legend-key) >
+      span:last-child`. Without the `:not`, it caught the verdict key's last
+      `.use-key`, so "Not usable" put its icon above the word.
+    - **On this page** (`#attribution-toc`, user request 2026-11-06): Symbols,
+      At a glance, then the eleven licenses folded into one "Licenses" row
+      with a count (`#attribution-toc-licenses`, a `.panel-fold`, closed at
+      first and remembered as `ax-toc-licenses`), each license row showing its
+      first symbol; then How to credit and Optional credits. Every row has
+      its icon.
     - Every Attribution page is a centred column (`.attribution`, 64 rem,
       `margin-inline: auto`).
 
@@ -974,9 +1057,11 @@ The shelf header shows a number (`01`), the provider's name, a rule, and
 **Result cards** (`catalog/partials/result_card.html`) are `<li
 class="result-card" data-kind="<kind>">`s:
 
-- **Whole-card link:** the title's `.result-link` opens the provider's page
-  in a new tab, and its `::after` is stretched over the card, so the whole
-  card is clickable. Interactive parts (the play button, the corner
+- **Whole-card link:** the title's `.result-link` opens the result in
+  Discover's drawer (see "Discover's drawer"; it opened the provider's page
+  in a new tab until 2026-11-06), and its `::after` is stretched over the
+  card, so the whole card is clickable. As a plain link it's the result's own
+  page (`catalog:discover_asset`). Interactive parts (the play button, the corner
   actions) sit above it with a higher `z-index`. Keyboard focus on the link
   draws a 2 px ink ring on the card.
 - **Thumbnail:** the provider's URL (`referrerpolicy="no-referrer"`, never
@@ -992,8 +1077,9 @@ class="result-card" data-kind="<kind>">`s:
 - **Corner actions** (`.card-actions`, Phase 4 polish, 2026-11-05): small
   translucent squares (`.card-action`, 1.75 rem) in the card's top-right
   corner, above the stretched link (`z-index: 3`).
-  - On Discover they are Save, Add to pack and Details. Library
-    cards have their own set (see "Library cards").
+  - On Discover they are Save, Add to pack, **View on <provider>** (the
+    `external` icon, the source site in a new tab, so it's still one click
+    away) and Details. Library cards have their own set (see "Library cards").
   - Each inverts on hover, like the chrome, and has a mono `.card-tip`
     label below it after 0.2 s.
   - The row lets the pointer through between its squares. Forms inside it
@@ -1031,10 +1117,55 @@ class="result-card" data-kind="<kind>">`s:
     search. So does Add to pack.
 - **Sound preview:** a card with a `preview_url` gets a square ink
   `.sound-play` button at the thumbnail's top left, and a 2 px
-  `.sound-progress` line along its foot. `static/js/sound-preview.js`
-  (delegated, loaded in `base.html`) plays one preview at a time with
-  `new Audio(url)`. It sets the card's `data-sound` (`loading`, `playing`,
+  `.sound-progress` line along its foot (`catalog/partials/sound_play.html`,
+  shared by library cards, both drawers and pack items since 2026-11-06).
+  `static/js/sound-preview.js` (delegated, loaded in `base.html`) plays one
+  preview at a time with `new Audio(url)`. It sets the nearest
+  `[data-sound-card]`'s `data-sound` (`loading`, `playing`,
   `paused`, `idle`, `error`) and `--progress`, and keeps the button's
   `aria-pressed` and `aria-label` in step. A preview that can't load
   disables its button ("Preview unavailable"). The sound stops when its
-  card leaves the page (`htmx:afterSwap`).
+  card leaves the page (`htmx:afterSwap`) or the dialog it plays in closes.
+- **License symbols** (user request, 2026-11-06): the meta line shows the
+  license as its symbols (`license_symbols.html` with `small`, 13 px) beside
+  its short name (`.result-license`), from the `license_info` template filter.
+  The details add "Commercial": the verdict and why.
+
+**Side panel: license filters** (user request, 2026-11-06), like the
+library's: `#discover-filters` with a "Filters" title (and **Clear** while
+any is on), then two `.filter-group`s: **Commercial use** ("Allowed only")
+and **License** (one chip per license but "unknown", each with its symbols,
+`.filter-chip.has-icons`). The chips belong to the command bar's form
+(`form="discover-search"`) and carry `data-autosubmit`, so `shell.js`
+submits it (boosted) as soon as one changes; without JavaScript a
+`<noscript>` Apply does. While any is on, `#discover-filter-note` above the
+shelves says which ("Only CC0 or CC BY, commercial use results.") with
+Clear filters. A shelf the filters rule out says "Filtered out" and "Every
+Poly Haven asset is CC0, which your filters leave out." with Clear filters;
+an empty filtered shelf suggests other licenses.
+
+**Discover's drawer** (user request, 2026-11-06): `<dialog
+id="discover-drawer" class="drawer-dialog">`, once on the page, filled by a
+card's title (`catalog/partials/discover_drawer.html`) and opened by
+`entry-drawer.js`, which now works on the page's one `dialog.drawer-dialog`.
+Like the library drawer: a sticky head ("Discover result", View on
+<provider>, Open as page, Close), the cropped mark, `transition:false`
+swaps. The body (`catalog/partials/discover_detail.html`, also the full
+page `catalog/discover_asset.html` in a centred 48 rem column with "Back to
+Discover"):
+
+- the thumbnail over the type icon (a sound's play button on it), the type
+  and provider, title, author and community rating
+- `#preview-actions`: **View on <provider>** (`btn-primary`, new tab), Save
+  (`catalog/partials/preview_save.html`: posts `slot=drawer` and swaps
+  itself for "In your library", inverted, or Try again with the message; a
+  visitor gets Sign in to save, back to their search) and Add to pack (the
+  page's pack picker, `data-picker`)
+- **License**: large symbols, the license (its deed link) and title, the
+  credit chip, the summary with What it means, "Can I use it?"
+  (`license_uses.html`) and the attribution
+- **Details**: the source link and tags; **Downloads**: each variant's
+  resolution and format badges, package, file count and size
+  (`.preview-variants`), with a note that saving lets you pick and download
+- a `ProviderError`: the alert with Retry (into the drawer) and Go to
+  <provider>

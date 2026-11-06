@@ -3,7 +3,8 @@
 {% block breadcrumb %}{% url 'packs:list' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="packs" icon="pack" %}{% url 'packs:create' as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="new" icon="plus" current=True %}{% endblock %}
 {% block side_panel %}{% include "packs/partials/pack_nav.html" %}{% endblock %}
 {% block content %}
-  <section class="space-y-5">
+  {# A centred column, like every page narrower than the content (docs/FRONTEND.md). #}
+  <section class="pack-new-page max-w-3xl mx-auto w-full space-y-5">
     {% include "partials/page_header.html" with label="New pack" heading="Start a pack." lead="Name the kit and say what it's for. It stays private until you make it public." compact=True %}
     <form id="new-pack-form" method="post" action="{% url 'packs:create' %}" class="pack-form space-y-5" novalidate>{% csrf_token %}
       {% include "partials/form_fields.html" %}

@@ -1,0 +1,21 @@
+{# Save to library in Discover's drawer: a full-size button, where a card has a corner  #}
+{# square. Saved: "In your library", linking there (and, after a save, the status     #}
+{# bar's count out of band). A member: a form posting slot=drawer to catalog:save,    #}
+{# which swaps this slot for the reply; after a ProviderError it says Try again with   #}
+{# the message under it. A visitor: Sign in to save, back to the Discover search.    #}
+<div class="preview-save">
+  {% if saved %}
+    <a href="{% url 'catalog:library' %}" class="btn btn-quiet btn-sm rounded-none gap-1.5 is-saved">{% include "partials/icon.html" with name="check" size=15 %}<span>In your library</span></a>
+    {% if count_oob %}{% include "partials/saved_count.html" with oob=True %}{% endif %}
+  {% elif user.is_authenticated %}
+    <form hx-post="{% url 'catalog:save' %}" hx-target="closest .preview-save" hx-swap="outerHTML transition:false" hx-disabled-elt="find button">
+      <input type="hidden" name="provider" value="{{ provider_key }}">
+      <input type="hidden" name="external_id" value="{{ external_id }}">
+      <input type="hidden" name="slot" value="drawer">
+      <button type="submit" class="btn btn-quiet btn-sm rounded-none gap-1.5">{% if error %}{% include "partials/icon.html" with name="alert" size=15 %}<span>Try again</span>{% else %}{% include "partials/icon.html" with name="plus" size=15 %}<span>Save to library</span>{% endif %}</button>
+    </form>
+    {% if error %}<p class="save-error-text" role="alert">{% include "partials/icon.html" with name="alert" size=13 %}<span>{{ error }}</span></p>{% endif %}
+  {% else %}
+    <a href="{% url 'accounts:login' %}?next={{ back_url|urlencode }}" class="btn btn-quiet btn-sm rounded-none gap-1.5">{% include "partials/icon.html" with name="login" size=15 %}<span>Sign in to save</span></a>
+  {% endif %}
+</div>

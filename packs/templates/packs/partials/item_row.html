@@ -3,14 +3,15 @@
 {# saving on change into the item's own status line. Download fetches this item's files   #}
 {# (packs:files?item=, zipped in the browser when there are several). Move up, Move down  #}
 {# and Remove swap the whole list. Nothing private from the library entry (notes, rating, #}
-{# status) shows here.                                                                     #}
+{# status) shows here. A sound plays from its thumbnail (user request, 2026-11-06).         #}
 {% with asset=item.saved_asset.asset %}{% with tile=asset.tile %}
 {% url 'packs:item_update' pack.pk item.pk as update_url %}{% url 'packs:item_move' pack.pk item.pk as move_url %}{% url 'packs:item_remove' pack.pk item.pk as remove_url %}{% url 'packs:files' pack.slug as files_url %}
-<li class="pack-item" id="item-{{ item.pk }}" data-kind="{{ asset.kind }}" data-sortable-item data-item-id="{{ item.pk }}" data-bundle-box data-bundle-state="idle">
+<li class="pack-item" id="item-{{ item.pk }}" data-kind="{{ asset.kind }}"{% if asset.preview_url %} data-sound-card{% endif %} data-sortable-item data-item-id="{{ item.pk }}" data-bundle-box data-bundle-state="idle">
   <span class="pack-item-grip" data-drag-handle title="Drag to reorder" aria-hidden="true">{% include "partials/icon.html" with name="grip" size=16 %}</span>
   <div class="pack-item-thumb">
-    <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=20 %}</span>
+    <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=24 %}</span>
     {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback draggable="false">{% endif %}
+    {% if asset.preview_url %}{% include "catalog/partials/sound_play.html" with url=asset.preview_url title=asset.title small=True %}{% endif %}
   </div>
   <div class="pack-item-main">
     <p class="library-type"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=12 %}</span><span class="micro">{{ asset.get_kind_display }} · {{ asset.get_provider_display }} · {{ asset.license }}</span></p>

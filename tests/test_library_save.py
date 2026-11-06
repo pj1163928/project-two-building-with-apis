@@ -302,7 +302,7 @@ def shelf(client, page=None):
 
 def save_slots(html):
     """{external_id: the card's Save slot HTML}, for each result card."""
-    pattern = r'href="https://polyhaven\.com/a/(\w+)".*?<div class="card-actions">(.*?)</div>\n'
+    pattern = r'href="/discover/asset/polyhaven/(\w+)/".*?<div class="card-actions">(.*?)</div>\n'
     return dict(re.findall(pattern, html, re.S))
 
 

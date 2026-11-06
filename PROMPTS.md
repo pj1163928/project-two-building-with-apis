@@ -28,6 +28,93 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Consistent layout, Discover license filters and drawer, packs as a list, sounds everywhere
+
+### Prompts
+
+1. Ok there are a few changes that I would like to make, the individual pack
+   page is not centered like the rest of the pages, please ensure from this
+   point forward all styling is kept consistent with current and future
+   pages.
+   On the license guide in the symbols section the Usable, With Conditions,
+   Not Usable; the Not usable looks strange has the icon and the text are on
+   two seperate lines please fix this to be like the other icon legends.
+   The "On this page" section show the individual pages and their licenses
+   can you collapse all of the licensesto clean up the sidebar menu a
+   bit.Also use Iconography for the sidebar menus where appropriate for all
+   menus.
+   For the disccover menu can you show the license type in iconography and
+   more specifically add a sort option to allow users t filter out results
+   based on license type and whther commerical use is allowed or not.
+   For the packs page currently packs are displayed as a grid, can you make
+   it optional to have packs displayed vertically in a list.
+   Currently audio assets have no way of being played except when in the
+   discover menu can you please add a way for them to be played in the pack
+   menu or library.
+   For the discover menu can you please have the sidebar menu displayed such
+   as in the library menu, but still offer a way to navigate to the website
+   where it was sourced from.
+   Following these changes please update PROMPTS.md according to source
+   formatting
+2. (Sent while the agent was working.) Ok the pack page and the pack editor
+   have asset icons that are oddly alligned can you fix this to allign them
+   more properly with the rest of the content
+
+### Summary
+
+- **Outcome:** every request built, recorded in the plan as "Phase 8 polish,
+  third request" and in the PRD as stories 120–125. 1,073 tests pass (1,024
+  before; 49 new across `test_discover_licenses.py`, `test_discover_drawer.py`,
+  `test_sound_playback.py`, `test_pack_layout.py` and additions to
+  `test_shell.py` and `test_attribution.py`); `ruff check` and `ruff format`
+  are clean. Nothing was committed.
+  - **Consistency:** the pack page, New pack and the Remove confirm are
+    centred columns like the entry, Attribution and Account pages. A new
+    "Page widths" section in docs/FRONTEND.md sets the rule for future
+    pages (full width for browsing and working, otherwise a centred column,
+    plus the shared components to reuse), and a test checks every column
+    class.
+  - **License guide:** the legend's stacked layout rule had caught the
+    verdict key's last item, which is why "Not usable" broke onto two lines;
+    it's scoped with `:not(.symbol-legend-key)` now. "On this page" folds the
+    eleven licenses into one remembered "Licenses" row.
+  - **Iconography:** every side-panel row (Account pages, Attribution center,
+    each pack, On this page) and every filter group has an icon; new icons
+    key, tag, globe, table, quote, shapes, external and coin.
+  - **Discover:** each card shows its license as symbols and its commercial
+    verdict. A side panel like the library's filters by license and by
+    commercial use. CC0-only providers are kept or dropped with no request,
+    and Openverse is asked for the allowed licenses. A result now opens in a
+    drawer like the library's (`catalog:discover_asset`,
+    `catalog/preview.py`), with View on <provider> as its primary action,
+    Save, Add to pack, the license and its uses, and the downloads. Each
+    card also keeps View on <provider> in its corner.
+  - **Packs:** a Grid / List switch on Your packs, remembered in the session.
+  - **Sounds:** library cards, the library drawer, builder items and pack
+    page items play a sound's first stored file through Discover's player.
+  - **Second prompt:** the builder's drag grip stretched the row and floated
+    half way down, away from its thumbnail; the type line sat a few pixels
+    below the thumbnail's top; and an empty status line left a band under
+    each row. All three are fixed, with 24 px type icons in empty
+    thumbnails.
+- **Deviations:** no questions were asked. Two readings were the agent's
+  own, reported for review. "Have the sidebar menu displayed such as in the
+  library menu" was read two ways at once: a side-panel filter list like the
+  library's, and the library's slide-in drawer for a result (keeping the
+  source site one click away in the drawer and on the card). "A sort option"
+  for license type was built as filters, since sorting by license wouldn't
+  remove anything. The packs layout is kept in the session rather than the
+  browser, so the server renders it with no flash.
+- **Sideways:** twelve existing tests pinned the old card markup, sidebar
+  icon sizes and row text; they were updated to the new markup on purpose.
+  The first try at adding a play button to pack items failed on a comment
+  anchor that didn't match, and was redone. The alignment fix was checked in
+  headless Firefox, on a scratch copy of the database with a throwaway
+  auto-sign-in settings file (the real database untouched), before and
+  after. The drawer's opening, the autosubmitting chips and audio playback
+  were not driven in a real browser (only server-side tests and static
+  screenshots), so try them by hand.
+
 ## 2026-11-05 — Pack builder polish, pack and item downloads, credits and the Attribution center
 
 ### Prompts

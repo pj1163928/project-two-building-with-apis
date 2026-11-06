@@ -8,7 +8,7 @@
     <span class="micro text-fg-muted">{{ shelf.number|stringformat:"02d" }}</span>
     <h2 id="{{ shelf.dom_id }}-title" class="micro text-fg-strong">{{ shelf.name }}</h2>
     <span class="shelf-rule" aria-hidden="true"></span>
-    {% if not shelf.loaded %}<span class="micro text-fg-weak">Searching</span>{% elif shelf.error %}<span class="micro text-fg-weak">Unavailable</span>{% else %}{% include "catalog/partials/shelf_count.html" %}{% endif %}
+    {% if not shelf.loaded %}<span class="micro text-fg-weak">Searching</span>{% elif shelf.filtered_out %}<span class="micro text-fg-weak">Filtered out</span>{% elif shelf.error %}<span class="micro text-fg-weak">Unavailable</span>{% else %}{% include "catalog/partials/shelf_count.html" %}{% endif %}
   </header>
   {% if not shelf.loaded %}
     <ul class="result-grid" aria-label="Loading {{ shelf.name }} results">
@@ -23,10 +23,16 @@
       </div>
       <button type="button" class="btn btn-sm btn-quiet" hx-get="{{ shelf.url }}" hx-target="#{{ shelf.dom_id }}" hx-swap="outerHTML" hx-disabled-elt="this">Retry</button>
     </div>
+  {% elif shelf.filtered_out %}
+    {# The license filters rule out every license this provider has: it wasn't asked. #}
+    <div class="shelf-empty shelf-filtered">
+      <p class="text-fg-strong">{% if shelf.provider_licenses %}Every {{ shelf.name }} asset is {{ shelf.provider_licenses }}, which your filters leave out.{% else %}No license allows that combination of filters.{% endif %}</p>
+      <p class="text-sm text-fg-weak mt-1"><a href="{{ shelf.clear_filters_url }}" class="entry-link">Clear filters</a> to see them.</p>
+    </div>
   {% elif not shelf.records %}
     <div class="shelf-empty">
-      <p class="text-fg-strong">No {{ shelf.name }} matches for <span class="font-mono">“{{ shelf.query }}”</span>.</p>
-      <p class="text-sm text-fg-weak mt-1">Try a different or broader phrase.</p>
+      <p class="text-fg-strong">No {{ shelf.name }} matches for <span class="font-mono">“{{ shelf.query }}”</span>{% if shelf.filters.active %} under your license filters{% endif %}.</p>
+      <p class="text-sm text-fg-weak mt-1">{% if shelf.filters.active %}Try other licenses, or <a href="{{ shelf.clear_filters_url }}" class="entry-link">clear filters</a>.{% else %}Try a different or broader phrase.{% endif %}</p>
     </div>
   {% else %}
     <ul id="{{ shelf.results_id }}" class="result-grid">

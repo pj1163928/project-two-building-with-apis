@@ -2,6 +2,29 @@
 {% block title %}Discover{% endblock %}
 {% block surface %}showcase{% endblock %}
 {% block breadcrumb %}{% url 'catalog:discover' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="discover" icon="search" current=True %}{% endblock %}
+{# Discover's own side panel, like the library's (user request, 2026-11-06): license      #}
+{# filters. Commercial use keeps only licenses that allow it; License chips (each with  #}
+{# the license's symbols) keep only those licenses. The chips belong to the command     #}
+{# bar's form (form="discover-search") and submit it as they change (shell.js,          #}
+{# data-autosubmit), so the search reloads with the filters on every shelf, tile and   #}
+{# Shuffle link. ambientCG and Poly Haven are all CC0, so they drop out only when CC0   #}
+{# is ruled out. Without JavaScript, Apply submits them.                                #}
+{% block side_panel %}
+  <section id="discover-filters" class="mt-3 border-t border-line" aria-labelledby="discover-filters-title">
+    <div class="h-11 flex items-center justify-between gap-2 pl-5 pr-3"><span id="discover-filters-title" class="filter-group-title micro text-fg-secondary">{% include "partials/icon.html" with name="filter" size=13 %}<span>Filters</span></span>{% if filters.active %}<a href="{{ clear_filters_url }}" class="panel-action" aria-label="Clear the license filters">{% include "partials/icon.html" with name="close" size=14 %}<span class="micro">Clear</span></a>{% endif %}</div>
+    <fieldset class="px-5 pb-6 space-y-5">
+      <legend class="sr-only">Filter Discover by license</legend>
+      {% for group in filter_groups %}
+      <div class="filter-group" role="group" aria-label="{{ group.title }}"><p class="filter-group-title micro text-fg-muted">{% include "partials/icon.html" with name=group.icon size=13 %}<span>{{ group.title }}</span></p>
+        <div class="flex flex-wrap gap-1.5">{% for chip in group.chips %}{% include "catalog/partials/filter_chip.html" with form_id="discover-search" control="discover-control" autosubmit=True %}{% endfor %}</div>
+      </div>
+      {% endfor %}
+      <p class="text-xs text-fg-muted leading-relaxed">ambientCG and Poly Haven are all CC0. Openverse sounds come in every license. <a href="{% url 'packs:attribution' %}" class="entry-link">What each license means</a></p>
+      <noscript><button type="submit" form="discover-search" class="btn btn-quiet btn-sm w-full">Apply</button></noscript>
+    </fieldset>
+  </section>
+{% endblock %}
+
 {% block content %}
   {% include "partials/page_header.html" with label="Discover" heading="Find assets for your next pack." lead="Search free CC0 and Creative Commons libraries, save what fits, and build packs your Axcenity projects can import." %}
 
@@ -32,6 +55,10 @@
     {% endfor %}
   </nav>
 
+  {% if filters.active %}
+    <p id="discover-filter-note" class="discover-filter-note">{% include "partials/icon.html" with name="filter" size=14 %}<span>Only <strong>{{ filters.summary }}</strong> results.</span><a href="{{ clear_filters_url }}" class="entry-link">Clear filters</a></p>
+  {% endif %}
+
   {# With no query, the shelves show a random pick for the type, so Discover always has #}
   {# something to look at. Shuffle swaps it for a different one.                      #}
   {% if featured %}
@@ -50,4 +77,6 @@
   </div>
   {# The shelves' "Add to pack" buttons open this; a visitor's buttons sign in instead. #}
   {% if user.is_authenticated %}{% include "catalog/partials/pack_picker.html" %}{% endif %}
+  {# The slide-over drawer a result's title fills (catalog/partials/discover_drawer.html). #}
+  <dialog id="discover-drawer" class="drawer-dialog" aria-labelledby="entry-title"></dialog>
 {% endblock %}

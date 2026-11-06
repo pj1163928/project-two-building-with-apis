@@ -90,8 +90,26 @@ class OwnPackMixin(PacksPageMixin):
         )
 
 
+# How Your packs lays the packs out (user request, 2026-11-06): cards in a grid,
+# or one row each in a list. The member's choice is kept in their session.
+PACK_LAYOUTS = ("grid", "list")
+PACK_LAYOUT_SESSION_KEY = "pack_layout"
+
+
+def pack_layout(request) -> str:
+    """The member's Your packs layout: `?layout=` when it's "grid" or "list"
+    (remembered in the session from then on), else the remembered one, else "grid"."""
+    chosen = request.GET.get("layout")
+    if chosen in PACK_LAYOUTS:
+        request.session[PACK_LAYOUT_SESSION_KEY] = chosen
+        return chosen
+    remembered = request.session.get(PACK_LAYOUT_SESSION_KEY)
+    return remembered if remembered in PACK_LAYOUTS else PACK_LAYOUTS[0]
+
+
 class PackListView(PacksPageMixin, TemplateView):
-    """The member's packs, newest change first, with New pack."""
+    """The member's packs, newest change first, with New pack, as a grid of
+    cards or a list of rows (pack_layout())."""
 
     template_name = "packs/pack_list.html"
 
@@ -100,6 +118,7 @@ class PackListView(PacksPageMixin, TemplateView):
         context["packs"] = (
             Pack.objects.owned_by(self.request.user).with_item_count().prefetch_related("tags")
         )
+        context["layout"] = pack_layout(self.request)
         return context
 
 

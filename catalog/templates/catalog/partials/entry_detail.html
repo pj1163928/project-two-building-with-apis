@@ -13,10 +13,11 @@
 {# Under the status chips: who set it, when and why, with a reason box and the history. #}
 {# Files: catalog/partials/entry_files.html (the member's bundle, filters, map types).  #}
 {% with asset=entry.asset %}{% with tile=asset.tile %}{% url 'catalog:update' entry.pk as update_url %}
-<article class="entry" data-kind="{{ asset.kind }}" aria-labelledby="entry-title">
+<article class="entry" data-kind="{{ asset.kind }}"{% if asset.preview_url %} data-sound-card{% endif %} aria-labelledby="entry-title">
   <div class="entry-thumb">
     <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=36 %}</span>
     {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+    {% if asset.preview_url %}{% include "catalog/partials/sound_play.html" with url=asset.preview_url title=asset.title %}{% endif %}
   </div>
 
   <header class="entry-head">

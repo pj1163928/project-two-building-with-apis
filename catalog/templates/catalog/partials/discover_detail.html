@@ -1,0 +1,85 @@
+{# One Discover result in full (catalog.preview.AssetPreview): Discover's drawer body,   #}
+{# and the full page at /discover/asset/<provider>/<id>/ (as_page makes the title the h1). #}
+{# Laid out like the library's entry: the thumbnail over the type icon (a sound's play   #}
+{# button on it), the type and provider, title and author, then the actions: View on     #}
+{# <provider> (the source site, a new tab: the primary action), Save to library and Add  #}
+{# to pack. Then the license (its symbols, "Can I use it?", the credit and a link to its #}
+{# card in the License guide), the details and the downloads the provider lists.        #}
+{# A ProviderError shows its message, with Retry in the drawer and a link to the         #}
+{# provider's site. Nothing here is saved until Save to library is pressed.              #}
+{% if error %}
+<article class="entry" aria-labelledby="entry-title">
+  <div role="alert" class="alert alert-error shelf-alert">
+    {% include "partials/icon.html" with name="alert" size=20 %}
+    <div class="flex-1 min-w-0">
+      {% if as_page %}<h1 id="entry-title" class="font-semibold text-fg-strong">{{ provider_name }} is unavailable</h1>{% else %}<h2 id="entry-title" class="font-semibold text-fg-strong">{{ provider_name }} is unavailable</h2>{% endif %}
+      <p class="text-sm text-fg-secondary mt-0.5">{{ error }}</p>
+    </div>
+    {% if not as_page %}{% url 'catalog:discover_asset' provider_key external_id as retry_url %}<button type="button" class="btn btn-sm btn-quiet" hx-get="{{ retry_url }}" hx-target="#discover-drawer" hx-swap="innerHTML transition:false" hx-disabled-elt="this">Retry</button>{% endif %}
+  </div>
+  <p><a href="{{ provider_home }}" target="_blank" rel="noopener noreferrer" class="btn btn-quiet btn-sm rounded-none gap-1.5">{% include "partials/icon.html" with name="external" size=15 %}<span>Go to {{ provider_name }}</span></a></p>
+</article>
+{% else %}
+{% with tile=preview.tile info=preview.license_info %}
+<article class="entry discover-entry" data-kind="{{ preview.kind }}" data-sound-card aria-labelledby="entry-title">
+  <div class="entry-thumb">
+    <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=36 %}</span>
+    {% if preview.thumbnail_url %}<img src="{{ preview.thumbnail_url }}" alt="" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+    {% if preview.preview_url %}{% include "catalog/partials/sound_play.html" with url=preview.preview_url title=preview.title %}{% endif %}
+  </div>
+
+  <header class="entry-head">
+    <p class="library-type"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=12 %}</span><span class="micro">{{ preview.kind_label }} · {{ provider_name }}</span></p>
+    {% if as_page %}<h1 id="entry-title" class="entry-title">{{ preview.title }}</h1>{% else %}<h2 id="entry-title" class="entry-title">{{ preview.title }}</h2>{% endif %}
+    {% if preview.author %}<p class="entry-byline">By {{ preview.author }}</p>{% endif %}
+    {% if community %}<p class="result-community">{% include "catalog/partials/community_rating.html" %}</p>{% endif %}
+  </header>
+
+  <div id="preview-actions" class="preview-actions">
+    {% if preview.source_url %}<a href="{{ preview.source_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm rounded-none gap-1.5">{% include "partials/icon.html" with name="external" size=15 %}<span>View on {{ provider_name }}</span></a>{% endif %}
+    {% include "catalog/partials/preview_save.html" %}
+    {% if user.is_authenticated %}
+      {% url 'packs:picker' as picker_url %}
+      <button type="button" class="btn btn-quiet btn-sm rounded-none gap-1.5" data-picker="pack-picker" data-picker-asset="{{ preview.title }}" data-picker-url="{{ picker_url }}?provider={{ preview.provider|urlencode }}&amp;external_id={{ preview.external_id|urlencode }}" aria-haspopup="dialog">{% include "partials/icon.html" with name="pack-add" size=15 %}<span>Add to pack</span></button>
+    {% else %}
+      <a href="{% url 'accounts:login' %}?next={{ back_url|urlencode }}" class="btn btn-quiet btn-sm rounded-none gap-1.5">{% include "partials/icon.html" with name="pack-add" size=15 %}<span>Sign in to add to a pack</span></a>
+    {% endif %}
+  </div>
+
+  <section class="entry-section" aria-labelledby="preview-license-title">
+    <h3 id="preview-license-title" class="micro text-fg-secondary">License</h3>
+    <div class="preview-license">
+      {% include "packs/partials/license_symbols.html" with large=True %}
+      <div class="min-w-0">
+        <p class="text-fg-strong font-semibold">{% if preview.license_url %}<a href="{{ preview.license_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">{{ preview.license }}</a>{% else %}{{ preview.license }}{% endif %}</p>
+        <p class="micro text-fg-muted">{{ info.title }}</p>
+      </div>
+      <span class="status-chip micro" data-credit="{{ info.credit }}">{{ info.credit_label }}</span>
+    </div>
+    <p class="text-sm text-fg-secondary">{{ info.summary }} <a href="{% url 'packs:attribution' %}#{{ info.anchor }}" class="entry-link text-fg-muted">What it means</a></p>
+    {% include "packs/partials/license_uses.html" %}
+    {% if preview.attribution %}<dl class="entry-facts"><div><dt class="micro">Attribution</dt><dd class="entry-attribution">{{ preview.attribution }}</dd></div></dl>{% endif %}
+  </section>
+
+  <section class="entry-section" aria-labelledby="preview-details-title">
+    <h3 id="preview-details-title" class="micro text-fg-secondary">Details</h3>
+    <dl class="entry-facts">
+      <div><dt class="micro">Source</dt><dd>{% if preview.source_url %}<a href="{{ preview.source_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">View on {{ provider_name }}</a>{% else %}{{ provider_name }}{% endif %}</dd></div>
+      {% if preview.tags %}<div><dt class="micro">Tags</dt><dd>{{ preview.tags|join:", " }}</dd></div>{% endif %}
+    </dl>
+  </section>
+
+  <section class="entry-section" aria-labelledby="preview-files-title">
+    <h3 id="preview-files-title" class="micro text-fg-secondary">Downloads</h3>
+    {% if preview.variants %}
+      <ul id="preview-variants" class="preview-variants">
+        {% for variant in preview.variants %}<li>{% if variant.resolution %}<span class="file-badge">{{ variant.resolution }}</span>{% endif %}<span class="file-badge">{{ variant.format_label }}</span><span class="text-fg-secondary">{{ variant.package_label }}</span><span class="preview-variant-meta">{{ variant.files|length }} file{{ variant.files|length|pluralize }}{% if variant.total_size is not None %} · {{ variant.total_size|filesizeformat }}{% endif %}</span></li>{% endfor %}
+      </ul>
+      <p class="text-xs text-fg-weak">Save it to choose a variant and download it from your library or a pack, with its credits.</p>
+    {% else %}
+      <p class="text-sm text-fg-weak">{{ provider_name }} lists no files for it. Its page has the download.</p>
+    {% endif %}
+  </section>
+</article>
+{% endwith %}
+{% endif %}

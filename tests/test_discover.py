@@ -293,7 +293,7 @@ def fetch_shelf(client, kind, provider, query="brick"):
 
 
 def cards(html):
-    return re.findall(r'<li class="result-card" data-kind="\w+">.*?</li>', html, re.S)
+    return re.findall(r'<li class="result-card" data-kind="\w+"[^>]*>.*?</li>', html, re.S)
 
 
 def test_a_normal_shelf_shows_thumbnail_title_author_and_license(client, monkeypatch):
@@ -305,10 +305,18 @@ def test_a_normal_shelf_shows_thumbnail_title_author_and_license(client, monkeyp
     html = fetch_shelf(client, "texture", "polyhaven")
     assert "2 results" in html
     first, second = cards(html)
-    # The title's link opens the provider's page in a new tab; CSS stretches it over the card.
+    # The title's link opens the result in Discover's drawer (as a plain link, its own
+    # page); CSS stretches it over the card. User request, 2026-11-06.
     assert (
-        '<h3 class="result-title"><a href="https://polyhaven.com/a/red_brick_03" target="_blank" '
-        'rel="noopener noreferrer" class="result-link">Red Brick 03</a></h3>'
+        '<h3 class="result-title"><a href="/discover/asset/polyhaven/red_brick_03/" '
+        'hx-get="/discover/asset/polyhaven/red_brick_03/" hx-target="#discover-drawer" '
+        'hx-swap="innerHTML transition:false" aria-haspopup="dialog" class="result-link">'
+        "Red Brick 03</a></h3>"
+    ) in first
+    # The provider's page is still a click away, in the corner, in a new tab.
+    assert (
+        '<a href="https://polyhaven.com/a/red_brick_03" target="_blank" '
+        'rel="noopener noreferrer" class="card-action"'
     ) in first
     assert '<img src="https://cdn.example/red_brick_03.png" alt="" loading="lazy"' in first
     assert "Rob Tuytel" in first and ">CC0<" in first
@@ -760,7 +768,7 @@ def test_a_sound_card_has_a_play_button_for_its_preview(client, monkeypatch):
     assert 'aria-pressed="false"' in button
     assert 'aria-label="Play a preview of Rain &amp; Thunder"' in button
     # The button sits in the thumbnail, outside the title's link, so it plays
-    # rather than opening the provider's page.
+    # rather than opening the result's drawer.
     link = re.search(r'<a [^>]*class="result-link">.*?</a>', card, re.S).group(0)
     assert "<button" not in link
     assert '<span class="sound-progress" aria-hidden="true"></span>' in card
@@ -820,8 +828,8 @@ def test_hovering_a_card_shows_its_full_details(client, monkeypatch):
     details = re.search(r'<div class="result-details" aria-hidden="true">(.*?)</dl>', card, re.S)
     text = " ".join(re.sub(r"<[^>]+>", " ", details.group(1)).split())
     assert text == (
-        f"Moon 03 By {long_author} License CC0 From Poly Haven "
-        "Tags moon, rock, crater, space, grey, rough, dust"
+        f"Moon 03 By {long_author} License CC0 Commercial Usable. No conditions. "
+        "From Poly Haven Tags moon, rock, crater, space, grey, rough, dust"
     )
     assert "html[data-pointer] .result-card:hover .result-details" in css
     # The panel lets clicks through to the card's link.
@@ -877,7 +885,7 @@ def test_each_card_has_its_actions_in_the_corner_and_never_the_logo(member_clien
         r'<span class="card-tip" aria-hidden="true">(.*?)</span>(?:</button>|</a>)', actions
     )
     tips = [re.sub(r"<[^>]+>", "", tip).replace("Saving…", "") for tip in tips]
-    assert tips == ["Save to library", "Add to pack", "Details"]
+    assert tips == ["Save to library", "Add to pack", "View on Poly Haven", "Details"]
     assert 'data-picker="pack-picker" data-picker-asset="Red Brick 03"' in actions
     # The corner sits on the provider's thumbnail, so the logo mark never appears there.
     assert "mark" not in actions

@@ -11,6 +11,9 @@ and, for the Toolbox:
 - KIND_FILTERS: {kind: the provider's filter value, or None}, one entry per
   kind the provider serves (the PRD's type-to-provider mapping)
 - CREDIT, HOME_URL: the credit line on its Discover shelf, and its link
+- LICENSES: the license keys every one of its assets carries, e.g. ("cc0",),
+  or None when they're mixed; then search_records() also takes
+  licenses=(keys...) and asks the API for those licenses only
 - search_records(query, kind, limit=12, page=1) -> list of AssetRecord
 - fetch_record(external_id) -> one AssetRecord with its download variants
 

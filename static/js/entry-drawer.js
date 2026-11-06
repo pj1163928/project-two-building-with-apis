@@ -1,5 +1,7 @@
 // The library drawer (catalog/partials/entry_drawer.html, in library.html's
-// <dialog id="library-drawer">) and the review's autosave
+// <dialog id="library-drawer">), Discover's drawer (catalog/partials/
+// discover_drawer.html, in discover.html's <dialog id="discover-drawer">), and
+// the review's autosave
 // (catalog/partials/entry_detail.html), on the drawer and on the full page.
 // Listens on the document, like the other scripts, so content that swaps in
 // later works too.
@@ -19,7 +21,8 @@
   var LEAVE_WARNING = "Your notes haven't saved yet. Leave anyway? They're kept in this browser and come back when you open this entry again.";
   var failed = null; // the autosave form whose last save failed, for Try again
 
-  function drawer() { return document.getElementById("library-drawer"); }
+  // The page's one drawer: the library's (#library-drawer) or Discover's (#discover-drawer).
+  function drawer() { return document.querySelector("dialog.drawer-dialog"); }
   function autosaveForm(element) { return element && element.closest ? element.closest("form[data-autosave]") : null; }
   function notesForms() { return document.querySelectorAll('form[data-autosave="notes"]'); }
   function notesOf(form) { return form.querySelector("textarea[name=notes]"); }

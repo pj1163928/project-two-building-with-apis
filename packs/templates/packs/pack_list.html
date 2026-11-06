@@ -2,31 +2,57 @@
 {% block title %}Packs{% endblock %}
 {% block breadcrumb %}{% url 'packs:list' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="packs" icon="pack" current=True %}{% endblock %}
 {% block side_panel %}{% include "packs/partials/pack_nav.html" %}{% endblock %}
+{# Your packs: a grid of cards, or a list with one row per pack (user request,      #}
+{# 2026-11-06). The Grid and List switch in the toolbar are links (?layout=), and  #}
+{# the choice is kept in the member's session (packs.views.pack_layout). Both show #}
+{# the same facts; the title opens the builder and View page the pack's page.      #}
 {% block content %}
-  {% url 'packs:create' as new_pack_url %}
+  {% url 'packs:create' as new_pack_url %}{% url 'packs:list' as list_url %}
   <section class="space-y-5">
     {% include "partials/page_header.html" with label="Packs" heading="Your packs." lead="Group saved assets into kits for a project, then export them for the engine." compact=True %}
     <div class="work-toolbar justify-between">
       <p class="micro text-fg-muted px-2">{{ packs|length }} pack{{ packs|length|pluralize }}</p>
-      <a href="{{ new_pack_url }}" class="btn btn-primary btn-sm gap-1.5">{% include "partials/icon.html" with name="plus" size=15 %}<span>New pack</span></a>
+      <div class="flex items-center gap-2">
+        <nav id="pack-layout" class="layout-switch" aria-label="Layout">
+          <a href="{{ list_url }}?layout=grid" class="layout-option"{% if layout == "grid" %} aria-current="true"{% endif %}>{% include "partials/icon.html" with name="grid" size=14 %}<span>Grid</span></a>
+          <a href="{{ list_url }}?layout=list" class="layout-option"{% if layout == "list" %} aria-current="true"{% endif %}>{% include "partials/icon.html" with name="list" size=14 %}<span>List</span></a>
+        </nav>
+        <a href="{{ new_pack_url }}" class="btn btn-primary btn-sm gap-1.5">{% include "partials/icon.html" with name="plus" size=15 %}<span>New pack</span></a>
+      </div>
     </div>
     {% if packs %}
-      <ul id="pack-list" class="pack-grid" aria-label="Your packs">
+      <ul id="pack-list" class="{% if layout == 'list' %}pack-rows{% else %}pack-grid{% endif %}" data-layout="{{ layout }}" aria-label="Your packs">
         {% for pack in packs %}
-          <li class="pack-card">
-            <div class="flex items-center justify-between gap-3">
+          {% if layout == "list" %}
+            <li class="pack-row">
               <span class="status-chip micro" data-visibility="{{ pack.visibility }}">{{ pack.get_visibility_display }}</span>
-              <span class="micro text-fg-muted">{{ pack.item_count }} item{{ pack.item_count|pluralize }}</span>
-            </div>
-            <h2 class="pack-card-title"><a href="{% url 'packs:builder' pack.pk %}" class="pack-card-link">{{ pack.title }}</a></h2>
-            {% if pack.description %}<p class="pack-card-description">{{ pack.description }}</p>{% endif %}
-            {% with tags=pack.tags.all %}{% if tags %}<p class="pack-card-tags">{% for tag in tags %}<span>{{ tag.name }}</span>{% endfor %}</p>{% endif %}{% endwith %}
-            <div class="mt-auto flex items-center justify-between gap-3">
-              <p class="micro text-fg-muted">Changed <time datetime="{{ pack.updated_at|date:'c' }}">{{ pack.updated_at|date:"j M Y" }}</time></p>
-              {# Above the title's stretched link, so it opens the pack's page, not the builder. #}
-              <a href="{{ pack.reader_url }}" class="pack-card-page micro" aria-label="View the page for {{ pack.title }}">View page</a>
-            </div>
-          </li>
+              <div class="pack-row-main">
+                <h2 class="pack-row-title"><a href="{% url 'packs:builder' pack.pk %}" class="pack-card-link">{{ pack.title }}</a></h2>
+                {% if pack.description %}<p class="pack-row-description">{{ pack.description }}</p>{% endif %}
+                {% with tags=pack.tags.all %}{% if tags %}<p class="pack-card-tags">{% for tag in tags %}<span>{{ tag.name }}</span>{% endfor %}</p>{% endif %}{% endwith %}
+              </div>
+              <div class="pack-row-meta">
+                <span class="micro text-fg-muted">{{ pack.item_count }} item{{ pack.item_count|pluralize }}</span>
+                <span class="micro text-fg-muted">Changed <time datetime="{{ pack.updated_at|date:'c' }}">{{ pack.updated_at|date:"j M Y" }}</time></span>
+                <a href="{{ pack.reader_url }}" class="pack-card-page micro" aria-label="View the page for {{ pack.title }}">View page</a>
+              </div>
+            </li>
+          {% else %}
+            <li class="pack-card">
+              <div class="flex items-center justify-between gap-3">
+                <span class="status-chip micro" data-visibility="{{ pack.visibility }}">{{ pack.get_visibility_display }}</span>
+                <span class="micro text-fg-muted">{{ pack.item_count }} item{{ pack.item_count|pluralize }}</span>
+              </div>
+              <h2 class="pack-card-title"><a href="{% url 'packs:builder' pack.pk %}" class="pack-card-link">{{ pack.title }}</a></h2>
+              {% if pack.description %}<p class="pack-card-description">{{ pack.description }}</p>{% endif %}
+              {% with tags=pack.tags.all %}{% if tags %}<p class="pack-card-tags">{% for tag in tags %}<span>{{ tag.name }}</span>{% endfor %}</p>{% endif %}{% endwith %}
+              <div class="mt-auto flex items-center justify-between gap-3">
+                <p class="micro text-fg-muted">Changed <time datetime="{{ pack.updated_at|date:'c' }}">{{ pack.updated_at|date:"j M Y" }}</time></p>
+                {# Above the title's stretched link, so it opens the pack's page, not the builder. #}
+                <a href="{{ pack.reader_url }}" class="pack-card-page micro" aria-label="View the page for {{ pack.title }}">View page</a>
+              </div>
+            </li>
+          {% endif %}
         {% endfor %}
       </ul>
     {% else %}

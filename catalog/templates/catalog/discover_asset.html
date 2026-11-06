@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{% if preview %}{{ preview.title }}{% else %}{{ provider_name }}{% endif %} · Discover{% endblock %}
+{% block surface %}showcase{% endblock %}
+{% block breadcrumb %}{% url 'catalog:discover' as crumb1_url %}{% include "partials/crumb.html" with href=crumb1_url label="discover" icon="search" %}<span class="crumb-sep" aria-hidden="true">/</span>{% url 'catalog:discover_asset' provider_key external_id as crumb2_url %}{% include "partials/crumb.html" with href=crumb2_url label="result" icon="info" current=True %}{% endblock %}
+
+{# One Discover result as a full page: what a direct visit, a new tab or "Open as page" #}
+{# gets. The same body as Discover's drawer (catalog/partials/discover_detail.html), in #}
+{# a centred column like every page narrower than the content (docs/FRONTEND.md).     #}
+{% block content %}
+  <section class="discover-asset-page space-y-5">
+    <a href="{{ back_url }}" class="btn btn-quiet btn-sm entry-back">Back to Discover</a>
+    <div class="entry-page">{% include "catalog/partials/discover_detail.html" with as_page=True %}</div>
+  </section>
+  {% if user.is_authenticated %}{% include "catalog/partials/pack_picker.html" %}{% endif %}
+{% endblock %}

@@ -4,14 +4,24 @@
 {% block panel_title %}Attribution{% endblock %}
 {% block side_panel %}
   {% include "packs/partials/attribution_nav.html" %}
-  <nav class="border-t border-line mt-3" aria-label="On this page">
+  {# Each row has its icon. The eleven licenses fold into one "Licenses" row, closed by #}
+  {# default and remembered the way the member last left it (shell.js, data-remember).  #}
+  {# Each license row shows the license's first symbol. User request, 2026-11-06.       #}
+  <nav id="attribution-toc" class="border-t border-line mt-3" aria-label="On this page">
     <div class="h-11 flex items-center pl-5 pr-3"><span class="micro text-fg-secondary">On this page</span></div>
     <ul class="flex flex-col gap-1 pb-3">
-      <li><a class="panel-row" href="#attribution-symbols"><span class="truncate">Symbols</span></a></li>
-      <li><a class="panel-row" href="#attribution-glance"><span class="truncate">At a glance</span></a></li>
-      {% for info in licenses %}<li><a class="panel-row" href="#{{ info.anchor }}"><span class="truncate">{{ info.name }}</span></a></li>{% endfor %}
-      <li><a class="panel-row" href="#attribution-how"><span class="truncate">How to credit</span></a></li>
-      <li><a class="panel-row" href="#attribution-optional"><span class="truncate">Optional credits</span></a></li>
+      <li><a class="panel-row" href="#attribution-symbols"><span class="panel-row-icon" aria-hidden="true">{% include "partials/icon.html" with name="shapes" size=16 %}</span><span class="truncate">Symbols</span></a></li>
+      <li><a class="panel-row" href="#attribution-glance"><span class="panel-row-icon" aria-hidden="true">{% include "partials/icon.html" with name="table" size=16 %}</span><span class="truncate">At a glance</span></a></li>
+      <li>
+        <details id="attribution-toc-licenses" class="panel-fold" data-remember="ax-toc-licenses">
+          <summary class="panel-row"><span class="panel-row-icon" aria-hidden="true">{% include "partials/icon.html" with name="license" size=16 %}</span><span class="truncate">Licenses</span><span class="panel-row-count">{{ licenses|length }}</span><span class="panel-fold-chevron" aria-hidden="true">{% include "partials/icon.html" with name="chevron-down" size=14 %}</span></summary>
+          <ul class="panel-fold-rows flex flex-col gap-0.5" aria-label="Licenses">
+            {% for info in licenses %}<li><a class="panel-row" href="#{{ info.anchor }}"><span class="panel-row-icon" aria-hidden="true">{% include "partials/icon.html" with name=info.symbols.0.0 size=14 %}</span><span class="truncate">{{ info.name }}</span></a></li>{% endfor %}
+          </ul>
+        </details>
+      </li>
+      <li><a class="panel-row" href="#attribution-how"><span class="panel-row-icon" aria-hidden="true">{% include "partials/icon.html" with name="quote" size=16 %}</span><span class="truncate">How to credit</span></a></li>
+      <li><a class="panel-row" href="#attribution-optional"><span class="panel-row-icon" aria-hidden="true">{% include "partials/icon.html" with name="star" size=16 %}</span><span class="truncate">Optional credits</span></a></li>
     </ul>
   </nav>
 {% endblock %}

@@ -5,8 +5,8 @@ The views stay thin; everything they decide comes from here.
 
 import hashlib
 import random
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from types import ModuleType
 from urllib.parse import urlencode
 
@@ -21,6 +21,9 @@ from providers import (
     ProviderError,
     providers_for_kind,
 )
+
+from .filters import FilterChip, FilterGroup
+from .licenses import LICENSE_ORDER, LICENSES, license_key
 
 # Longest query passed to a provider. Longer input is cut, not refused.
 MAX_QUERY_LENGTH = 100
@@ -44,6 +47,109 @@ FEATURED_QUERIES = {
 SEARCH_CACHE_SECONDS = 60 * 60
 # How long a provider's last known status is kept before it reads as unknown again.
 STATUS_CACHE_SECONDS = 60 * 60
+
+
+# The licenses Discover can filter by (user request, 2026-11-06): every license
+# in the guide but "unknown", which no provider can search for.
+FILTER_LICENSES = tuple(key for key in LICENSE_ORDER if key != "unknown")
+
+
+@dataclass(frozen=True)
+class DiscoverFilters:
+    """Discover's license filters: the chosen licenses (none means any) and
+    whether only licenses that allow commercial use may show."""
+
+    licenses: tuple[str, ...] = ()
+    commercial: bool = False
+
+    @property
+    def active(self) -> bool:
+        return bool(self.licenses) or self.commercial
+
+    @property
+    def allowed(self) -> frozenset[str] | None:
+        """The license keys a result may carry, or None when any may.
+
+        With Commercial use on, only licenses whose guide says yes to
+        commercial use count (CC0, Public Domain Mark, CC BY, BY-SA, BY-ND).
+        The set can be empty: then nothing can match.
+        """
+        if not self.active:
+            return None
+        keys = self.licenses or FILTER_LICENSES
+        if self.commercial:
+            keys = tuple(key for key in keys if LICENSES[key].commercial is True)
+        return frozenset(keys)
+
+    def allows(self, license_name: str) -> bool:
+        """Whether a result with this license (as the provider wrote it) may show."""
+        allowed = self.allowed
+        return allowed is None or license_key(license_name) in allowed
+
+    @property
+    def params(self) -> list[tuple[str, str]]:
+        """The filters as query-string pairs, for every Discover link that keeps them."""
+        pairs = [("license", key) for key in self.licenses]
+        return pairs + ([("commercial", "1")] if self.commercial else [])
+
+    @property
+    def cache_part(self) -> str:
+        """The filters' part of a search's cache key: the allowed licenses, in order."""
+        allowed = self.allowed
+        if allowed is None:
+            return "any"
+        return ",".join(key for key in FILTER_LICENSES if key in allowed) or "none"
+
+    @property
+    def summary(self) -> str:
+        """The filters in words, e.g. "CC0 or CC BY, commercial use"."""
+        parts = []
+        if self.licenses:
+            parts.append(" or ".join(LICENSES[key].name for key in self.licenses))
+        if self.commercial:
+            parts.append("commercial use")
+        return ", ".join(parts)
+
+
+NO_FILTERS = DiscoverFilters()
+
+
+def clean_filters(params: Mapping) -> DiscoverFilters:
+    """Discover's filters from a query string: known license keys only, in the
+    guide's order, and `commercial=1`. Anything else is ignored."""
+    getlist = getattr(params, "getlist", None)
+    chosen = set(getlist("license") if getlist else [])
+    return DiscoverFilters(
+        licenses=tuple(key for key in FILTER_LICENSES if key in chosen),
+        commercial=params.get("commercial") == "1",
+    )
+
+
+def discover_filter_groups(filters: DiscoverFilters) -> list[FilterGroup]:
+    """Discover's side-panel chips: Commercial use, then one chip per license
+    with its symbols, each checked to match `filters`."""
+    return [
+        FilterGroup(
+            "commercial",
+            "Commercial use",
+            True,
+            [FilterChip("1", "Allowed only", filters.commercial, icons=("use-commercial",))],
+        ),
+        FilterGroup(
+            "license",
+            "License",
+            True,
+            [
+                FilterChip(
+                    key,
+                    LICENSES[key].name,
+                    key in filters.licenses,
+                    icons=tuple(icon for icon, _, _ in LICENSES[key].symbols),
+                )
+                for key in FILTER_LICENSES
+            ],
+        ),
+    ]
 
 
 @dataclass(frozen=True)
@@ -91,10 +197,20 @@ class Shelf:
     records: tuple[AssetRecord, ...] = ()
     error: str = ""  # a ProviderError message, safe to show
     page: int = 1  # Load more fetches the next page into the same shelf
+    filters: DiscoverFilters = field(default=NO_FILTERS)
+    # True when the filters rule out every license the provider has (ambientCG and
+    # Poly Haven are all CC0), so the shelf is empty without asking the provider.
+    filtered_out: bool = False
 
     @property
     def url(self) -> str:
-        return shelf_url(self.kind, self.key, self.query, self.page)
+        return shelf_url(self.kind, self.key, self.query, self.page, self.filters)
+
+    @property
+    def provider_licenses(self) -> str:
+        """The licenses the provider's assets all carry, in words ("CC0"), or ""."""
+        keys = getattr(PROVIDERS_BY_KEY[self.key], "LICENSES", None) or ()
+        return " and ".join(LICENSES[key].name for key in keys)
 
     @property
     def has_more(self) -> bool:
@@ -113,11 +229,16 @@ class Shelf:
     @property
     def page_url(self) -> str:
         """The Discover page this shelf belongs on: where sign-in sends a visitor back to."""
+        return discover_url(self.kind, self.query, self.filters)
+
+    @property
+    def clear_filters_url(self) -> str:
+        """The same Discover search without the license filters."""
         return discover_url(self.kind, self.query)
 
     @property
     def next_url(self) -> str:
-        return shelf_url(self.kind, self.key, self.query, self.page + 1)
+        return shelf_url(self.kind, self.key, self.query, self.page + 1, self.filters)
 
     @property
     def shown_count(self) -> int:
@@ -190,21 +311,28 @@ def featured_query(
     return (choose or random.choice)(choices)
 
 
-def shuffle_url(kind: str, featured: str) -> str:
-    """Discover for `kind` with a new random pick, never `featured` again."""
-    return f"{reverse('catalog:discover')}?{urlencode({'type': kind, 'shuffle': featured})}"
+def shuffle_url(kind: str, featured: str, filters: DiscoverFilters = NO_FILTERS) -> str:
+    """Discover for `kind` with a new random pick, never `featured` again, keeping `filters`."""
+    params = [("type", kind), ("shuffle", featured), *filters.params]
+    return f"{reverse('catalog:discover')}?{urlencode(params)}"
 
 
-def shelf_url(kind: str, provider_key: str, query: str, page: int = 1) -> str:
+def shelf_url(
+    kind: str,
+    provider_key: str,
+    query: str,
+    page: int = 1,
+    filters: DiscoverFilters = NO_FILTERS,
+) -> str:
     """The fragment URL for one page of one provider's shelf of `query` results."""
     path = reverse("catalog:discover_shelf", args=[kind, provider_key])
-    params = {"q": query, "page": page} if page > 1 else {"q": query}
+    params = [("q", query)] + ([("page", str(page))] if page > 1 else []) + filters.params
     return f"{path}?{urlencode(params)}"
 
 
-def discover_url(kind: str, query: str = "") -> str:
-    """The Discover page for `kind`, with `query` in the command bar."""
-    params = {"type": kind, "q": query} if query else {"type": kind}
+def discover_url(kind: str, query: str = "", filters: DiscoverFilters = NO_FILTERS) -> str:
+    """The Discover page for `kind`, with `query` in the command bar and `filters` on."""
+    params = [("type", kind)] + ([("q", query)] if query else []) + filters.params
     return f"{reverse('catalog:discover')}?{urlencode(params)}"
 
 
@@ -220,10 +348,17 @@ def shelf_provider(kind: str, provider_key: str) -> ModuleType | None:
     return provider
 
 
-def pending_shelves(kind: str, query: str) -> list[Shelf]:
+def pending_shelves(kind: str, query: str, filters: DiscoverFilters = NO_FILTERS) -> list[Shelf]:
     """The not-yet-loaded shelves the Discover page shows for a search."""
     return [
-        Shelf(key=provider.KEY, name=provider.NAME, kind=kind, query=query, number=number)
+        Shelf(
+            key=provider.KEY,
+            name=provider.NAME,
+            kind=kind,
+            query=query,
+            number=number,
+            filters=filters,
+        )
         for number, provider in enumerate(providers_for_kind(kind), start=1)
     ]
 
@@ -274,19 +409,36 @@ def provider_statuses() -> list[ProviderStatus]:
     ]
 
 
-def search_cache_key(provider_key: str, kind: str, query: str, page: int = 1) -> str:
+def search_cache_key(
+    provider_key: str, kind: str, query: str, page: int = 1, licenses: str = "any"
+) -> str:
     """The cache key for one page of one search.
 
     Searches that differ only in case or spacing share it. The normalized
-    query is hashed, so the key holds no spaces or user text.
+    query is hashed, so the key holds no spaces or user text. `licenses` is
+    the filters' part (DiscoverFilters.cache_part) for a provider that
+    filters by license itself.
     """
     normalized = clean_query(query).casefold()
     digest = hashlib.sha256(normalized.encode()).hexdigest()
-    return f"discover:search:{provider_key}:{kind}:{digest}:{page}"
+    suffix = "" if licenses == "any" else f":{licenses}"
+    return f"discover:search:{provider_key}:{kind}:{digest}:{page}{suffix}"
 
 
-def load_shelf(provider: ModuleType, kind: str, query: str, page: int = 1) -> Shelf:
+def load_shelf(
+    provider: ModuleType,
+    kind: str,
+    query: str,
+    page: int = 1,
+    filters: DiscoverFilters = NO_FILTERS,
+) -> Shelf:
     """Search one provider and return page `page` of its loaded shelf.
+
+    With license filters on, a provider whose assets all carry one license
+    (its LICENSES, e.g. ambientCG's CC0) is searched as usual when that
+    license is allowed, and otherwise not asked at all: the shelf is
+    `filtered_out`. A provider with mixed licenses (LICENSES = None) is
+    asked for the allowed licenses only.
 
     A successful search is cached for SEARCH_CACHE_SECONDS. A ProviderError
     becomes the shelf's error message. Nothing else is caught: any other
@@ -294,13 +446,34 @@ def load_shelf(provider: ModuleType, kind: str, query: str, page: int = 1) -> Sh
     """
     number = providers_for_kind(kind).index(provider) + 1
     shelf = Shelf(
-        key=provider.KEY, name=provider.NAME, kind=kind, query=query, number=number, page=page
+        key=provider.KEY,
+        name=provider.NAME,
+        kind=kind,
+        query=query,
+        number=number,
+        page=page,
+        filters=filters,
     )
-    key = search_cache_key(provider.KEY, kind, query, page)
+    allowed = filters.allowed
+    fixed = getattr(provider, "LICENSES", None)
+    search_kwargs = {}
+    licenses_part = "any"
+    if allowed is not None:
+        if fixed is not None:
+            if not allowed.intersection(fixed):
+                return replace(shelf, loaded=True, filtered_out=True)
+        elif not allowed:
+            return replace(shelf, loaded=True, filtered_out=True)
+        else:
+            licenses_part = filters.cache_part
+            search_kwargs["licenses"] = tuple(key for key in FILTER_LICENSES if key in allowed)
+    key = search_cache_key(provider.KEY, kind, query, page, licenses_part)
     records = cache.get(key)
     if records is None:
         try:
-            records = tuple(provider.search_records(query, kind, limit=PAGE_SIZE, page=page))
+            records = tuple(
+                provider.search_records(query, kind, limit=PAGE_SIZE, page=page, **search_kwargs)
+            )
         except ProviderError as error:
             record_status(provider, ok=False)
             return replace(shelf, loaded=True, error=str(error))

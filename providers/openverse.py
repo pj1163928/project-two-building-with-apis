@@ -4,6 +4,7 @@ Used anonymously, which Openverse caps at 20 requests/minute and 200/day.
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import replace
 
 from .formatting import duration
@@ -88,6 +89,8 @@ HOME_URL = "https://openverse.org"
 
 # Openverse serves sounds only, with no type filter (the PRD's mapping).
 KIND_FILTERS = {"sound": None}
+# Openverse's licenses are mixed, so None: search_records() filters by license itself.
+LICENSES = None
 
 # Anonymous clients may page no deeper than this many results.
 MAX_DEPTH = 240
@@ -114,12 +117,16 @@ def _record(item):
     )
 
 
-def search_records(query: str, kind: str, limit: int = 12, page: int = 1) -> list[AssetRecord]:
+def search_records(
+    query: str, kind: str, limit: int = 12, page: int = 1, licenses: Sequence[str] = ()
+) -> list[AssetRecord]:
     """Return up to `limit` sound AssetRecords matching `query`, from page `page`.
 
     Pages are 1-based. A page past MAX_DEPTH is empty, with no request, since
-    Openverse refuses it. `kind` must be "sound". Any failure raises
-    ProviderError.
+    Openverse refuses it. `kind` must be "sound". `licenses` (the Toolbox's
+    license keys, which are Openverse's own codes: "cc0", "by", "by-nc-sa",
+    "sampling+"...) limits the results to those licenses; empty means any.
+    Any failure raises ProviderError.
     """
     if kind not in KIND_FILTERS:
         raise ValueError(f"{NAME} has no {kind!r} assets.")
@@ -128,6 +135,8 @@ def search_records(query: str, kind: str, limit: int = 12, page: int = 1) -> lis
     params = {"q": query.strip(), "page_size": limit}
     if page > 1:
         params["page"] = page
+    if licenses:
+        params["license"] = ",".join(licenses)
     data = get_json(API_URL, params, provider=NAME)
     records = (_record(item) for item in items_in(data, "results", NAME))
     return [record for record in records if record][:limit]

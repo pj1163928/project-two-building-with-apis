@@ -54,10 +54,11 @@
       {% include "packs/partials/import_path_help.html" %}
       <ol id="pack-page-items" class="pack-items" aria-label="Items in this pack">
         {% for item in items %}{% with asset=item.saved_asset.asset export=item.export %}{% with tile=asset.tile %}
-          <li class="pack-item pack-item-read" data-kind="{{ asset.kind }}" data-bundle-box data-bundle-state="idle">
+          <li class="pack-item pack-item-read" data-kind="{{ asset.kind }}"{% if asset.preview_url %} data-sound-card{% endif %} data-bundle-box data-bundle-state="idle">
             <div class="pack-item-thumb">
-              <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=20 %}</span>
+              <span class="result-fallback {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=24 %}</span>
               {% if asset.thumbnail_url %}<img src="{{ asset.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+              {% if asset.preview_url %}{% include "catalog/partials/sound_play.html" with url=asset.preview_url title=asset.title small=True %}{% endif %}
             </div>
             <div class="pack-item-main">
               <p class="library-type"><span class="library-type-icon {{ tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=tile.key size=12 %}</span><span class="micro">{{ asset.get_kind_display }} · {{ asset.get_provider_display }}</span></p>

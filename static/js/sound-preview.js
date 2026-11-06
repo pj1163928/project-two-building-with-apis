@@ -1,8 +1,12 @@
-// Sound previews on Discover's result cards. A card's play button
-// (catalog/partials/result_card.html) carries the provider's audio URL in
-// data-sound-preview; the audio streams from the provider and is never copied.
-// One preview plays at a time. Shelves arrive and change through HTMX, so this
-// listens on the document, and stops the sound if its card is swapped away.
+// Sound previews: on Discover's result cards and drawer, library cards and the
+// library drawer, and pack items in the builder and on a pack's page (user
+// request, 2026-11-06). A play button (catalog/partials/sound_play.html)
+// carries the provider's audio URL in data-sound-preview; the audio streams
+// from the provider and is never copied. Its nearest [data-sound-card] takes
+// the state (data-sound) and the progress (--progress). One preview plays at a
+// time. Content arrives and changes through HTMX, so this listens on the
+// document, stops the sound if its card is swapped away, and stops it when the
+// dialog it plays in (a drawer) closes.
 (function () {
   var current = null; // { button, card, audio }
 
@@ -30,7 +34,7 @@
   }
 
   function start(button) {
-    var card = button.closest(".result-card");
+    var card = button.closest("[data-sound-card]") || button.parentNode;
     var audio = new Audio(button.dataset.soundPreview);
     audio.preload = "auto";
     var entry = { button: button, card: card, audio: audio };
@@ -83,4 +87,9 @@
   document.addEventListener("htmx:afterSwap", function () {
     if (current && !document.contains(current.button)) stop();
   });
+
+  // A drawer that closes takes its sound with it ("close" doesn't bubble).
+  document.addEventListener("close", function (event) {
+    if (current && event.target.contains && event.target.contains(current.button)) stop();
+  }, true);
 })();

@@ -155,6 +155,21 @@ class Asset(models.Model):
         """What its license lets you do and asks in return (catalog.licenses)."""
         return license_info(self.license)
 
+    @property
+    def preview_url(self) -> str:
+        """A sound's playable audio: its first stored file, the provider's URL
+        (streamed, never copied). "" for any other kind, or a sound with no files.
+
+        Openverse lists the main audio file first, then any alternatives."""
+        if self.kind != "sound":
+            return ""
+        for variant in self.variants or []:
+            files = variant.get("files") if isinstance(variant, dict) else None
+            for file in files or []:
+                if isinstance(file, dict) and file.get("url"):
+                    return file["url"]
+        return ""
+
 
 # The library's sorts, by their URL value; "newest" is the default. Each ends
 # on a unique column, so the order never shifts between pages. "community"

@@ -18,9 +18,11 @@ from providers import PROVIDERS_BY_KEY, ProviderError
 from .discover import (
     KIND_TILES,
     TILES_BY_KIND,
+    clean_filters,
     clean_kind,
     clean_page,
     clean_query,
+    discover_filter_groups,
     discover_url,
     featured_query,
     load_shelf,
@@ -40,6 +42,7 @@ from .library import (
     status_history,
 )
 from .models import STATUS_REASON_MAX_LENGTH, SavedAsset, Tag
+from .preview import asset_preview, valid_asset_ref
 
 # The drawer's stars, lowest first.
 RATING_VALUES = (1, 2, 3, 4, 5)
@@ -50,7 +53,9 @@ class DiscoverView(TemplateView):
 
     Open to signed-out visitors. The page never waits for a provider: each
     shelf fetches itself with its own HTMX request once the page is up. With
-    no query, the shelves show a random featured search for the kind.
+    no query, the shelves show a random featured search for the kind. The
+    side panel's license filters (license, commercial use) ride along on every
+    shelf, tile and Shuffle link.
     """
 
     template_name = "catalog/discover.html"
@@ -60,15 +65,19 @@ class DiscoverView(TemplateView):
         context = super().get_context_data(**kwargs)
         kind = clean_kind(self.request.GET.get("type"))
         query = clean_query(self.request.GET.get("q"))
+        filters = clean_filters(self.request.GET)
         featured = "" if query else featured_query(kind, after=self.request.GET.get("shuffle", ""))
         context.update(
             kind=kind,
             query=query,
             featured=featured,
-            shuffle_url=shuffle_url(kind, featured) if featured else "",
+            filters=filters,
+            filter_groups=discover_filter_groups(filters),
+            clear_filters_url=discover_url(kind, query),
+            shuffle_url=shuffle_url(kind, featured, filters) if featured else "",
             tile=TILES_BY_KIND[kind],
-            tiles=[(tile, discover_url(tile.key, query)) for tile in KIND_TILES],
-            shelves=pending_shelves(kind, query or featured),
+            tiles=[(tile, discover_url(tile.key, query, filters)) for tile in KIND_TILES],
+            shelves=pending_shelves(kind, query or featured, filters),
         )
         return context
 
@@ -93,10 +102,11 @@ class DiscoverShelfView(View):
         if page is None:
             return HttpResponseBadRequest("That shelf page doesn't exist.")
 
+        filters = clean_filters(request.GET)
         # A shelf is a fragment; opened directly, it's shown on its page.
         if not request.htmx or request.htmx.boosted:
-            return redirect(discover_url(kind, query))
-        shelf = load_shelf(source, kind, query, page)
+            return redirect(discover_url(kind, query, filters))
+        shelf = load_shelf(source, kind, query, page, filters)
         template = (
             "catalog/partials/shelf.html" if page == 1 else "catalog/partials/shelf_more.html"
         )
@@ -110,6 +120,64 @@ class DiscoverShelfView(View):
         return render(request, template, context)
 
 
+class DiscoverAssetView(View):
+    """One Discover result in full: Discover's drawer, or the same as a page.
+
+    Open to visitors, like Discover. A result's title hx-gets it into the
+    page's drawer; any other request (a direct visit, a boosted link, a new
+    tab) gets the full page. The asset comes from catalog.preview: the stored
+    Asset when anyone has saved it, otherwise the provider (cached). A bad
+    provider or ID is a 400 before any provider is called, and a
+    ProviderError shows its message with Retry and a link to the provider.
+    Nothing is saved.
+    """
+
+    drawer_template_name = "catalog/partials/discover_drawer.html"
+    template_name = "catalog/discover_asset.html"
+
+    def get(self, request, provider, external_id):
+        external_id = external_id.strip()
+        if not valid_asset_ref(provider, external_id):
+            return HttpResponseBadRequest("That isn't a known provider and asset ID.")
+        source = PROVIDERS_BY_KEY[provider]
+        context = {
+            "active_nav": "discover",
+            "provider_key": provider,
+            "provider_name": source.NAME,
+            "provider_home": source.HOME_URL,
+            "external_id": external_id,
+            "back_url": _discover_back_url(request),
+        }
+        try:
+            preview = asset_preview(provider, external_id)
+        except ProviderError as error:
+            context["error"] = str(error)
+        else:
+            context.update(
+                preview=preview,
+                saved=bool(
+                    SavedAsset.objects.saved_external_ids(request.user, provider, [external_id])
+                ),
+                community=SavedAsset.objects.community_ratings(provider, [external_id]).get(
+                    external_id
+                ),
+            )
+        template = self.drawer_template_name if _wants_fragment(request) else self.template_name
+        return render(request, template, context)
+
+
+def _discover_back_url(request) -> str:
+    """The Discover page a drawer was opened from (HX-Current-URL), or Discover itself.
+
+    Sign-in from the drawer comes back here. Only a Discover URL counts.
+    """
+    htmx = request.htmx
+    current = urlsplit((htmx and htmx.current_url) or "")
+    if current.path == reverse("catalog:discover"):
+        return f"{current.path}?{current.query}" if current.query else current.path
+    return reverse("catalog:discover")
+
+
 class SaveAssetView(LoginRequiredMixin, View):
     """Save to library: the POST behind a Discover result's Save button.
 
@@ -117,7 +185,8 @@ class SaveAssetView(LoginRequiredMixin, View):
     request). The reply is a fragment that replaces the button: the "In
     library" badge (with the status bar's saved count out of band), or the
     ProviderError message with Try again. A bad provider or ID is a 400
-    before any provider is called.
+    before any provider is called. Discover's drawer posts slot=drawer and
+    gets its own full-size button back (catalog/partials/preview_save.html).
     """
 
     http_method_names = ["post"]
@@ -135,13 +204,18 @@ class SaveAssetView(LoginRequiredMixin, View):
         if provider not in PROVIDERS_BY_KEY or not external_id or len(external_id) > 200:
             return HttpResponseBadRequest("Saving needs a known provider and an asset ID.")
         slot = {"provider": provider, "external_id": external_id}
+        # Discover's drawer has its own full-size Save button (slot=drawer).
+        if request.POST.get("slot") == "drawer":
+            slot = {"provider_key": provider, "external_id": external_id}
+            saved_template = error_template = "catalog/partials/preview_save.html"
+        else:
+            saved_template = "catalog/partials/in_library.html"
+            error_template = "catalog/partials/save_error.html"
         try:
             save_to_library(request.user, provider, external_id)
         except ProviderError as error:
-            return render(
-                request, "catalog/partials/save_error.html", {**slot, "error": str(error)}
-            )
-        return render(request, "catalog/partials/in_library.html", {**slot, "count_oob": True})
+            return render(request, error_template, {**slot, "error": str(error)})
+        return render(request, saved_template, {**slot, "saved": True, "count_oob": True})
 
 
 def _wants_fragment(request) -> bool:
