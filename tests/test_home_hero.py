@@ -1,6 +1,7 @@
-"""The orbit hero on the main page (Phase 12): thumbnails of assets from public
-packs only, each opening a public pack that holds it, on rings coloured by
-type; the type-icon tiles below HERO_MINIMUM assets.
+"""The orbit hero on the main page (Phase 12): thumbnails of textures from public
+packs only (textures only at the user's request, 2026-11-06), each opening a
+public pack that holds it, on rings in the texture colour; the texture-icon
+tiles below HERO_MINIMUM textures.
 
 App tests, so provider functions are never reached.
 """
@@ -12,7 +13,7 @@ from itertools import pairwise
 import pytest
 
 from catalog.models import SavedAsset
-from packs.hero import OUTER_RING, hero_orbit
+from packs.hero import RING_SIZES, hero_orbit, ring_counts
 from packs.models import Pack
 from packs.services import add_to_pack
 
@@ -69,9 +70,9 @@ def _shown(orbit):
 
 
 def test_the_hero_never_draws_from_private_or_unlisted_packs(asset_maker, pack_of):
-    public = asset_maker("texture", 3) + asset_maker("hdri", 3)
-    private_only = asset_maker("model", 4)
-    unlisted_only = asset_maker("sound", 4)
+    public = asset_maker("texture", 6)
+    private_only = asset_maker("texture", 4)
+    unlisted_only = asset_maker("texture", 4)
     pack_of("Shared kit", public)
     pack_of("Secret kit", private_only, Pack.Visibility.PRIVATE)
     pack_of("Link kit", unlisted_only, Pack.Visibility.UNLISTED)
@@ -80,7 +81,6 @@ def test_the_hero_never_draws_from_private_or_unlisted_packs(asset_maker, pack_o
         orbit = hero_orbit(random.Random(seed))
         assert not orbit.is_fallback
         assert _shown(orbit) == {asset.pk for asset in public}
-        assert {ring.kind for ring in orbit.rings} == {"texture", "hdri"}
 
 
 # ------------------------------------------------------------------ TDD 2: links to a public pack
@@ -90,9 +90,9 @@ def test_each_thumbnail_links_to_a_public_pack_that_holds_it(
     django_user_model, password, asset_maker, pack_of
 ):
     other = django_user_model.objects.create_user(username="hero_other", password=password)
-    assets = asset_maker("texture", 4) + asset_maker("model", 3)
+    assets = asset_maker("texture", 7)
     shared = assets[0]
-    # The shared asset sits in a private and an unlisted pack made last, and in two
+    # The shared texture sits in a private and an unlisted pack made last, and in two
     # public packs: it must link to a public one, never to the others.
     older = pack_of("Older public kit", assets[:4])
     newer = pack_of("Newer public kit", [shared, *assets[4:]], user=other)
@@ -115,93 +115,72 @@ def test_each_thumbnail_links_to_a_public_pack_that_holds_it(
 # ------------------------------------------------------------------ TDD 3: threshold and cap
 
 
-def test_below_six_assets_the_type_tiles_show_and_above_eighteen_it_caps(asset_maker, pack_of):
-    # Five distinct assets, one of them in two public packs: still five, so the
-    # four type-icon tiles show, one per type, each opening Discover for it.
-    five = asset_maker("texture", 3) + asset_maker("sound", 2)
-    pack_of("Kit one", five)
+def test_below_six_textures_the_texture_tiles_show_and_above_eighteen_it_caps(asset_maker, pack_of):
+    # Five distinct textures, one of them in two public packs, and other kinds that
+    # don't count: still five, so texture-icon tiles show, opening Discover's textures.
+    five = asset_maker("texture", 5)
+    pack_of("Kit one", five + asset_maker("hdri", 3) + asset_maker("model", 3))
     pack_of("Kit two", five[:1])
     orbit = hero_orbit(random.Random(0))
     assert orbit.is_fallback
-    assert [ring.kind for ring in orbit.rings] == ["texture", "hdri", "model", "sound"]
-    for ring in orbit.rings:
-        assert len(ring.thumbs) == 1
-        (thumb,) = ring.thumbs
+    assert len(orbit.thumbs) == 6
+    for thumb in orbit.thumbs:
         assert thumb.asset is None and thumb.pack is None
-        assert thumb.kind == ring.kind
-        assert thumb.url == f"/discover/?type={ring.kind}"
+        assert thumb.kind == "texture"
+        assert thumb.url == "/discover/?type=texture"
 
-    # A sixth distinct asset: the thumbnails show instead.
-    pack_of("Kit three", asset_maker("hdri", 1))
+    # A sixth distinct texture: the thumbnails show instead.
+    pack_of("Kit three", asset_maker("texture", 1))
     orbit = hero_orbit(random.Random(0))
     assert not orbit.is_fallback
     assert len(orbit.thumbs) == 6
 
-    # Far more than eighteen: exactly eighteen distinct assets, each on its
-    # own type's ring.
-    pack_of("Big kit", asset_maker("texture", 20) + asset_maker("model", 6))
+    # Far more than eighteen: exactly eighteen distinct textures.
+    pack_of("Big kit", asset_maker("texture", 24))
     for seed in range(5):
         orbit = hero_orbit(random.Random(seed))
         shown = [thumb.asset.pk for thumb in orbit.thumbs]
         assert len(shown) == 18
         assert len(set(shown)) == 18
-        for ring in orbit.rings:
-            assert ring.thumbs
-            assert {thumb.asset.kind for thumb in ring.thumbs} == {ring.kind}
 
 
 # ------------------------------------------------------------------ the pick and the rings
 
 
-def test_thumbnails_are_spread_across_the_types_not_crowded_by_textures(asset_maker, pack_of):
+def test_only_textures_ever_show(asset_maker, pack_of):
     pack_of(
         "Mixed kit",
-        asset_maker("texture", 30)
-        + asset_maker("hdri", 3)
-        + asset_maker("model", 3)
-        + asset_maker("sound", 3),
+        asset_maker("texture", 7)
+        + asset_maker("hdri", 5)
+        + asset_maker("model", 5)
+        + asset_maker("sound", 5),
     )
     for seed in range(5):
         orbit = hero_orbit(random.Random(seed))
-        counts = {ring.kind: len(ring.thumbs) for ring in orbit.rings}
-        # Every other type shows all it has; textures fill the rest of the 18.
-        assert counts == {"hdri": 3, "model": 3, "sound": 3, "texture": 9}
+        assert {thumb.asset.kind for thumb in orbit.thumbs} == {"texture"}
+        assert len(orbit.thumbs) == 7
+        assert {ring.kind for ring in orbit.rings} == {"texture"}
 
 
-def test_the_busiest_ring_is_outermost_and_each_ring_is_its_type_colour(asset_maker, pack_of):
-    pack_of(
-        "Kit",
-        asset_maker("sound", 1)
-        + asset_maker("model", 4)
-        + asset_maker("texture", 2)
-        + asset_maker("hdri", 3),
-    )
+@pytest.mark.parametrize(
+    "total, counts",
+    [(6, [6]), (7, [3, 4]), (12, [5, 7]), (13, [3, 4, 6]), (18, [4, 6, 8])],
+)
+def test_tiles_fill_the_outer_rings_first_the_busiest_outermost(total, counts):
+    assert ring_counts(total) == counts
+
+
+def test_the_rings_are_the_texture_colour_turning_opposite_ways(asset_maker, pack_of):
+    pack_of("Kit", asset_maker("texture", 18))
     orbit = hero_orbit(random.Random(3))
-    assert [ring.kind for ring in orbit.rings] == ["sound", "texture", "hdri", "model"]
-    sizes = [ring.size for ring in orbit.rings]
-    assert sizes == sorted(sizes) and sizes[-1] == OUTER_RING and len(set(sizes)) == 4
-    assert [ring.ring_class for ring in orbit.rings] == [
-        "border-sound",
-        "border-texture",
-        "border-hdri",
-        "border-model",
-    ]
+    assert [ring.size for ring in orbit.rings] == list(RING_SIZES)
+    assert [len(ring.thumbs) for ring in orbit.rings] == [4, 6, 8]
+    assert {ring.ring_class for ring in orbit.rings} == {"border-texture"}
     # Neighbouring rings turn opposite ways; tiles are evenly spaced round each.
-    assert [ring.reverse for ring in orbit.rings] == [False, True, False, True]
-    model = orbit.rings[-1]
-    angles = sorted(thumb.angle for thumb in model.thumbs)
+    assert [ring.reverse for ring in orbit.rings] == [False, True, False]
+    angles = sorted(thumb.angle for thumb in orbit.rings[-1].thumbs)
     gaps = [b - a for a, b in pairwise(angles)]
-    assert all(abs(gap - 90) < 0.05 for gap in gaps)
-
-
-def test_the_centre_counts_the_assets_and_packs(asset_maker, pack_of):
-    assets = asset_maker("texture", 7)
-    pack_of("One", assets[:4])
-    pack_of("Two", assets[3:])
-    pack_of("Empty", [])
-    pack_of("Secret", asset_maker("model", 2), Pack.Visibility.PRIVATE)
-    orbit = hero_orbit(random.Random(0))
-    assert (orbit.asset_count, orbit.pack_count) == (7, 2)
+    assert all(abs(gap - 45) < 0.05 for gap in gaps)
 
 
 # ------------------------------------------------------------------ on the main page
@@ -213,21 +192,26 @@ def _orbit_html(html):
 
 @pytest.fixture
 def public_kit(asset_maker, pack_of):
-    return pack_of("Public kit", asset_maker("texture", 4) + asset_maker("sound", 3))
+    return pack_of("Public kit", asset_maker("texture", 6) + asset_maker("sound", 3))
 
 
 @pytest.mark.parametrize("signed_in", [False, True])
-def test_the_page_shows_the_orbit_to_visitors_and_members(client, member, public_kit, signed_in):
+def test_the_page_shows_the_textures_to_visitors_and_members(client, member, public_kit, signed_in):
     if signed_in:
         client.force_login(member)
     orbit = _orbit_html(client.get("/").content.decode())
-    assert len(re.findall(r'class="orbit-thumb[ "]', orbit)) == 7
-    # Textures float as cut-outs; sounds (no image here) keep their framed tile.
-    assert orbit.count('class="orbit-thumb is-cutout"') == 4
-    assert orbit.count(f'href="{public_kit.get_public_url()}"') == 7
+    # Six textures, each floating as a cut-out; the pack's sounds never show.
+    assert len(re.findall(r'class="orbit-thumb[ "]', orbit)) == 6
+    assert orbit.count('class="orbit-thumb is-cutout"') == 6
+    assert 'data-kind="sound"' not in orbit
+    assert orbit.count(f'href="{public_kit.get_public_url()}"') == 6
     assert 'referrerpolicy="no-referrer"' in orbit
-    assert "7 assets from 1 public pack, one ring per type." in orbit
-    assert 'id="home-orbit-legend"' in orbit and "Textures" in orbit and "Sounds" in orbit
+
+
+def test_the_legend_and_note_are_gone(client, public_kit):
+    orbit = _orbit_html(client.get("/").content.decode())
+    assert "home-orbit-legend" not in orbit and "home-orbit-note" not in orbit
+    assert "Public packs will orbit here" not in client.get("/").content.decode()
 
 
 def test_the_orbit_never_carries_a_logo(client, public_kit):
@@ -235,11 +219,11 @@ def test_the_orbit_never_carries_a_logo(client, public_kit):
     assert "mark" not in orbit and "wordmark" not in orbit and "brand/" not in orbit
 
 
-def test_a_private_or_unlisted_packs_asset_never_reaches_the_page(
+def test_a_private_or_unlisted_packs_texture_never_reaches_the_page(
     client, member, asset_maker, pack_of, public_kit
 ):
-    secret = asset_maker("model", 1)[0]
-    secret.title = "SENTINEL secret model"
+    secret = asset_maker("texture", 1)[0]
+    secret.title = "SENTINEL secret texture"
     secret.thumbnail_url = "https://cdn.example.org/SENTINEL.png"
     secret.save()
     private = pack_of("Secret kit", [secret], Pack.Visibility.PRIVATE)
@@ -253,13 +237,14 @@ def test_a_private_or_unlisted_packs_asset_never_reaches_the_page(
         assert unlisted.share_token not in orbit
 
 
-def test_a_thumbnail_without_an_image_shows_its_type_icon(client, public_kit):
+def test_a_texture_without_an_image_shows_its_icon_in_a_frame(client, public_kit):
     entry = public_kit.ordered_items()[0].saved_asset
     entry.asset.thumbnail_url = ""
     entry.asset.save()
     orbit = _orbit_html(client.get("/").content.decode())
-    assert orbit.count("<img") == 6
-    assert orbit.count('class="result-fallback text-texture"') == 4
+    assert orbit.count("<img") == 5
+    assert orbit.count('class="orbit-thumb is-cutout"') == 5
+    assert orbit.count('class="orbit-thumb"') == 1
 
 
 def test_the_orbit_shows_nothing_from_anyones_library(client, public_kit):
@@ -272,29 +257,38 @@ def test_the_orbit_shows_nothing_from_anyones_library(client, public_kit):
     assert "SENTINEL-NOTE" not in orbit and "Rejected" not in orbit and "star" not in orbit
 
 
-def test_with_few_assets_the_page_shows_the_four_type_tiles(client, asset_maker, pack_of):
-    pack_of("Small kit", asset_maker("texture", 5))
+def test_with_few_textures_the_page_shows_texture_tiles(client, asset_maker, pack_of):
+    pack_of("Small kit", asset_maker("texture", 5) + asset_maker("model", 4))
     orbit = _orbit_html(client.get("/").content.decode())
     assert 'class="orbit is-fallback"' in orbit
     assert "<img" not in orbit
-    for kind in ("texture", "hdri", "model", "sound"):
-        assert f'href="/discover/?type={kind}"' in orbit
-    assert "Public packs will orbit here" in orbit
+    assert orbit.count('href="/discover/?type=texture"') == 6
 
 
-def test_type_colour_in_the_orbit_is_only_its_rings_icons_and_legend(client, public_kit):
+def test_type_colour_in_the_orbit_is_only_the_texture_rings_and_icons(client, public_kit):
     orbit = _orbit_html(client.get("/").content.decode())
     classes = " ".join(re.findall(r'class="([^"]*)"', orbit))
     tokens = re.findall(r"\b[\w:-]*-(?:texture|hdri|model|sound)\b", classes)
-    # Two rings, seven tile icons, two legend icons.
-    assert sorted(set(tokens)) == ["border-sound", "border-texture", "text-sound", "text-texture"]
-    assert len(tokens) == 2 + 7 + 2
+    # One ring, six tile icons (under their images).
+    assert sorted(set(tokens)) == ["border-texture", "text-texture"]
+    assert len(tokens) == 1 + 6
 
 
 def test_a_gallery_swap_leaves_the_orbit_out(client, public_kit):
     response = client.get("/?q=kit", headers={"HX-Request": "true"})
     assert 'id="gallery-results"' in response.content.decode()
     assert "home-orbit" not in response.content.decode()
+
+
+def test_the_hero_is_a_cover_with_the_rings_blended_in():
+    from django.conf import settings
+
+    css = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    hero = re.search(r"\.home-hero \{([^}]*)\}", css).group(1)
+    assert "min-height: calc(100dvh - 4.5rem);" in hero  # the window less both bars
+    orbit = re.search(r"  \.orbit \{([^}]*)\}", css).group(1)
+    assert "mask-image: linear-gradient(" in orbit and "transparent);" in orbit
+    assert ".orbit-ring::before {" in css and "opacity: 0.4;" in css
 
 
 def test_the_orbit_pauses_on_hover_and_focus_and_stills_for_reduced_motion():

@@ -1276,6 +1276,22 @@ Discover".
 - [x] Standard gate (see top). Access rules: unchanged; the ruler is chrome and
   shows nothing from anyone's library.
 
+**Second request, the same day:**
+
+- [x] **Textures only:** the hero shows only textures from public packs (they
+  look the best), up to 18 on up to three texture rings (`ring_counts()`, the
+  busiest outermost); the fallback is six texture-icon tiles opening Discover's
+  textures. This replaces the first request's "spread across every type".
+- [x] **A cover:** the hero fills the first screen (the window less the title and
+  status bars); the rings are faint (40 % lines), and the orbit fades into the
+  page down its lower half.
+- [x] **No caption:** the legend and the count line are gone.
+- [x] **Fixed on the way:** a texture in two public packs was counted twice
+  (PackItem's default ordering defeated `DISTINCT`), which could tip the 6-texture
+  threshold; caught by the TDD 3 test.
+- [x] Standard gate (see top). Access rules: unchanged; a test still proves no
+  private or unlisted pack's texture reaches the hero.
+
 > **For Phase 13:** the orbit and the ruler already turn their motion off under
 > reduced motion; Phase 13's sweep should keep them in its list. **Still open
 > from Phase 7:** after Add to pack on Discover saves a result, its Save corner

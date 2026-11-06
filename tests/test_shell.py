@@ -510,8 +510,8 @@ def test_type_colour_means_type_only_on_the_discover_tiles(pages):
 
     (Shelf fragments and library cards also use it, only for an asset's type:
     see the test below and test_discover.py.) On the main page, the orbit hero's
-    rings, icons and legend are the only place (Phase 12; with no public packs
-    it's the four type-icon tiles, one per type).
+    rings and icons are the only place (Phase 12; textures only, so with no
+    public packs it's the texture-icon tiles).
     """
     for name, response in pages:
         html = response.content.decode()
@@ -520,7 +520,7 @@ def test_type_colour_means_type_only_on_the_discover_tiles(pages):
             orbit = content.split('<div id="home-orbit"', 1)[1].split("</section>", 1)[0]
             assert not TYPE_TOKEN.search(_classes(content.replace(orbit, ""))), name
             used = {match.group(1) for match in TYPE_TOKEN.finditer(_classes(orbit))}
-            assert used == set(KIND_KEYS)
+            assert used == {"texture"}  # textures only (user request, 2026-11-06)
             continue
         if name != "catalog:discover":
             assert not TYPE_TOKEN.search(_classes(content)), f"{name} uses a type colour"

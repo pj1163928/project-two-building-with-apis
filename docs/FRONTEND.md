@@ -83,9 +83,9 @@ It's a throwaway prototype, so take its look, not its code.
     (2026-11-05)
   - each gallery card's mosaic tiles on the main page: the asset's type
     icon under its thumbnail (Phase 9)
-  - the main page's orbit hero (Phase 12): each ring's outline
-    (`border-<kind>`, from `packs.hero.RING_CLASSES`), each tile's type
-    icon, and the legend's icons (never the grey guide rings)
+  - the main page's orbit hero (Phase 12; textures only): each ring's
+    line (`border-texture`) and each tile's texture icon (never the grey
+    guide rings)
 
   `test_shell.py` keeps them out of the chrome on every page, out of every
   other page's own content (on the main page, out of everything but the
@@ -1069,47 +1069,46 @@ open pack current. With none: "The packs you create are listed here."
     - nothing from anyone's library. Hovering inverts the edge, behind the
       hover gate.
 
-- **Orbit hero** (`#home-orbit`, `packs/partials/hero_orbit.html`, Phase 12; after
-  Artcraft's hero at the user's request, 2026-11-06): the text is centred in
-  front (`#home-hero-text`: the header, search and buttons, on a soft
-  panel-coloured pool so it reads over the rings) and the orbit turns behind it,
-  filling the hero. The hero reaches up to the content's top edge (an unlayered
-  `margin-top`, as `space-y-8` would reset a component one), clips the rings
-  above and below with a soft fade (a mask on `.orbit`), and the page clips them
-  at its sides (`.content-stage` gets `overflow-x: clip` on this page). The text
-  comes first in the HTML, so the keyboard reaches the search before the orbit.
-  From `packs.hero.hero_orbit()` (see ARCHITECTURE.md, "Main page and gallery"):
-  - **Rings:** a square stage (`clamp(46rem, 84vw, 104rem)`) centred just above
-    the hero's middle. Seven faint grey `.orbit-guide` rings (some dashed) for
-    depth; over them one `<ul class="orbit-ring border-<kind>">` per type with
-    tiles, a 1.5 px circle in the type colour, sized `--ring-size` (44–86 %, the
-    busiest outermost) and turning once per `--spin` (70 s inner, 20 s slower each
-    ring out), neighbours turning opposite ways (`.is-reverse`).
-  - **Tiles:** `--tile` rem across (`OrbitRing.tile_rem`, bigger further out;
-    × 0.62 on a phone). Each `.orbit-arm` (`--angle`) turns its `.orbit-thumb` to
-    its place; the thumb turns back and its `.orbit-face` counter-spins against
-    the ring, so it stays upright. Textures and models are **cut-outs**
-    (`.is-cutout`, `OrbitThumb.is_cutout`): the providers' renders on a
-    transparent background, 1.3× bigger, with no tile behind them and a
-    drop-shadow that follows their shape (user request: "the background is
-    removed"). If the image is missing or fails, the framed tile and type icon
-    come back (`:has(img)`). HDRIs are framed squares; an asset with no image
-    (most sounds) shows its type icon. Images load eagerly (`referrerpolicy=
-    "no-referrer"`, `data-thumb-fallback`). Each tile links to the newest public
-    pack holding the asset, named in `aria-label` and `title`.
+- **Orbit hero** (`#home-orbit`, `packs/partials/hero_orbit.html`, Phase 12;
+  after Artcraft's hero, and a cover of textures only, at the user's requests,
+  2026-11-06): the hero fills the first screen (`min-height: calc(100dvh -
+  4.5rem)`, the window less the title and status bars) from the content's top
+  edge (an unlayered `margin-top`, as `space-y-8` would reset a component one).
+  The text is centred in front (`#home-hero-text`: the header, search and
+  buttons, on a soft pool of the panel colour) and the orbit turns behind it. The
+  orbit fades out down its lower half into the page (a mask on `.orbit`, whose
+  layer reaches past the hero's sides, as a mask paints only inside its own
+  box), and the page clips it at its sides (`overflow-x: clip` on
+  `.content-stage` here). The text comes first in the HTML, so the keyboard
+  reaches the search before the orbit. From `packs.hero.hero_orbit()` (see
+  ARCHITECTURE.md, "Main page and gallery"):
+  - **Rings:** a square stage wider than the window (`min(max(96vw, 150dvh),
+    140rem)`, 160vw on a phone), centred on the hero. Faint grey `.orbit-guide`
+    rings (some dashed) for depth; over them up to three texture rings (46, 66
+    and 86 %, the busiest outermost), each line a 40 % `::before` in its
+    `border-texture` colour so it blends in, turning once per `--spin` (90, 120,
+    150 s), neighbours turning opposite ways (`.is-reverse`).
+  - **Tiles:** textures only. Each is `--tile` rem across (`OrbitRing.tile_rem`,
+    bigger further out; × 0.62 on a phone). Each `.orbit-arm` (`--angle`) turns
+    its `.orbit-thumb` to its place; the thumb turns back and its `.orbit-face`
+    counter-spins against the ring, so it stays upright. A texture with an image
+    is a **cut-out** (`.is-cutout`): the provider's sphere render on its
+    transparent background, 1.3× bigger, with no tile behind it and a
+    drop-shadow that follows its shape. With no image (or one that fails), the
+    framed tile and texture icon show (`:has(img)`). Images load eagerly
+    (`referrerpolicy="no-referrer"`, `data-thumb-fallback`). Each tile links to
+    the newest public pack holding the texture, named in `aria-label` and
+    `title`.
   - **Pausing:** hovering a tile (`.orbit:has(.orbit-thumb:hover)`) or keyboard
-    focus inside the orbit pauses every ring and face. Reduced motion stills them.
-    Only the tiles and the caption take the pointer; the text's own controls sit
-    above.
+    focus inside the orbit pauses every ring and face. Reduced motion stills
+    them. Only the tiles take the pointer; the text's own controls sit above.
   - **No logo:** nothing in the orbit is the mark or the wordmark. The page's
     faint `.hero-mark` stays (every page has it) but moves below the hero here
-    (`translate: 0 58rem`), so it never shows among the thumbnails.
-  - **Caption** (`.orbit-caption`, at the hero's foot): `#home-orbit-legend` names
-    each ring's type with its icon; `#home-orbit-note` reads "42 assets from 6
-    public packs, one ring per type. Click a thumbnail to open its pack."
-  - **Fallback** (`.orbit.is-fallback`, fewer than 6 assets in public packs):
-    four rings, one type-icon tile each, opening Discover for that type; the note
-    says "Public packs will orbit here."
+    (`translate: 0 calc(100dvh - 4.5rem)`).
+  - **No caption:** the legend and the count line were removed at the user's
+    request.
+  - **Fallback** (`.orbit.is-fallback`, fewer than 6 textures in public packs):
+    six texture-icon tiles on the outer ring, opening Discover's textures.
 - **Scroll ruler:** see "Scroll ruler". Its sections are Toolbox (`#home-hero`),
   How it works (`#home-steps`, visitors only) and Public packs (`#gallery`).
 

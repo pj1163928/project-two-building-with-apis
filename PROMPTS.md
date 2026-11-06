@@ -28,6 +28,62 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Phase 12 polish, second request: a textures-only cover hero
+
+### Prompts
+
+1. Ok I cannot see the textures that are spinning also please keep it to just
+   textures not other asset types as they look the best. Also please blend the
+   orbital rings into the rest of the page and make it fill up the entire page
+   as a cover until you scroll down. Remove (pasted: the legend's Textures,
+   HDRIs, Models, Sounds, and "Public packs will orbit here. Once they hold six
+   assets, their thumbnails circle here; for now each type opens Discover.").
+2. I still am not getting any textures this is all I am getting (a screenshot
+   of the hero showing two texture-icon tiles).
+3. Run seed_demo now (chosen from: run it, add textures by hand, or lower the
+   minimum).
+
+### Summary
+
+- **Outcome:**
+  - The hero shows textures only, up to 18 on up to three texture rings, the
+    busiest outermost.
+  - It fills the first screen as a cover. The rings are faint and fade into the
+    page, and the legend and note are gone.
+  - The user's database had only 1 texture in public packs, so they saw the
+    fallback; `seed_demo` now gives it 15.
+  - 1,236 tests pass. `ruff check` and `ruff format` are clean.
+- **Changes:**
+  - `packs/hero.py`: textures only (`HERO_KIND`), `RING_SIZES`, `RING_SPINS`,
+    `ring_counts()`, a texture-icon fallback (`FALLBACK_TILES`). The per-type
+    pick, the counts and `CUTOUT_KINDS` are gone.
+  - `packs/partials/hero_orbit.html`: no caption, new guide rings.
+  - `styles/source.css`: the cover height, the blended rings (40 % `::before`
+    lines), the fade down the lower half, the bigger stage, and the mark moved
+    below the cover.
+  - `tests/test_home_hero.py` (rewritten for textures only) and
+    `tests/test_shell.py` (the orbit's type colour is texture only).
+  - `docs/FRONTEND.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md` and the plan.
+  - The local `db.sqlite3` (git-ignored): `seed_demo` run, at the user's choice.
+- **TDD:** the three approved behaviours (public packs only; links to a public
+  pack; the 6 threshold and the 18 cap) were kept and their tests rewritten for
+  textures only. The user's request changed what the hero shows, not those
+  rules.
+- **Decisions:**
+  - The fallback is six texture-icon tiles on the outer ring (the PRD's
+    "type-icon tiles", for the one type left).
+  - The rings fill from the outside in: one ring per 6 tiles, shared by size.
+- **Deviations:**
+  - The user's earlier requirement to spread thumbnails across every type was
+    replaced by "just textures".
+  - Lowering the 6-texture minimum was offered and not chosen.
+- **Sideways:**
+  - The new tests caught a real bug: a texture in two public packs was counted
+    twice, because PackItem's default ordering defeated `DISTINCT`. The old code
+    hid it by building a dict. Fixed with `.order_by()`.
+  - The user's "I can't see textures" was missing data, not code: their one
+    public pack held one texture.
+
 ## 2026-11-06 — Phase 12 polish: the ruler on every page, an Artcraft-style hero, textures as cut-outs
 
 ### Prompts

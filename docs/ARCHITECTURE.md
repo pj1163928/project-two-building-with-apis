@@ -600,27 +600,27 @@ workflows), `packs/forms.py` and `packs/views.py`.
   FRONTEND.md, "Main page").
 - **The orbit hero** *(Phase 12)*: `packs/hero.py`, `hero_orbit(rng=None)`,
   gives a `HeroOrbit` (its `OrbitRing`s innermost first, each holding
-  `OrbitThumb`s; `is_fallback`; `asset_count` and `pack_count` for the note).
-  - **Only public packs:** the distinct Assets held by items of
-    `Pack.objects.public()` packs, so a private or unlisted pack's asset never
-    gets in, and each tile links to the **newest public pack** holding its
-    asset (`_newest_public_packs()`, which also reads only public packs), so a
-    private or unlisted pack is never the link either.
-  - **The pick:** up to `HERO_SIZE` (18), taken from each kind in turn in
-    Discover's order, each kind's assets shuffled, so a library of textures
-    can't crowd out the rest: a kind runs short only when it has no more.
-    Pass a seeded `random.Random` for a repeatable pick.
-  - **The rings:** one per kind with tiles, ordered by how many tiles it holds
-    (the busiest outermost, ties in Discover's order), `RING_STEP` (14 %) steps
-    up to `OUTER_RING` (86 %) of the orbit, alternating directions, each with its
-    `tile_rem` (bigger further out); tiles evenly spaced from a random start.
-    `RING_CLASSES` holds the `border-<kind>` classes in full for Tailwind.
-    `OrbitThumb.is_cutout` marks textures and models with an image
-    (`CUTOUT_KINDS`), whose renders sit on a transparent background, so the
-    page shows them with no tile behind.
-  - **The fallback:** with fewer than `HERO_MINIMUM` (6) distinct assets, four
-    rings, one type-icon tile each, opening Discover for that type
-    (`discover_url()`).
+  `OrbitThumb`s; `is_fallback`). **Textures only** (`HERO_KIND`; user request,
+  2026-11-06, as they look the best).
+  - **Only public packs:** the distinct textures held by items of
+    `Pack.objects.public()` packs (`.order_by()` first, as PackItem's default
+    ordering would defeat `DISTINCT`), so a private or unlisted pack's texture
+    never gets in, and each tile links to the **newest public pack** holding it
+    (`_newest_public_packs()`, which also reads only public packs), so a private
+    or unlisted pack is never the link either.
+  - **The pick:** up to `HERO_SIZE` (18), at random. Pass a seeded
+    `random.Random` for a repeatable pick.
+  - **The rings:** `ring_counts(total)` uses one ring per `HERO_MINIMUM` tiles
+    (up to three, always the outermost of `RING_SIZES` 46, 66 and 86 %), each
+    ring's share in proportion to its size, so the busiest is outermost (18 tiles
+    are 4, 6 and 8). Neighbours turn opposite ways; tiles are evenly spaced from a
+    random start; `tile_rem` grows outwards. `RING_CLASSES` holds the
+    `border-<kind>` classes in full for Tailwind. `OrbitThumb.is_cutout` marks a
+    texture with an image: its render sits on a transparent background, so the
+    page shows it with no tile behind.
+  - **The fallback:** with fewer than `HERO_MINIMUM` (6) distinct textures,
+    `FALLBACK_TILES` (6) texture-icon tiles on the outer ring, opening Discover's
+    textures (`discover_url()`).
   - It reads Pack, PackItem and Asset rows only: nothing from anyone's
     library (notes, ratings, statuses). The gallery's HTMX swaps don't build it.
 
@@ -887,7 +887,7 @@ the API. All are built:
 | `seed_demo(snapshot=None)` | Built (Phase 9), `packs/demo.py`. The demo members, libraries and packs from the committed snapshot, offline and safe to run again (see "Demo data") |
 | `pack_credits(items)` | Built (user request, 2026-11-05), `packs/credits.py`. A pack's licenses, required and optional credits and warnings, and the formal notice (see "Licenses and credits") |
 | `license_info(name)` | Built (user request, 2026-11-05), `catalog/licenses.py`. What a license allows and asks |
-| `hero_orbit(rng=None)` | Built (Phase 12), `packs/hero.py`. The main page's orbit: up to 18 distinct assets from public packs only, from each type in turn, on one ring per type (the busiest outermost), each linking to the newest public pack holding it; the type-icon tiles below 6 (see "Main page and gallery") |
+| `hero_orbit(rng=None)` | Built (Phase 12), `packs/hero.py`. The main page's orbit: up to 18 distinct textures from public packs only, on up to three rings (the busiest outermost), each linking to the newest public pack holding it; texture-icon tiles below 6 (see "Main page and gallery") |
 | `suggest_assets(pack, limit)` | Built (Phase 10), `packs/suggestions.py`. Stored Assets ranked by shared tags with the pack, ties by title then id, never the pack's own (see "Packs") |
 | `copy_pack(pack, user)` | Built (Phase 11), `packs/services.py`. A private copy for `user` in one transaction: title, `copied_from`, tags, and each item's variant, import path and position, on the copier's own entries (missing ones To review, theirs untouched) (see "Packs") |
 | `add_to_pack(pack, saved_asset)` | Built (Phase 7), `packs/services.py`. Adds an item at the end on the default variant, once per entry, and refuses another member's entry (see "Packs") |

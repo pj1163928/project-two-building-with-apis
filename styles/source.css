@@ -753,27 +753,28 @@
   .gallery-card-summary { margin-top: auto; padding-top: 0.25rem; }
   .pack-card-page { position: relative; z-index: 1; color: var(--color-fg-secondary); text-decoration: underline; text-underline-offset: 2px; }
   html[data-pointer] .pack-card-page:hover, .pack-card-page:focus-visible { color: var(--color-fg-strong); outline: none; }
-  /* The orbit hero (Phase 12; after Artcraft's hero, user request 2026-11-06). The text
-     sits centred in front (.home-hero-text, on a soft panel-coloured pool so it reads over
-     the rings); the orbit (#home-orbit) fills the hero behind it. The hero reaches the top
-     of the content and clips the rings above and below; the page clips them at its sides.
-     The stage is a square wider than the hero, centred on the text: grey guide rings for
-     depth, then one ring per type, outlined in its type colour (border-<kind>), the busiest
-     outermost, its tiles --tile rem across (bigger further out). Each arm turns its tile to
-     its angle; the tile turns back, and its face counter-spins against the ring, so every
-     thumbnail stays upright as the ring goes round. Textures and models float as cut-outs
-     (.is-cutout: their transparent renders, no tile, a shadow that follows the shape);
-     HDRIs are framed squares; no image shows the type icon. A hovered tile, or keyboard
-     focus in the orbit, pauses it; reduced motion stills it. No logo: the page's faint
-     mark sits below the hero here. Only the tiles and the caption take the pointer, and the text's
-     own controls sit above them. */
+  /* The orbit hero (Phase 12; after Artcraft's hero, user requests 2026-11-06). The hero
+     fills the first screen as a cover (the content's height: the window less the title
+     and status bars) and reaches the content's top. The text sits centred in front
+     (.home-hero-text, on a soft pool of the panel colour so it reads over the rings); the
+     orbit (#home-orbit) fills the hero behind it, fading out down its lower half into the
+     page, and the page clips it at its sides. The stage is a square wider than the
+     window, centred on the hero: faint grey guide rings, then up to three texture rings
+     (their line a 40 % pseudo-element in border-texture), the busiest outermost, its tiles
+     --tile rem across (bigger further out). Each arm turns its tile to its angle; the tile
+     turns back, and its face counter-spins against the ring, so every texture stays
+     upright. Textures float as cut-outs (.is-cutout: their transparent renders, no tile,
+     a shadow that follows the shape); no image shows the texture icon in a frame. A
+     hovered tile, or keyboard focus in the orbit, pauses it; reduced motion stills it.
+     No logo: the page's faint mark sits below the hero here. Only the tiles take the
+     pointer, and the text's own controls sit above them. */
   .home-hero { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center;
-    min-height: clamp(38rem, 86vh, 54rem); padding: 6rem 0 9rem; overflow-x: visible; overflow-y: clip; }
+    min-height: calc(100dvh - 4.5rem); padding: 4rem 0 6rem; overflow-x: visible; overflow-y: clip; }
   #content:has(#home-orbit) .content-stage { overflow-x: clip; }
   .home-hero-text { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2rem;
     width: 100%; max-width: 46rem; text-align: center; pointer-events: none; }
   .home-hero-text::before { content: ""; position: absolute; inset: -6rem -9rem; z-index: -1; pointer-events: none;
-    background: radial-gradient(closest-side, var(--color-panel) 45%, color-mix(in srgb, var(--color-panel) 70%, transparent) 70%, transparent); }
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--color-panel) 85%, transparent) 35%, color-mix(in srgb, var(--color-panel) 45%, transparent) 65%, transparent); }
   .home-hero-text :is(a, button, input, label, form) { pointer-events: auto; }
   .home-hero-text .page-hero { margin-inline: auto; }
   .home-hero-text .page-hero > div:first-child { justify-content: center; }
@@ -782,14 +783,19 @@
   /* The layer reaches past the hero's sides (a mask paints only inside its own box); the
      page clips it at the content's edges. */
   .orbit { position: absolute; inset: 0 -50vw; z-index: 1; pointer-events: none;
-    mask-image: linear-gradient(to bottom, transparent, var(--color-ink) 5rem, var(--color-ink) calc(100% - 5rem), transparent); }
-  .orbit-stage { position: absolute; left: 50%; top: 44%; width: clamp(46rem, 84vw, 104rem); aspect-ratio: 1 / 1; translate: -50% -50%; }
+    mask-image: linear-gradient(to bottom, transparent, var(--color-ink) 4rem, var(--color-ink) 55%, transparent); }
+  .orbit-stage { position: absolute; left: 50%; top: 50%; width: min(max(96vw, 150dvh), 140rem); aspect-ratio: 1 / 1; translate: -50% -50%; }
+  @media (max-width: 40rem) { .orbit-stage { width: 160vw; } }
   .orbit-guide, .orbit-ring { position: absolute; left: 50%; top: 50%; width: var(--ring-size); aspect-ratio: 1 / 1;
     translate: -50% -50%; border-radius: 50%; }
-  .orbit-guide { border: 1px solid var(--color-line); }
-  .orbit-guide.is-dashed { border-style: dashed; border-color: var(--color-line-strong); opacity: 0.6; }
-  .orbit-ring { margin: 0; padding: 0; list-style: none; border-width: 1.5px; border-style: solid;
+  .orbit-guide { border: 1px solid var(--color-line); opacity: 0.7; }
+  .orbit-guide.is-dashed { border-style: dashed; border-color: var(--color-line-strong); opacity: 0.4; }
+  /* The ring's line is a pseudo-element at 40 %, so it blends into the page while its
+     tiles stay solid; it takes the ring's border-<kind> colour. */
+  .orbit-ring { margin: 0; padding: 0; list-style: none; border-width: 0;
     animation: orbit-spin var(--spin) linear infinite; }
+  .orbit-ring::before { content: ""; position: absolute; inset: 0; border: 1px solid; border-color: inherit;
+    border-radius: 50%; opacity: 0.4; pointer-events: none; }
   .orbit-ring.is-reverse { animation-direction: reverse; }
   .orbit-arm { position: absolute; inset: 0; rotate: var(--angle); pointer-events: none; }
   .orbit-thumb { --size: calc(var(--tile) * var(--tile-scale, 1) * 1rem);
@@ -815,13 +821,6 @@
   .orbit:focus-within .orbit-ring, .orbit:focus-within .orbit-face { animation-play-state: paused; }
   .orbit.is-fallback .orbit-face .result-fallback { opacity: 1; }
   @media (max-width: 40rem) { .orbit { --tile-scale: 0.62; } }
-  .orbit-caption { position: absolute; left: 50%; bottom: 2.25rem; z-index: 2; display: grid; justify-items: center; gap: 0.6rem;
-    width: min(100%, 34rem); translate: -50% 0; padding: 0.75rem 1rem; pointer-events: auto;
-    background: radial-gradient(closest-side, var(--color-panel) 55%, transparent); }
-  .orbit-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem 1rem; margin: 0; padding: 0;
-    list-style: none; color: var(--color-fg-secondary); }
-  .orbit-legend li { display: inline-flex; align-items: center; gap: 0.4rem; }
-  .orbit-note { max-width: 30rem; text-align: center; }
   @keyframes orbit-spin { to { transform: rotate(360deg); } }
   /* The scroll ruler (Phase 12; on every page at the user's request, 2026-11-06), from
      80 rem only (xl:flex): fixed down the content's right edge, between the title and
@@ -1391,8 +1390,8 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
    so space-y-8's margin utility doesn't reset it. */
 .content-body > .home-hero { margin-top: -3.5rem; }
 /* The main page (Phase 12): the faint mark stays (every page has it) but moves below the
-   hero, so it never shows among the orbit's thumbnails. The hero is at most about 54 rem. */
-#content:has(#home-orbit) .hero-atmosphere { translate: 0 58rem; }
+   hero, which fills the first screen, so it never shows among the orbit's thumbnails. */
+#content:has(#home-orbit) .hero-atmosphere { translate: 0 calc(100dvh - 4.5rem); }
 #content[data-surface="work"] .ambient-blob { animation-duration: calc(var(--drift) * 1.15); }
 
 /* The scroll ruler (Phase 12) is on every page from 80 rem, so the content and footer
