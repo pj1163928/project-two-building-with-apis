@@ -60,6 +60,13 @@
     line.dataset.saveStatus = state;
     line.setAttribute("role", state === "error" ? "alert" : "status");
     line.textContent = "";
+    if (state === "saving") {
+      // The logo loader's mark (templates/partials/loader.html) beside "Saving…".
+      var mark = document.createElement("i");
+      mark.className = "ax-loader-mark";
+      mark.setAttribute("aria-hidden", "true");
+      line.appendChild(mark);
+    }
     var text = document.createElement("span");
     text.textContent = message;
     line.appendChild(text);

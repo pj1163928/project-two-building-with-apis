@@ -391,8 +391,8 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
   per-page scripts block. Scripts listen on the `document` (delegation)
   rather than binding to elements a swap replaces, as `shell.js`,
   `password-toggle.js`, `sound-preview.js`, `card-actions.js`,
-  `entry-drawer.js`, `entry-files.js`, `bundle-download.js`, `pack-sort.js`, `scroll-ruler.js` and `ambient.js`
-  do (the last sets itself up through `htmx.onLoad`).
+  `entry-drawer.js`, `entry-files.js`, `bundle-download.js`, `pack-sort.js`, `scroll-ruler.js`, `ambient.js`
+  and `motion.js` do (`ambient.js` sets itself up through `htmx.onLoad`).
 - **Preserved:** the title-bar logo link (`#brand-link`) is
   `hx-preserve`, so it isn't rebuilt on each swap. A rebuilt image left a
   blank frame with the chips sliding left. Its `<img>` also has
@@ -417,6 +417,78 @@ in the htmx config.
   motion turns every transition animation off. The user asked for this on
   2026-10-31, ahead of Phase 13, which lists "View Transitions on HTMX
   swaps".
+- **Fragment swaps** (Phase 13): every other htmx swap (a filter, Load more,
+  a builder save) ran the same drop and rise, so the whole page lifted for a
+  small change. `motion.js` marks each swap on `htmx:beforeTransition`:
+  boosted navigation clears `<html data-swap>`, anything else sets it to
+  `fragment`, and then `#content` crossfades in place over 0.2 s (opacity
+  only). Whatever didn't change is the same in both images, so only what
+  changed visibly changes. Swaps that say `transition:false` (the drawers,
+  the pickers, the builder) still skip it.
+
+## Motion
+
+*(Phase 13, stories 77 and 79.)* The branding's motion, in `source.css`'s
+"Motion" section plus `static/js/motion.js`, which only marks state for the
+CSS. Monochrome throughout: ink and the grey tokens, never a type or drop
+colour.
+
+- **Wordmark:** it wipes in from the left on load (`brand-wipe`, a
+  `clip-path` on `#brand-link`). Every 12 s, starting at 3 s, the letters
+  dim to 60 % (`brand-dim` on the image) while an ink band crosses them
+  (`.brand-shine`, a layer masked to the wordmark through `--word-url`). At
+  rest the band waits outside the mask. The shine is hidden while the chip
+  is hovered or focused, because the chip inverts.
+- **The mark cuts in:** the page's faint mark (`.hero-mark`) is revealed
+  diagonally on load (`mark-cut`). The PRD's icon tile left the activity bar
+  at the user's request, so the mark stands in for it.
+- **Full loads only:** both intros match `html:not([data-booted])`;
+  `motion.js` sets `data-booted` after 1.6 s, so a boosted swap never
+  replays them (some browsers re-insert the preserved logo, which restarts
+  its animations).
+- **Parallax watermark:** the mark's layer (`.hero-atmosphere`) sinks at 0.4×
+  the scroll over the first 60 rem (a scroll-driven animation on `#content`'s
+  `--page` timeline), so it drifts behind the content. It sits in `@supports
+  (animation-timeline: scroll())`, so other browsers show the mark still. The
+  PRD's giant wordmark stays gone (story 104).
+- **The logo loader** (`partials/loader.html`, `.ax-loader`): the mark in
+  grey with a light band sweeping across it (`--loader-band`, `loader-sweep`),
+  with a label or a screen-reader "Loading". It carries no role; the region
+  that's loading says so. It's the only loading indicator, and there are no
+  spinners.
+  - **Everywhere:** the status bar's mark (`#status-loader .status-mark`)
+    sweeps while any htmx request runs, boosted navigation included.
+    `motion.js` counts from `htmx:beforeSend` to the request's own
+    `loadend`, shows it after 150 ms (`<html data-busy>`) and sets
+    `aria-busy` on `#content`.
+  - **In place:** a pending shelf's "Searching", Load more's "Loading…", the
+    pack picker's "Loading your packs…" (`card-actions.js`) and the drawer's
+    "Saving…" (`entry-drawer.js`).
+  - **Never on a thumbnail:** a card's corner squares sit on the provider's
+    image, so a saving Save keeps its pulse; the status bar shows the loader.
+- **Cursor spotlight:** result and library cards, Discover's type tiles,
+  gallery cards, pack cards and pack rows. A `::before` holds a 16 rem pool of
+  ink (9 %, 6 % in light mode) at `--spot-x`/`--spot-y`, shown on the card
+  `motion.js` marks `data-spot`. It's mouse only, behind the hover gate, and
+  ignores the pointer. It sits above the thumbnail but under a card's details
+  and corner actions (z-index 1).
+- **Cards blur up:** cards in `.result-grid`, `.gallery-grid`, `.pack-grid`
+  and `.pack-rows` rise out of a 10 px blur (`card-in`, 0.5 s), 40 ms apart.
+  The stagger counts within each 12 (`:nth-child(12n+k)`), so a Load more
+  batch staggers from its own first card. The fill is `backwards` only, so a
+  card holds no filter or transform once it's in.
+- **Reduced motion:** a blanket rule in the first reduced-motion block
+  (`*, *::before, *::after { animation: none !important; transition: none
+  !important; scroll-behavior: auto !important; }`) on top of the
+  per-component list, which stays. Every entry animation runs from a `from`
+  state to the element's own style (or ends fully shown), so with nothing
+  animating, the content simply shows as it rests. The spotlight isn't lit,
+  and a loader's mark holds still in `fg-secondary` (that rule comes after
+  the loader's own, which it has to beat). The orbit and the ruler stay still
+  as before.
+- **Where it's missing:** htmx starts a View Transition only where
+  `document.startViewTransition` exists, and the parallax needs scroll
+  timelines. Everything else is plain CSS animation.
 
 ## Page widths (keep every page consistent)
 
@@ -1193,7 +1265,7 @@ from 80 rem only (`hidden xl:flex`), with `static/js/scroll-ruler.js`.
 
 | State | What shows |
 |---|---|
-| Pending | `aria-busy`, `hx-get` of its own URL, `hx-trigger="load"`, `hx-swap="outerHTML"`, and six pulsing `.result-skeleton`s |
+| Pending | `aria-busy`, `hx-get` of its own URL, `hx-trigger="load"`, `hx-swap="outerHTML"`, the logo loader with "Searching" in its header (Phase 13), and six pulsing `.result-skeleton`s |
 | Results | A `.result-grid` (`#shelf-<provider>-results`) of `.result-card`s (see "Result cards"), then Load more when the page came back full |
 | No matches | `.shelf-empty`: "No <provider> matches for “q”." |
 | Failed | A DaisyUI `alert alert-error` (`.shelf-alert`, toned down and square, with the error colour only on the icon) holding the `ProviderError` message and a Retry button inside the alert. Retry `hx-get`s this shelf's own URL into `#shelf-<provider>` |

@@ -445,7 +445,7 @@
   .shelf-more-button { width: 100%; height: 2.75rem; }
   .shelf-more-busy { display: none; }
   .shelf-more-button.htmx-request .shelf-more-label { display: none; }
-  .shelf-more-button.htmx-request .shelf-more-busy { display: inline; }
+  .shelf-more-button.htmx-request .shelf-more-busy { display: inline-flex; }
   .shelf-end { padding: 0.75rem 0; text-align: center; font-size: 12.5px; color: var(--color-fg-muted); }
 
   /* The featured (random) search shown when Discover has no query. */
@@ -1421,6 +1421,11 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .entry-similar-link, .filter-more-toggle, .filter-more-toggle > svg, .entry-bundle-progress, .entry-bundle-progress > span, .entry-reason input { transition: none; }
   .pack-pick-zoom, .license-chip, .attribution-link { transition: none; }
   .panel-row-icon, .panel-fold-chevron, .layout-option, .pack-row { transition: none; }
+  /* Phase 13: nothing at all moves. Every entry animation runs from a "from" state to the
+     element's own style, so with no animation the content simply shows as it rests. The
+     cursor spotlight goes too (a loader's still mark is set after "Motion", below). */
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  :is(.result-card, .type-tile, .gallery-card, .pack-card, .pack-row)::before { display: none; }
 }
 
 /* ---------- Light mode ----------
@@ -1511,8 +1516,108 @@ html[data-scheme="light"] {
   animation-duration: 0.32s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes page-out { to { opacity: 0; transform: translateY(-6px); } }
 @keyframes page-in { from { opacity: 0; transform: translateY(12px); } }
+/* HTMX fragment swaps (Phase 13) run as View Transitions too (globalViewTransitions),
+   but a filter, Load more or a builder save shouldn't drop and lift the whole page.
+   static/js/motion.js marks a swap that isn't boosted navigation (html[data-swap=
+   "fragment"]), and the content then crossfades in place: what's unchanged is the
+   same in both images, so only what changed visibly changes. Swaps that say
+   transition:false (the drawers, the pickers) are left alone. */
+html[data-swap="fragment"]::view-transition-old(content) { animation: swap-out 0.2s ease both; }
+html[data-swap="fragment"]::view-transition-new(content) { animation: swap-in 0.2s ease both; }
+@keyframes swap-out { to { opacity: 0; } }
+@keyframes swap-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+/* ---------- Motion (Phase 13) ----------
+   The branding's motion, in CSS with a little of static/js/motion.js. All of it stops
+   under reduced motion (the blanket rule in the reduced-motion block above). Monochrome
+   throughout: ink and the grey tokens only, never a type or drop colour. */
+
+/* The wordmark wipes in from the left, and the page's faint mark cuts in diagonally (the
+   icon tile it stands in for left the activity bar at the user's request). Both only on
+   a full page load: motion.js sets <html data-booted> once they're done, so a boosted
+   swap (which re-inserts the preserved logo in some browsers) never replays them. */
+html:not([data-booted]) .brand-link { animation: brand-wipe 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.1s backwards; }
+@keyframes brand-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+html:not([data-booted]) .hero-mark { animation: mark-cut 1.2s cubic-bezier(0.65, 0, 0.35, 1) 0.3s backwards; }
+@keyframes mark-cut { from { clip-path: polygon(0 0, 0 0, 0 0); } to { clip-path: polygon(0 0, 200% 0, 0 200%); } }
+
+/* The wordmark's shine: every 12 s the letters dim a little while an ink band crosses
+   them (.brand-shine, masked to the wordmark, over the image). At rest the band waits
+   off to the left, outside the mask. It stops while the chip is hovered and inverted. */
+.brand-link { position: relative; }
+.brand-shine { position: absolute; inset: 0 0.375rem; overflow: hidden; pointer-events: none;
+  -webkit-mask: var(--word-url) center / contain no-repeat; mask: var(--word-url) center / contain no-repeat; }
+.brand-shine::before { content: ""; position: absolute; inset: 0; transform: translateX(-110%);
+  background: linear-gradient(105deg, transparent 30%, var(--color-ink) 50%, transparent 70%);
+  animation: brand-shine 12s ease-in-out 3s infinite; }
+.brand-link img { animation: brand-dim 12s ease-in-out 3s infinite; }
+@keyframes brand-shine { 0% { transform: translateX(-110%); } 12%, 100% { transform: translateX(110%); } }
+@keyframes brand-dim { 0%, 14%, 100% { opacity: 1; } 3%, 10% { opacity: 0.6; } }
+html[data-pointer] .brand-link:hover .brand-shine, .brand-link:focus-visible .brand-shine { visibility: hidden; }
+html[data-pointer] .brand-link:hover img { animation: none; }
+.brand-link:focus-visible img { animation: none; }
+
+/* The parallax watermark: the page's faint mark (its .hero-atmosphere layer) sinks 0.4×
+   as fast as the page scrolls, so it drifts behind the content. The giant wordmark the
+   PRD imagined stays gone (the user had it removed, story 104). Scroll-driven, so it
+   needs no script; a browser without scroll timelines shows the mark still. */
+@supports (animation-timeline: scroll()) {
+  #content { scroll-timeline: --page block; }
+  .hero-atmosphere { animation: atmosphere-drift linear both; animation-timeline: --page; animation-range: 0px 60rem; }
+}
+@keyframes atmosphere-drift { to { transform: translateY(24rem); } }
+
+/* The logo loader (partials/loader.html): the mark in grey with a light band sweeping
+   across it, in place of any spinner. The status bar's mark becomes the same loader
+   while any htmx request runs (html[data-busy], set by motion.js after 150 ms), so every
+   loading state shows it, including saves from a card's corner, which can't carry the
+   logo (it sits on the provider's thumbnail) and keep their pulse. */
+:root { --loader-band: linear-gradient(100deg, var(--color-fg-muted) 35%, var(--color-ink) 50%, var(--color-fg-muted) 65%); }
+.ax-loader { display: inline-flex; align-items: center; gap: 0.5rem; }
+.ax-loader-mark { flex: none; display: inline-block; width: 1rem; aspect-ratio: 1; background: var(--loader-band);
+  background-size: 300% 100%; background-position: 100% 0;
+  -webkit-mask: var(--mark-url) center / contain no-repeat; mask: var(--mark-url) center / contain no-repeat;
+  animation: loader-sweep 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.ax-loader.is-small .ax-loader-mark, .entry-save-status .ax-loader-mark { width: 0.8rem; }
+html[data-busy] .status-mark { background: var(--loader-band); background-size: 300% 100%; background-position: 100% 0;
+  animation: loader-sweep 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes loader-sweep { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+/* The cursor spotlight: a soft pool of ink light that follows the mouse over cards and
+   tiles. motion.js marks the card under the pointer (data-spot) and sets --spot-x and
+   --spot-y; mouse only, behind the hover gate. It ignores the pointer, so every click
+   still lands, and sits under a card's details and corner actions. */
+:is(.result-card, .type-tile, .gallery-card, .pack-card, .pack-row)::before { content: ""; position: absolute; inset: 0;
+  z-index: 1; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+  background: radial-gradient(16rem circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    color-mix(in srgb, var(--color-ink) var(--spot-alpha, 9%), transparent), transparent 70%); }
+html[data-pointer] :is(.result-card, .type-tile, .gallery-card, .pack-card, .pack-row)[data-spot]::before { opacity: 1; }
+html[data-scheme="light"] { --spot-alpha: 6%; }
+
+/* Cards blur up into place, one after another (40 ms apart). The stagger counts within
+   each 12, a page's worth, so a batch from Load more staggers from its own first card.
+   The fill is backwards only: once in, a card holds no filter or transform. */
+:is(.result-grid > .result-card, .gallery-grid > .gallery-card, .pack-grid > .pack-card, .pack-rows > .pack-row) {
+  animation: card-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--stagger, 0) * 40ms); }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+2) { --stagger: 1; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+3) { --stagger: 2; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+4) { --stagger: 3; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+5) { --stagger: 4; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+6) { --stagger: 5; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+7) { --stagger: 6; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+8) { --stagger: 7; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+9) { --stagger: 8; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+10) { --stagger: 9; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+11) { --stagger: 10; }
+:is(.result-card, .gallery-card, .pack-card, .pack-row):nth-child(12n+12) { --stagger: 11; }
+@keyframes card-in { from { opacity: 0; filter: blur(10px); transform: translateY(10px) scale(0.985); } }
+/* Under reduced motion a loader's mark holds still in a mid grey (after the rules above,
+   which it must beat), so the status bar still shows that something is loading. */
+@media (prefers-reduced-motion: reduce) {
+  .ax-loader-mark, html[data-busy] .status-mark { background: var(--color-fg-secondary); }
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }

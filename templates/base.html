@@ -74,6 +74,7 @@
   <script src="{% versioned_static 'js/pack-sort.js' %}" defer></script>
   <script src="{% versioned_static 'js/ambient.js' %}" defer></script>
   <script src="{% versioned_static 'js/scroll-ruler.js' %}" defer></script>
+  <script src="{% versioned_static 'js/motion.js' %}" defer></script>
 </head>
 <body class="bg-app text-fg" hx-boost="true">
 {# The CSRF header lives on #app, not <body>: a boosted swap replaces #app but keeps <body>, #}
@@ -87,6 +88,8 @@
     {# (a blank frame with the chips sliding left). width/height reserve its space on first load. #}
     <a href="{% url 'packs:home' %}" id="brand-link" hx-preserve class="brand-link flex items-center h-8 px-1.5" aria-label="Axcenity Toolbox home">
       <img src="{% static 'brand/wordmark-white.png' %}" alt="Axcenity" width="103" height="32" class="h-8 w-auto">
+      {# The shine (Phase 13): a band that sweeps the letters every 12 s, masked to the wordmark. #}
+      <i class="brand-shine" aria-hidden="true"></i>
     </a>
     <span class="w-px h-5 mx-2 bg-line-strong" aria-hidden="true"></span>
     <a href="{% url 'packs:home' %}" id="home-button" class="bar-item chip-swap"{% if active_nav == "home" %} aria-current="page"{% endif %}><span class="chip-label">Home</span><span class="chip-icon" aria-hidden="true">{% include "partials/icon.html" with name="home" size=16 %}</span></a>
@@ -231,7 +234,8 @@
 
   {# ---------- Status bar (monochrome; each provider's last known status, and a member's saved count) ---------- #}
   <footer id="status-bar" class="h-6 shrink-0 flex items-center gap-4 px-3 text-[11.5px] bg-app border-t border-line text-fg-secondary">
-    <span class="flex items-center gap-1.5 text-fg-strong"><i class="mark w-3" aria-hidden="true"></i>Toolbox</span>
+    {# The mark is the logo loader while any htmx request runs (html[data-busy], static/js/motion.js). #}
+    <span id="status-loader" class="flex items-center gap-1.5 text-fg-strong"><i class="mark status-mark w-3" aria-hidden="true"></i>Toolbox</span>
     {% for status in status_providers %}{% include "partials/provider_status.html" %}{% endfor %}
     {% if user.is_authenticated %}{% include "partials/saved_count.html" %}{% endif %}
   </footer>

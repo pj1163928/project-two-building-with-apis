@@ -1326,16 +1326,42 @@ of it is turned off.
 
 ### Acceptance criteria
 
-- [ ] Every HTMX loading state uses the logo loader, and no spinner
+- [x] Every HTMX loading state uses the logo loader, and no spinner
   classes are left.
-- [ ] With reduced motion on, no animation or transition runs, and the
+- [x] With reduced motion on, no animation or transition runs, and the
   content still appears in its final state.
 - [ ] Motion works in a current browser and degrades cleanly where View
   Transitions aren't supported.
-- [ ] Every page from earlier phases still renders, and the HTMX tests
+- [x] Every page from earlier phases still renders, and the HTMX tests
   still pass.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: no access rule changes, and
+- [x] Standard gate (see top). Access rules: no access rule changes, and
   every earlier access test passes untouched.
+
+> **Built as (2026-11-06):** CSS ("Motion" in `styles/source.css`) plus
+> `static/js/motion.js`; see docs/FRONTEND.md, "Motion". Two PRD items met
+> later user requests, so they were adapted: the icon tile that "cuts in" left
+> the activity bar, so the page's faint mark cuts in instead; and the "giant
+> parallax watermark" would undo story 104, so the parallax moves that same
+> mark (CSS scroll-driven, behind `@supports`). The intros play on a full load
+> only (`data-booted`). The loader is `partials/loader.html`: the status bar's
+> mark sweeps while any htmx request runs (after 150 ms), and a pending shelf,
+> Load more, the pack picker and the drawer's Saving show it in place. A card's
+> corner squares keep their pulse, because they sit on the provider's thumbnail,
+> where the logo never goes. Fragment swaps, which already ran the page's drop
+> and rise, now crossfade in place (`html[data-swap="fragment"]`); boosted
+> navigation keeps the rise. Reduced motion is one blanket rule on top of the
+> old list, and every entry animation ends on the element's resting style.
+> Checked in headless Firefox (1600 px, light) with and without
+> `ui.prefersReducedMotion`: the gallery's cards, the wordmark and the mark end
+> in place, with nothing covering the content.
+>
+> **Left unticked:** "Motion works in a current browser". The fallbacks are
+> covered by tests, but a headless screenshot only shows the end state, so the
+> moving parts (the wipe, the shine, the spotlight, the stagger, the crossfade,
+> the parallax in Chrome) need a look in a real browser.
+>
+> **Still open from Phase 7:** after Add to pack on Discover saves a result,
+> its Save corner still says Save until the next search.

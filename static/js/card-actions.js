@@ -36,7 +36,10 @@
       // The list is fetched each time it opens, so it's always current.
       var list = dialog.querySelector("#pack-picker-list");
       if (list && opener.dataset.pickerUrl && window.htmx) {
-        list.innerHTML = '<p class="picker-empty">Loading your packs…</p>';
+        // The logo loader (templates/partials/loader.html), while the list arrives.
+        list.innerHTML =
+          '<p class="picker-empty"><span class="ax-loader"><i class="ax-loader-mark" aria-hidden="true"></i>' +
+          '<span class="ax-loader-label">Loading your packs…</span></span></p>';
         htmx.ajax("GET", opener.dataset.pickerUrl, { source: list, target: list, swap: "innerHTML transition:false" });
       }
       dialog.showModal();

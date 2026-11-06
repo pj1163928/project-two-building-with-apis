@@ -8,7 +8,7 @@
     <span class="micro text-fg-muted">{{ shelf.number|stringformat:"02d" }}</span>
     <h2 id="{{ shelf.dom_id }}-title" class="micro text-fg-strong">{{ shelf.name }}</h2>
     <span class="shelf-rule" aria-hidden="true"></span>
-    {% if not shelf.loaded %}<span class="micro text-fg-weak">Searching</span>{% elif shelf.filtered_out %}<span class="micro text-fg-weak">Filtered out</span>{% elif shelf.error %}<span class="micro text-fg-weak">Unavailable</span>{% else %}{% include "catalog/partials/shelf_count.html" %}{% endif %}
+    {% if not shelf.loaded %}<span class="micro text-fg-weak shelf-searching">{% include "partials/loader.html" with label="Searching" small=True %}</span>{% elif shelf.filtered_out %}<span class="micro text-fg-weak">Filtered out</span>{% elif shelf.error %}<span class="micro text-fg-weak">Unavailable</span>{% else %}{% include "catalog/partials/shelf_count.html" %}{% endif %}
   </header>
   {% if not shelf.loaded %}
     <ul class="result-grid" aria-label="Loading {{ shelf.name }} results">

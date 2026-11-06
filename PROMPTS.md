@@ -28,6 +28,91 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Axcenity Toolbox: Phase 13/13, Branding motion and reduced motion
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 13`.
+2. Go ahead and start development (approving the brief).
+
+### Summary
+
+- **Outcome:** the site has its branding motion, and none of it runs under
+  reduced motion.
+  - The wordmark wipes in on a full load and shines every 12 s. The page's
+    faint mark cuts in diagonally, and its layer drifts as a parallax
+    watermark as the page scrolls.
+  - The logo loader (the mark with a light band sweeping across it) is the only
+    loading indicator. The status bar's mark sweeps while any htmx request
+    runs, and the loader shows in place in a pending shelf, Load more, the pack
+    picker and the drawer's Saving.
+  - A cursor spotlight lights cards and tiles, and cards blur up into place
+    with a stagger.
+  - htmx fragment swaps crossfade in place instead of dropping and lifting the
+    whole page; boosted navigation keeps its rise.
+  - 1,261 tests pass (1,236 before; 25 new). `ruff check` and `ruff format`
+    are clean.
+- **Changes:**
+  - `styles/source.css`: the "Motion" section (wipe, cut-in, shine, parallax
+    behind `@supports`, the loader, the spotlight, the card entry), the
+    fragment-swap crossfade, and the blanket reduced-motion rule, with the
+    loader's still state after the section; Load more's busy label is
+    `inline-flex`.
+  - `static/js/motion.js` (new): the `data-booted` flag, the busy count
+    (`htmx:beforeSend` to `loadend`, shown after 150 ms, `aria-busy` on the
+    content), `data-swap` on `htmx:beforeTransition`, and the spotlight.
+  - `templates/partials/loader.html` (new): the logo loader.
+  - `templates/base.html`: loads `motion.js`, adds `.brand-shine` to the
+    wordmark link, and makes the status bar's mark the loader
+    (`#status-loader`, `.status-mark`).
+  - `catalog/.../shelf.html` and `load_more.html`: the loader for
+    "Searching" and "Loading…".
+  - `static/js/card-actions.js` and `entry-drawer.js`: the loader's mark in
+    "Loading your packs…" and "Saving…".
+  - `tests/test_motion.py` (new).
+  - `docs/FRONTEND.md` (a "Motion" section, fragment swaps under "Page
+    transitions", the script list, the pending shelf) and `docs/TESTING.md`.
+  - `plans/axcenity-toolbox.md`: Phase 13 ticked (one criterion left open),
+    with a "Built as" note.
+- **TDD:** skipped. The phase is motion, styling and markup, with no
+  permissions, rules or data; ordinary tests cover each criterion.
+- **Decisions:**
+  - The PRD's icon tile that "cuts in" left the activity bar at the user's
+    request, so the page's faint mark cuts in instead.
+  - The "giant parallax watermark" would undo story 104, so the parallax
+    moves that same mark (CSS scroll-driven, at 0.4× over the first 60 rem).
+  - The intros play on a full load only, not on each boosted swap.
+  - A card's corner squares keep their pulse while saving, because they sit
+    on the provider's thumbnail and the logo never goes there; the status
+    bar's loader shows instead.
+  - Fragment swaps already ran the page's drop and rise (global View
+    Transitions), so they now crossfade the content in place; swaps marked
+    `transition:false` are unchanged.
+  - The spotlight covers result and library cards, Discover's type tiles,
+    gallery cards, pack cards and pack rows. The blur-up covers the same
+    cards (not the tiles), staggered within each 12, so a Load more batch
+    staggers too.
+  - Reduced motion is one blanket rule on top of the existing list. Every
+    entry animation ends on the element's resting style, and the loader holds
+    still in grey.
+- **Deviations:** none. The brief was approved as written.
+- **Sideways:**
+  - The reduced-motion colour for the loader was first written into the old
+    reduced-motion block, before the Motion section, where the loader's own
+    later rule would have beaten it at equal specificity. It was caught in
+    review before any test and moved after the section, and a test checks
+    the order.
+  - The first run of the new tests had five failures, all in the test helpers:
+    keyframes indented inside a layer, selectors that appear more than once
+    (the first match was the reduced-motion copy), and checks for
+    `startViewTransition` and `animation-timeline` that matched a comment and
+    the `@supports` condition. Each was fixed in the test, not the code.
+  - Headless Firefox screenshots (1600 px, light, against a scratch copy of
+    the database) with and without `ui.prefersReducedMotion` showed the
+    gallery's cards, the wordmark and the mark ending in place. A screenshot
+    shows only the end state, so the moving parts weren't watched; "Motion
+    works in a current browser" stays unticked until they're checked by hand.
+
 ## 2026-11-06 — Phase 12 polish, second request: a textures-only cover hero
 
 ### Prompts

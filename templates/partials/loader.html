@@ -1,0 +1,6 @@
+{# The logo loader (Phase 13): the mark in grey with a light band sweeping across it,  #}
+{# the Toolbox's only loading indicator (no spinners). `label` is shown beside it;     #}
+{# without one, screen readers hear "Loading". `small` is a size down. It carries no   #}
+{# role: the region that's loading says so (aria-busy, or its own status line). Never  #}
+{# put it on a provider's thumbnail: the logo doesn't go there.                       #}
+<span class="ax-loader{% if small %} is-small{% endif %}"><i class="ax-loader-mark" aria-hidden="true"></i>{% if label %}<span class="ax-loader-label">{{ label }}</span>{% else %}<span class="sr-only">Loading</span>{% endif %}</span>
