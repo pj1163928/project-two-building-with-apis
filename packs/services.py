@@ -13,7 +13,7 @@ from catalog.library import save_asset, save_to_library
 from catalog.models import Asset, SavedAsset
 from providers import KINDS
 
-from .models import Pack, PackItem, default_variant
+from .models import TITLE_MAX_LENGTH, Pack, PackItem, default_variant
 
 
 class NotYourEntryError(ValueError):
@@ -168,3 +168,45 @@ def add_suggestion(pack: Pack, asset: Asset) -> tuple[SavedAsset, bool, PackItem
         entry, entry_created = save_asset(pack.owner, asset)
         item, _ = add_to_pack(pack, entry)
     return entry, entry_created, item
+
+
+COPY_SUFFIX = " (copy)"
+
+
+def copy_title(title: str) -> str:
+    """The copy's title, "<title> (copy)", shortened so it fits the title's limit."""
+    room = TITLE_MAX_LENGTH - len(COPY_SUFFIX)
+    return title[:room].rstrip() + COPY_SUFFIX
+
+
+def copy_pack(pack: Pack, user) -> Pack:
+    """Copy pack: a private copy of `pack` for `user`, in one transaction.
+
+    The copy is titled "<title> (copy)", keeps the intended use and tags, and
+    points back with copied_from. Each item becomes an item of the copy on
+    `user`'s own entry for its asset: an entry they have is used untouched,
+    otherwise a new To review one is made (save_asset), so no provider is
+    ever called and nothing of the original owner's review comes along. The
+    variant, import path and position are copied as they are. A failure
+    part-way leaves no pack, item or entry behind.
+    """
+    with transaction.atomic():
+        title = copy_title(pack.title)
+        copy = Pack.objects.create(
+            owner=user,
+            title=title,
+            description=pack.description,
+            slug=Pack.objects.free_slug(title),
+            copied_from=pack,
+        )
+        copy.tags.set(pack.tags.all())
+        for item in pack.ordered_items():
+            entry, _ = save_asset(user, item.asset)
+            PackItem.objects.create(
+                pack=copy,
+                saved_asset=entry,
+                preferred_variant=item.preferred_variant,
+                import_path=item.import_path,
+                position=item.position,
+            )
+    return copy

@@ -862,9 +862,29 @@ open pack current. With none: "The packs you create are listed here."
   icon, type and provider, title, author, then `.pack-item-facts` (License,
   "no credit needed" for CC0 or the Credit line, Files as a `.file-badge` with
   the count and size, the Import path in mono, and the Source). **Credits**
-  (`#pack-page-credits`) says how many items need credit. No forms and no
-  `hx-post` anywhere, for the owner too; nothing from anyone's library
-  (notes, ratings, statuses, the community rating). Members get their packs
+  (`#pack-page-credits`) says how many items need credit. No edit controls,
+  for the owner too; nothing from anyone's library (notes, ratings, statuses,
+  the community rating) except the reader's own "In your library".
+- **Save and Copy on a pack's page** *(Phase 11)*: the page's only forms.
+  - Each item's `.pack-item-download` row starts with
+    `packs/partials/item_save.html` (`.item-save`, `btn btn-quiet btn-xs`):
+    **Save to library** (plus icon) for a member, posting with `hx-post` and
+    swapping itself (`transition:false`); **In your library** (check icon,
+    inverted like Discover drawer's `.is-saved`) once the reader has it,
+    linking to their own entry, with the saved count out of band after a new
+    save; **Sign in to save** for a visitor, back to this page.
+  - The toolbar's right group (`#pack-page-own`) ends with **Copy pack**
+    (`#pack-copy-button`, the `copy` icon), which opens `#pack-copy-dialog`
+    ("Make a private copy?", what it copies, and `#pack-copy-missing`: "N
+    assets you don't have yet go into your library as To review." or
+    "Everything in it is already in your library, and stays as it is."). Its
+    form is a plain boosted POST; the copy's builder opens next. A visitor
+    gets **Sign in to copy** instead, and no dialog.
+  - By share link, both post to the link's own URLs, and a visitor's sign-in
+    comes back to the link.
+  - The builder of a copy says "Copied from <title> by <owner>"
+    (`#pack-copied-from`, `text-xs`, the `copy` icon), the title linking to
+    the original's page only when the member can read it by slug. Members get their packs
   in the side panel; a visitor gets "Shared pack" (`#pack-visitor-panel`)
   with Sign up. Type colour: only the two type icons, as in the builder.
 - **Item alignment and sounds** (user reports and request, 2026-11-06): on

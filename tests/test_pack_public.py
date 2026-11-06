@@ -242,9 +242,24 @@ def test_a_non_owner_sees_the_pack_read_only(golden_pack, other, who):
 
     assert "Edit in builder" not in content
     assert reverse("packs:builder", args=[golden_pack.pk]) not in content
-    assert "<form" not in content
-    assert "<input" not in content and "<select" not in content and "<textarea" not in content
-    assert "hx-post" not in content
+    _assert_no_edit_controls(content, golden_pack)
+
+
+def _assert_no_edit_controls(content, pack):
+    """Read-only: no field to change, and the only forms are Phase 11's Save to
+    library and Copy pack (and the copy dialog's Cancel), never a pack write."""
+    assert "<select" not in content and "<textarea" not in content
+    for tag in re.findall(r"<input[^>]*>", content):
+        assert 'type="hidden" name="csrfmiddlewaretoken"' in tag, tag
+    allowed = {reverse("packs:copy", args=[pack.slug])} | {
+        reverse("packs:save_item", args=[pack.slug, item.pk]) for item in pack.items.all()
+    }
+    for form in re.findall(r"<form[^>]*>", content):
+        if 'method="dialog"' in form:
+            continue
+        action = re.search(r'action="([^"]+)"', form).group(1)
+        assert action in allowed, form
+    assert set(re.findall(r'hx-post="([^"]+)"', content)) <= allowed
 
 
 def test_the_owner_gets_a_way_into_the_builder(member_client, golden_pack):
@@ -253,7 +268,7 @@ def test_the_owner_gets_a_way_into_the_builder(member_client, golden_pack):
     assert f'href="{reverse("packs:builder", args=[golden_pack.pk])}"' in content
     assert "Edit in builder" in content
     # Still read-only here: every change happens in the builder.
-    assert "<form" not in content and "hx-post" not in content
+    _assert_no_edit_controls(content, golden_pack)
 
 
 def test_the_owner_sees_their_private_pack_marked_private(member_client, member):

@@ -48,6 +48,8 @@ phases add.
 | `packs:public` | `/packs/<slug>/` | Everyone for a public pack; the owner only for a private or unlisted one (**404** otherwise). Read-only; the owner also gets Edit in builder |
 | `packs:export` | `/packs/<slug>/export/` | As `packs:public`. GET only: the manifest as a download, `<slug>.axcenity-pack.json` |
 | `packs:shared`, `packs:shared_export` | `/packs/link/<token>/`, `…/export/` | Anyone holding an unlisted pack's share link (a public pack's link redirects to its page). A replaced token, a private pack's or an unknown one is a **404**. `X-Robots-Tag: noindex, nofollow` |
+| `packs:save_item`, `packs:shared_save_item` | `/packs/<slug>/items/<item>/save/`, `/packs/link/<token>/items/<item>/save/` | Members (sent to sign in and back to the pack's page otherwise) who can read the pack, as `packs:public` and `packs:shared` (**404** otherwise; another pack's item is a **404**); POST only, with CSRF. Saves the item's stored Asset to the member's library (To review, or their entry untouched); HTMX gets the item's "In your library" slot, anything else goes back to the page |
+| `packs:copy`, `packs:shared_copy` | `/packs/<slug>/copy/`, `/packs/link/<token>/copy/` | As `packs:save_item`. Copy pack: a private copy for the member (`copy_pack()`), then its builder. Website only: the API has no copy URL |
 | `packs:rotate_link` | `/packs/<id>/link/` | The owner only; POST only, with CSRF. New link: replaces the share token, so every older link is a **404** |
 | `packs:items_reorder`, `packs:items_sort` | `/packs/<id>/items/order/`, `…/items/sort/` | The owner only; POST only, with CSRF. Reorder takes `order` (every item's id once, comma-separated; anything else is a **400** that changes nothing); sort takes `type`, `title`, `provider` or `license` |
 | `packs:files`, `packs:shared_files` | `/packs/<slug>/files/`, `/packs/link/<token>/files/` | As `packs:public` and `packs:shared`. GET only: the JSON list Download files zips in the browser (`?item=<id>` for one item; another pack's item is a **404**) |
@@ -393,7 +395,7 @@ workflows), `packs/forms.py` and `packs/views.py`.
     use", up to 2,000), `tags` (to `Tag`), `visibility` (`private` by
     default, `unlisted` or `public`; `is_public` and `is_unlisted` read it),
     `share_token` (see "Unlisted packs"),
-    `copied_from` (nullable, for Phase 11) and created/updated timestamps.
+    `copied_from` (nullable, set by Copy pack) and created/updated timestamps.
     `Pack.objects.create_pack(owner, title, description, tags)` writes the
     pack, a free slug and its tags in **one transaction**. The slug is the
     slugified title, then `-2`, `-3`… (`free_slug()`), unique site-wide,
@@ -486,6 +488,33 @@ workflows), `packs/forms.py` and `packs/views.py`.
     (`packs:details`) sends `packTagsChanged`, and only then. The two events
     stay separate: Add from my library listens for `packItemsChanged` only,
     the suggestions for both.
+- **Save single items and Copy pack** *(Phase 11)*:
+  - Who: any signed-in member who can **read** the pack, through the pack
+    page's own rule (`visible_to()` by slug, `shared_by_link()` by token), so
+    another member's private pack, or an unlisted one by slug, is a **404**
+    that writes nothing. An unlisted pack's readers save and copy through its
+    share link (decided with the user, 2026-11-06). The owner can too: their
+    items are already theirs, and Copy duplicates the pack. A visitor is sent
+    to sign in and back to the pack's page (`PackReaderWriteMixin`; HTMX gets
+    `HX-Redirect`).
+  - Save (`PackItemSaveView`) is `catalog.library.save_asset(user,
+    item.asset)`: the stored Asset, so no provider is called; the member's
+    entry comes back untouched, or a new To review one is made. The reply is
+    `packs/partials/item_save.html` ("In your library", linking to the
+    member's entry), with the saved count out of band for a new entry.
+  - `copy_pack(pack, user)` (`packs/services.py`) runs in **one
+    transaction**: a private pack titled `copy_title()` ("<title> (copy)",
+    shortened to fit 120 characters) with `copied_from`, the intended use and
+    the tags, and no share token; then for each item in position order,
+    `save_asset()` for `user` (an entry they have is used untouched, otherwise
+    a new To review one with its status record) and a `PackItem` with the
+    original's `preferred_variant`, `import_path` and `position`, copied as
+    they are. A failure part-way leaves no pack, item, entry or status record.
+    Nothing of the original owner's review comes along.
+  - The builder names the original ("Copied from <title> by <owner>",
+    `_copied_from()`), linking to its page only when the member can still read
+    it by slug, so an unlisted original's link is never shown. Deleting the
+    original sets `copied_from` to null; the copy stays.
 - **Forms:** `NewPackForm` (title, intended use, tags). `PackDetailsForm`
   and `PackItemForm` bind only the posted fields, like `ReviewForm`, so each
   autosaving field writes only itself. A variant must be one of the asset's
@@ -525,7 +554,9 @@ workflows), `packs/forms.py` and `packs/views.py`.
   import path and the source link. Those come from `manifest_item()`, so the
   page shows what the export will hold. It never reads anything from a
   library entry: no notes, rating, status or community rating. Only the
-  owner sees Edit in builder (and a Private chip); there are no forms.
+  owner sees Edit in builder (and a Private chip). Its only forms are Phase
+  11's Save to library on each item and Copy pack; "In your library" checks
+  the reader's own entries only.
   `PackExportView` (`/packs/<slug>/export/`) serves `manifest_for()` as an
   indented JSON download.
 
@@ -832,6 +863,7 @@ the API. All are built:
 | `pack_credits(items)` | Built (user request, 2026-11-05), `packs/credits.py`. A pack's licenses, required and optional credits and warnings, and the formal notice (see "Licenses and credits") |
 | `license_info(name)` | Built (user request, 2026-11-05), `catalog/licenses.py`. What a license allows and asks |
 | `suggest_assets(pack, limit)` | Built (Phase 10), `packs/suggestions.py`. Stored Assets ranked by shared tags with the pack, ties by title then id, never the pack's own (see "Packs") |
+| `copy_pack(pack, user)` | Built (Phase 11), `packs/services.py`. A private copy for `user` in one transaction: title, `copied_from`, tags, and each item's variant, import path and position, on the copier's own entries (missing ones To review, theirs untouched) (see "Packs") |
 | `add_to_pack(pack, saved_asset)` | Built (Phase 7), `packs/services.py`. Adds an item at the end on the default variant, once per entry, and refuses another member's entry (see "Packs") |
 | `build_manifest(pack, *, source_url, exported_at=None)` | Built (Phase 8), `packs/manifest.py`. The Option A export, locked by a golden file (see "Export manifest") |
 | `search_records()` | Built (Phase 2a). Returns `AssetRecord`s (`providers/records.py`), next to the console's `search()`. Openverse's also takes `licenses=` (user request, 2026-11-06) |

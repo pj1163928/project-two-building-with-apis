@@ -28,6 +28,90 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Axcenity Toolbox: Phase 11/13, Save single items and Copy pack
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 11`.
+2. Looks good move on to tests (approving the brief, including the
+   recommendation that an unlisted pack's share link allows Save and Copy).
+3. Looks good move to next test (approving TDD 1's red test).
+4. Looks good move to next (approving TDD 2's test).
+5. Looks good move to building (approving TDD 3's red test).
+
+### Summary
+
+- **Outcome:** a pack's page now has **Save to library** on each item and
+  **Copy pack** for signed-in readers.
+  - Save makes a To review entry from the stored Asset, or shows "In your
+    library" for one the reader has, linking to it.
+  - Copy pack confirms first (saying how many assets would join the
+    library), then makes a private "<title> (copy)" with `copied_from`, the
+    intended use, the tags, and each item's variant, import path and
+    position, all in one transaction. Missing assets go into the copier's
+    library as To review, and their own entries stay untouched.
+  - The copy's builder says where it came from. The API has no copy URL.
+  - 1,196 tests pass (1,169 before; 27 new). `ruff check` and
+    `ruff format` are clean.
+- **Changes:**
+  - `packs/services.py`: `copy_pack()` and `copy_title()`.
+  - `packs/views.py`:
+    - `PackReaderWriteMixin` (members only; the pack page's reader rule; a
+      visitor goes to sign in and back to the page)
+    - `PackItemSaveView` and `PackCopyView`
+    - the pack page's context: each item's save URL and the reader's own
+      entry, the copy URL, and the confirm's count
+    - `_copied_from()` for the builder
+  - `packs/urls.py`: `packs:save_item`, `packs:copy`,
+    `packs:shared_save_item` and `packs:shared_copy`.
+  - Templates:
+    - `packs/partials/item_save.html` (new)
+    - `pack_page.html`: Save in each item's row, Copy pack and its confirm
+      dialog, and Sign in links for visitors
+    - `builder.html`: "Copied from …"
+  - `templates/partials/icon.html`: a `copy` icon.
+  - `styles/source.css`: `.item-save`, with "In your library" inverted.
+  - `tests/test_pack_copy.py` (new).
+  - `tests/test_pack_public.py`: the "read-only" checks now allow only the
+    Save and Copy forms, with no edit controls.
+  - `docs/ARCHITECTURE.md`, `docs/FRONTEND.md` and `docs/TESTING.md`: the
+    new URLs, `copy_pack()`, the page's buttons and the test file.
+  - `plans/axcenity-toolbox.md`: Phase 11 ticked, with a "Built as" note.
+- **TDD:** three behaviours, each red before green:
+  1. Copying saves missing assets as To review and leaves the copier's own
+     entries (and the owner's) untouched, never calling a provider.
+  2. A copy that fails partway leaves no pack, item, entry or status record.
+  3. Save and Copy follow the pack page's reader rule. Another member's
+     private pack, an unlisted one by slug, and a private pack's link are a
+     404 that writes nothing. A visitor goes to sign in and back.
+- **Decisions:**
+  - Save and Copy are open to anyone signed in who can read the pack, the
+    owner included (copying your own pack duplicates it).
+  - An unlisted pack's readers use its share link. The plan left this open;
+    the user approved it.
+  - Neither action ever calls a provider (`save_asset()` on the stored
+    Asset).
+  - The copy keeps the intended use, has no share token, and its title is
+    shortened to fit " (copy)". Positions are copied exactly.
+  - Copy pack confirms first and lands in the copy's builder. "Copied from"
+    links to the original only when it's readable by slug, so an unlisted
+    original's link is never shown.
+- **Deviations:** none. Every recommendation was approved as given.
+- **Sideways:**
+  - TDD 2 couldn't go red on its own: `transaction.atomic()` was already
+    written while making TDD 1 pass. It was shown red by temporarily
+    removing `atomic()` (2 packs where 1 was expected), then green with it
+    restored. The change was reverted and checked.
+  - Phase 8's pack-page tests asserted "no `<form>` at all" and failed once
+    Save and Copy existed. As planned, they were narrowed to "no edit
+    controls; only Save and Copy forms".
+  - Two first-draft test bugs were fixed in the tests:
+    - "Sign in to save" was counted twice per item, because of the
+      `aria-label`.
+    - Django's `urlencode` keeps `/`, so the expected `next` was wrong.
+  - Not driven in a real browser this session: the dialog, the swaps and the
+    styles. Check them by hand with the guide.
+
 ## 2026-11-06 — Axcenity Toolbox: Phase 10/13, Suggestions and "Find more from providers"
 
 ### Prompts

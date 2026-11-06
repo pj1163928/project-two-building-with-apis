@@ -1177,22 +1177,38 @@ Copying is website-only.
 
 ### Acceptance criteria
 
-- [ ] Saving a single item creates a To review SavedAsset, or shows "In
+- [x] Saving a single item creates a To review SavedAsset, or shows "In
   library" if the member already has it.
-- [ ] The copy is private, has the right title and `copied_from`, and
+- [x] The copy is private, has the right title and `copied_from`, and
   matches the original's items, variants, import paths and order.
-- [ ] Copying never changes the copier's existing SavedAssets.
-- [ ] If a failure is forced partway through, the copy leaves no pack, no
+- [x] Copying never changes the copier's existing SavedAssets.
+- [x] If a failure is forced partway through, the copy leaves no pack, no
   items and no new SavedAssets behind (transaction test).
-- [ ] The API has no copy URL.
+- [x] The API has no copy URL.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules:
+- [x] Standard gate (see top). Access rules:
   - Saving an item or copying a pack sends signed-out visitors to sign
     in.
   - Copying another member's private pack returns **404**.
   - Both actions need a valid CSRF token.
+
+> **Built as (2026-11-06):** `copy_pack()` and `copy_title()` are in
+> `packs/services.py`; Save is `catalog.library.save_asset()` on the item's
+> stored Asset, so neither ever calls a provider. Both use the pack page's
+> reader rule (`PackReaderWriteMixin`): anyone signed in who can read the pack,
+> the owner included. At the user's request, an unlisted pack's readers save
+> and copy through its share link (`packs:shared_save_item`,
+> `packs:shared_copy`); by slug it stays a 404. The copy also keeps the
+> intended use, gets no share token, and the title is shortened to fit
+> " (copy)". Copy pack confirms first, saying how many assets would join the
+> library, then opens the copy's builder, which says "Copied from …" (linked
+> only when the original is readable by slug). The pack page's "read-only"
+> tests now allow these two forms and no other control.
+>
+> **Still open from Phase 7:** after Add to pack on Discover saves a result,
+> its Save corner still says Save until the next search.
 
 ---
 

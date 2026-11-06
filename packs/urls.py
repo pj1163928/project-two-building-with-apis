@@ -58,11 +58,29 @@ urlpatterns = [
         attribution.SharedPackAttributionView.as_view(),
         name="shared_attribution",
     ),
+    # Save an item, or Copy pack, from a pack the member can read by its link.
+    path(
+        "packs/link/<slug:token>/items/<int:item_pk>/save/",
+        views.PackItemSaveView.as_view(by_link=True),
+        name="shared_save_item",
+    ),
+    path(
+        "packs/link/<slug:token>/copy/",
+        views.PackCopyView.as_view(by_link=True),
+        name="shared_copy",
+    ),
     # The pack's own page and its manifest download: anyone for a public pack,
     # the owner only for a private or unlisted one. Slugs are unique site-wide;
     # "new", "picker" and "link" are never given out (packs.models.RESERVED_SLUGS).
     path("packs/<slug:slug>/", views.PackPageView.as_view(), name="public"),
     path("packs/<slug:slug>/export/", views.PackExportView.as_view(), name="export"),
+    # Save an item to the member's library, or Copy pack (members, POST with CSRF).
+    path(
+        "packs/<slug:slug>/items/<int:item_pk>/save/",
+        views.PackItemSaveView.as_view(),
+        name="save_item",
+    ),
+    path("packs/<slug:slug>/copy/", views.PackCopyView.as_view(), name="copy"),
     # Download files: the providers' URLs for the browser's zip (?item=<id> for one item).
     path("packs/<slug:slug>/files/", views.PackFilesView.as_view(), name="files"),
     # The Attribution center: the license guide for everyone; each pack's attribution

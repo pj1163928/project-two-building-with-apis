@@ -874,6 +874,9 @@
   .pack-item-bundle:empty { display: none; }
   .pack-item-bundle { font-size: 12px; color: var(--color-fg-secondary); }
   .pack-item-download { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  /* Save to library on a pack's page (Phase 11): "In your library" inverted, as in Discover's drawer. */
+  .pack-item-download form.item-save { display: contents; }
+  .item-save.is-saved { color: var(--color-on-ink); background: var(--color-ink); border-color: var(--color-ink); }
   .pack-downloads-status:empty { display: none; }
   .pack-downloads-status { flex-basis: 100%; }
   [data-bundle-state="error"] [data-bundle-status] { color: var(--color-fg-strong); }

@@ -1,0 +1,14 @@
+{# Save to library for one item of a pack's page (Phase 11), Discover's "In library"     #}
+{# behaviour as a small button. The reader has it: "In your library", linking to their   #}
+{# own entry (after a save, the status bar's count out of band for a new one). A member: #}
+{# a form posting to the item's save URL (the slug's, or the share link's), swapping     #}
+{# itself for the reply. A visitor: Sign in to save, back to this page. Nothing here is  #}
+{# ever about the pack owner's own review.                                                #}
+{% if item.my_entry_id %}
+  <a href="{% url 'catalog:entry' item.my_entry_id %}" class="item-save btn btn-quiet btn-xs gap-1 is-saved" aria-label="{{ item.saved_asset.asset.title }} is in your library. Open it">{% include "partials/icon.html" with name="check" size=13 %}<span>In your library</span></a>
+  {% if count_oob %}{% include "partials/saved_count.html" with oob=True %}{% endif %}
+{% elif user.is_authenticated %}
+  <form class="item-save" method="post" action="{{ item.save_url }}" hx-post="{{ item.save_url }}" hx-target="this" hx-swap="outerHTML transition:false" hx-disabled-elt="find button">{% csrf_token %}<button type="submit" class="btn btn-quiet btn-xs gap-1" aria-label="Save {{ item.saved_asset.asset.title }} to your library">{% include "partials/icon.html" with name="plus" size=13 %}<span>Save to library</span></button></form>
+{% else %}
+  <a href="{% url 'accounts:login' %}?next={{ page_url|urlencode }}" class="item-save btn btn-quiet btn-xs gap-1" aria-label="Sign in to save {{ item.saved_asset.asset.title }}">{% include "partials/icon.html" with name="login" size=13 %}<span>Sign in to save</span></a>
+{% endif %}

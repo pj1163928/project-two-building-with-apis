@@ -23,7 +23,9 @@
 {# files, and each item's Download, are zipped in the browser from the providers' URLs   #}
 {# (files_url, static/js/bundle-download.js); a one-file item is a plain link instead.   #}
 {# Credits (packs/partials/credits.html) groups the items by license, with what each     #}
-{# asks, the lines to paste and the optional thank-yous.                                 #}
+{# asks, the lines to paste and the optional thank-yous. Phase 11: each item's Save to   #}
+{# library (packs/partials/item_save.html) and Copy pack (a confirm, then a plain POST)  #}
+{# for members; a visitor gets Sign in links back here. They're the page's only forms.  #}
 {% block content %}
   <section class="pack-page space-y-5">
     <header class="page-hero space-y-3 max-w-2xl">
@@ -40,12 +42,17 @@
         <a href="{{ export_url }}" class="btn {% if has_files %}btn-quiet{% else %}btn-primary{% endif %} btn-sm gap-1.5" hx-boost="false" download="{{ pack.slug }}.axcenity-pack.json">{% include "partials/icon.html" with name="download" size=15 %}<span>Download manifest</span></a>
         <span class="text-xs text-fg-weak px-1" data-bundle-status role="status">{% if has_files %}Files: every item's files in one zip, in their import paths, with CREDITS.txt and the manifest. {% endif %}Manifest: JSON for the engine, with every file's URL, its import path and the credits.</span>
       </div>
-      {% if is_owner %}
-        <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2" id="pack-page-own">
+        {% if is_owner %}
           <span class="status-chip micro" data-visibility="{{ pack.visibility }}">{% if pack.is_public %}Public{% elif pack.is_unlisted %}Unlisted · link only{% else %}Private · only you{% endif %}</span>
           <a href="{% url 'packs:builder' pack.pk %}" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="pack-add" size=15 %}<span>Edit in builder</span></a>
-        </div>
-      {% endif %}
+        {% endif %}
+        {% if user.is_authenticated %}
+          <button type="button" id="pack-copy-button" class="btn btn-quiet btn-sm gap-1.5" data-dialog-open="pack-copy-dialog" aria-haspopup="dialog">{% include "partials/icon.html" with name="copy" size=15 %}<span>Copy pack</span></button>
+        {% else %}
+          <a id="pack-copy-button" href="{% url 'accounts:login' %}?next={{ page_url|urlencode }}" class="btn btn-quiet btn-sm gap-1.5">{% include "partials/icon.html" with name="login" size=15 %}<span>Sign in to copy</span></a>
+        {% endif %}
+      </div>
     </div>
 
     {% if items %}{% include "packs/partials/compatibility.html" %}{% endif %}
@@ -71,16 +78,17 @@
                 <div><dt class="micro">Import path</dt><dd><span class="font-mono text-xs">{{ export.import_path }}</span> <a href="#import-path-help" class="entry-link text-fg-muted" data-open-details="import-path-help">What's this?</a></dd></div>
                 <div><dt class="micro">Source</dt><dd>{% if asset.source_url %}<a href="{{ asset.source_url }}" target="_blank" rel="noopener noreferrer" class="entry-link">View on {{ asset.get_provider_display }}</a>{% else %}{{ asset.get_provider_display }}{% endif %}</dd></div>
               </dl>
-              {% if export.files %}
-                <p class="pack-item-download">
+              <div class="pack-item-download">
+                {% include "packs/partials/item_save.html" %}
+                {% if export.files %}
                   {% if export.files|length == 1 %}
                     <a href="{{ export.files.0.url }}" class="btn btn-quiet btn-xs gap-1" target="_blank" rel="noopener noreferrer" download>{% include "partials/icon.html" with name="download" size=13 %}<span>Download {{ export.files.0.filename|default:"file" }}</span></a>
                   {% else %}
                     <button type="button" class="btn btn-quiet btn-xs gap-1" data-bundle-download data-bundle-url="{{ files_url }}?item={{ item.pk }}" aria-label="Download {{ asset.title }}'s files">{% include "partials/icon.html" with name="download" size=13 %}<span>Download this item</span></button>
                   {% endif %}
                   <span class="text-xs text-fg-weak" data-bundle-status role="status"></span>
-                </p>
-              {% endif %}
+                {% endif %}
+              </div>
             </div>
           </li>
         {% endwith %}{% endwith %}{% endfor %}
@@ -92,4 +100,24 @@
 
     {% include "packs/partials/credits.html" %}
   </section>
+
+  {% if user.is_authenticated %}
+    {# Copy pack: a plain (boosted) POST after this confirm; the copy's builder opens next. #}
+    <dialog id="pack-copy-dialog" class="picker-dialog" aria-labelledby="pack-copy-title">
+      <div class="picker-panel">
+        <header class="picker-head">
+          <div class="min-w-0 space-y-1"><p class="micro text-fg-muted">Copy pack</p><h2 id="pack-copy-title" class="picker-title">Make a private copy?</h2></div>
+          <form method="dialog"><button type="submit" value="close" class="picker-close" aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button></form>
+        </header>
+        <div class="picker-body">
+          <p class="text-sm text-fg">“{{ pack.title }} (copy)” will be yours to change, {% if items %}with the same {{ items|length }} item{{ items|length|pluralize }}, variants, import paths and order{% else %}empty like this one, with the same tags{% endif %}. Only you can see it until you share it.</p>
+          <p class="picker-note" id="pack-copy-missing">{% include "partials/icon.html" with name="info" size=14 %}<span>{% if copy_missing %}{{ copy_missing }} asset{{ copy_missing|pluralize }} you don't have yet go{{ copy_missing|pluralize:"es," }} into your library as To review.{% else %}Everything in it is already in your library, and stays as it is.{% endif %}</span></p>
+        </div>
+        <footer class="picker-foot gap-2">
+          <form method="dialog"><button type="submit" value="close" class="btn btn-quiet btn-sm">Cancel</button></form>
+          <form method="post" action="{{ copy_url }}">{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Copy pack</button></form>
+        </footer>
+      </div>
+    </dialog>
+  {% endif %}
 {% endblock %}

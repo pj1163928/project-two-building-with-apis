@@ -19,7 +19,7 @@ from django.views import View
 from django.views.generic import FormView, TemplateView
 from django_htmx.http import HttpResponseClientRedirect, push_url, trigger_client_event
 
-from catalog.library import UnknownProviderError, filter_library
+from catalog.library import UnknownProviderError, filter_library, save_asset
 from catalog.models import Asset, SavedAsset
 from providers import PROVIDERS_BY_KEY, ProviderError
 
@@ -35,6 +35,7 @@ from .services import (
     add_from_provider,
     add_suggestion,
     add_to_pack,
+    copy_pack,
     move_item,
     reorder_items,
     sort_items,
@@ -177,7 +178,23 @@ class PackBuilderView(OwnPackMixin, TemplateView):
         pack = self.get_pack()
         context.update(_items_context(pack), **_share_context(self.request, pack))
         context.update(_suggestions_context(self.request.user, pack))
+        context["copied_from"] = _copied_from(self.request.user, pack)
         return context
+
+
+def _copied_from(user, pack: Pack) -> dict | None:
+    """The pack this one was copied from (Copy pack), for the builder's note: its
+    title and owner, and its page when `user` may still read it by slug (public,
+    or their own). None for a pack that wasn't copied, or whose original is gone."""
+    original = pack.copied_from
+    if original is None:
+        return None
+    readable = Pack.objects.visible_to(user).filter(pk=original.pk).exists()
+    return {
+        "title": original.title,
+        "owner": original.owner.get_username(),
+        "url": original.get_public_url() if readable else "",
+    }
 
 
 def _items_context(pack: Pack, **extra) -> dict:
@@ -621,23 +638,36 @@ class PackPageView(TemplateView):
         return _visible_pack(self.request, self.kwargs["slug"])
 
     def page_urls(self, pack: Pack) -> dict:
-        """The page's own address (the crumb) and its downloads'."""
+        """The page's own address (the crumb), its downloads' and Copy pack's."""
         return {
             "page_url": pack.get_public_url(),
             "export_url": reverse("packs:export", args=[pack.slug]),
             "files_url": reverse("packs:files", args=[pack.slug]),
             "attribution_url": reverse("packs:attribution_pack", args=[pack.slug]),
+            "copy_url": reverse("packs:copy", args=[pack.slug]),
         }
+
+    def item_save_url(self, pack: Pack, item: PackItem) -> str:
+        return reverse("packs:save_item", args=[pack.slug, item.pk])
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         pack = self.pack = self.get_pack()
         items = list(pack.ordered_items())
+        user = self.request.user
+        # The reader's own entries for these assets (Save's "In your library"):
+        # only theirs, never anything about the pack owner's.
+        mine = dict(
+            SavedAsset.objects.for_user(user)
+            .filter(asset__in=[item.saved_asset.asset_id for item in items])
+            .values_list("asset_id", "pk")
+        )
         for item in items:
             item.export = manifest_item(item)
             item.needs_credit = not is_cc0(item.asset.license)
             item.credit = credit_line(item.asset)
-        user = self.request.user
+            item.save_url = self.item_save_url(pack, item)
+            item.my_entry_id = mine.get(item.saved_asset.asset_id)
         credits = pack_credits(items)
         urls = self.page_urls(pack)
         context.update(
@@ -649,6 +679,8 @@ class PackPageView(TemplateView):
             credits=credits,
             credits_needed=credits.needing_credit,
             has_files=any(item.export["files"] for item in items),
+            # Copy pack's confirm: how many assets would join the reader's library.
+            copy_missing=sum(1 for item in items if item.my_entry_id is None),
             **urls,
         )
         return context
@@ -690,7 +722,11 @@ class PackSharedView(PackPageView):
             "export_url": reverse("packs:shared_export", args=[pack.share_token]),
             "files_url": reverse("packs:shared_files", args=[pack.share_token]),
             "attribution_url": reverse("packs:shared_attribution", args=[pack.share_token]),
+            "copy_url": reverse("packs:shared_copy", args=[pack.share_token]),
         }
+
+    def item_save_url(self, pack: Pack, item: PackItem) -> str:
+        return reverse("packs:shared_save_item", args=[pack.share_token, item.pk])
 
 
 class PackSharedExportView(View):
@@ -750,3 +786,62 @@ class PackSharedFilesView(View):
 
     def get(self, request, token):
         return _unindexed(_files_reply(request, _shared_pack(token)))
+
+
+# ---------------------------------------------------------------- Save and Copy (Phase 11)
+
+
+class PackReaderWriteMixin(LoginRequiredMixin):
+    """Save an item from, or copy, a pack the member can read: members only, POST
+    with CSRF. The pack comes by slug or, with by_link, by its share link.
+
+    A signed-out visitor goes to sign in and back to the pack's page (an HTMX
+    request redirects the whole window), never to this POST-only URL.
+    """
+
+    http_method_names = ["post"]
+    by_link = False
+
+    def page_url(self) -> str:
+        if self.by_link:
+            return reverse("packs:shared", args=[self.kwargs["token"]])
+        return reverse("packs:public", args=[self.kwargs["slug"]])
+
+    def handle_no_permission(self):
+        login = redirect_to_login(self.page_url())
+        return HttpResponseClientRedirect(login.url) if self.request.htmx else login
+
+    def get_pack(self) -> Pack:
+        """The pack page's reader rule: a 404 for any pack the member can't read."""
+        if self.by_link:
+            return _shared_pack(self.kwargs["token"])
+        return _visible_pack(self.request, self.kwargs["slug"])
+
+
+class PackItemSaveView(PackReaderWriteMixin, View):
+    """Save one item of the pack to the member's library (Save to library).
+
+    The stored Asset is saved through save_asset(): an entry the member has
+    comes back untouched, otherwise a new To review one is made, and no
+    provider is called. HTMX gets the item's "In your library" slot (with the
+    saved count out of band for a new entry); anything else goes back to the
+    pack's page. An item of another pack is a 404.
+    """
+
+    def post(self, request, item_pk, **kwargs):
+        pack = self.get_pack()
+        item = get_object_or_404(pack.items.select_related("saved_asset__asset"), pk=item_pk)
+        entry, created = save_asset(request.user, item.asset)
+        if not _wants_fragment(request):
+            return redirect(self.page_url())
+        item.my_entry_id = entry.pk
+        context = {"item": item, "saved": True, "count_oob": created}
+        return render(request, "packs/partials/item_save.html", context)
+
+
+class PackCopyView(PackReaderWriteMixin, View):
+    """Copy pack: a private copy for the member (copy_pack()), then its builder."""
+
+    def post(self, request, **kwargs):
+        copy = copy_pack(self.get_pack(), request.user)
+        return redirect(copy)

@@ -17,6 +17,7 @@
     <div class="page-hero space-y-3 max-w-2xl">
       <div class="micro text-fg-secondary flex items-center gap-2"><i class="mark w-3" aria-hidden="true"></i>Pack builder</div>
       {% include "packs/partials/pack_title.html" %}
+      {% if copied_from %}<p id="pack-copied-from" class="text-xs text-fg-muted flex items-center gap-1.5">{% include "partials/icon.html" with name="copy" size=12 %}<span>Copied from {% if copied_from.url %}<a href="{{ copied_from.url }}" class="entry-link">{{ copied_from.title }}</a>{% else %}{{ copied_from.title }}{% endif %} by {{ copied_from.owner }}</span></p>{% endif %}
     </div>
 
     <div class="work-toolbar justify-between items-start">
