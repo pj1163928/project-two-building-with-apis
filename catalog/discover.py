@@ -363,16 +363,6 @@ def pending_shelves(kind: str, query: str, filters: DiscoverFilters = NO_FILTERS
     ]
 
 
-def discover_ruler_sections(shelves: list[Shelf]) -> list[tuple[str, str]]:
-    """Discover's sections for the scroll ruler, as (element id, label): the
-    command bar, the type tiles, then each provider's shelf in page order."""
-    return [
-        ("discover-search", "Search"),
-        ("type-tiles", "Types"),
-        *((shelf.dom_id, shelf.name) for shelf in shelves),
-    ]
-
-
 @dataclass(frozen=True)
 class ProviderStatus:
     """A provider's last known status for the status bar: ok, error or unknown."""

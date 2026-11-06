@@ -25,8 +25,13 @@
   </section>
 {% endblock %}
 
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="discover-search" label="Search" %}
+  {% include "partials/ruler_entry.html" with target="type-tiles" label="Types" %}
+  {% for shelf in shelves %}{% include "partials/ruler_entry.html" with target=shelf.dom_id label=shelf.name %}{% endfor %}
+{% endblock %}
 {% block content %}
-  {% include "partials/scroll_ruler.html" %}
   {% include "partials/page_header.html" with label="Discover" heading="Find assets for your next pack." lead="Search free CC0 and Creative Commons libraries, save what fits, and build packs your Axcenity projects can import." %}
 
   {# The command bar. "/" focuses it (shell.js) unless the cursor is already in a text field. #}

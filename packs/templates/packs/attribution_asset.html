@@ -7,6 +7,13 @@
 {# One asset's attribution, the member's own entry only: its license with the formal     #}
 {# terms, the credit it needs, the notice to copy, and the member's packs it's in (each  #}
 {# linking to that pack's attribution). Monochrome: no type colour here.                 #}
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="attribution-asset-title" label="Asset" %}
+  {% include "partials/ruler_entry.html" with target="attribution-asset-license" label="License" %}
+  {% include "partials/ruler_entry.html" with target="attribution-notice" label="Notice" %}
+  {% include "partials/ruler_entry.html" with target="attribution-asset-packs" label="In your packs" %}
+{% endblock %}
 {% block content %}
   {% with info=group.info %}
   <section class="attribution space-y-6">

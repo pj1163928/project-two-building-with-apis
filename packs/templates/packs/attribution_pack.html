@@ -8,6 +8,13 @@
 {# notice to copy, then each license with its formal terms and every item's credit, and  #}
 {# the optional acknowledgements. The pack page's reader rule (packs/attribution.py);    #}
 {# only Pack, PackItem and Asset data, never anyone's notes, ratings or statuses.        #}
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="attribution-pack-title" label="Pack" %}
+  {% if credits.warnings %}{% include "partials/ruler_entry.html" with target="attribution-restrictions-title" label="Restrictions" %}{% endif %}
+  {% if items %}{% include "partials/ruler_entry.html" with target="attribution-notice" label="Notice" %}{% include "partials/ruler_entry.html" with target="attribution-terms-title" label="License terms" %}{% endif %}
+  {% include "partials/ruler_entry.html" with target="page-footer" label="End" %}
+{% endblock %}
 {% block content %}
   <section class="attribution space-y-6">
     <header class="page-hero space-y-3 max-w-2xl">

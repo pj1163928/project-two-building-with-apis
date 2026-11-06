@@ -26,6 +26,12 @@
 {# asks, the lines to paste and the optional thank-yous. Phase 11: each item's Save to   #}
 {# library (packs/partials/item_save.html) and Copy pack (a confirm, then a plain POST)  #}
 {# for members; a visitor gets Sign in links back here. They're the page's only forms.  #}
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="pack-page-title" label="Pack" %}
+  {% if items %}{% include "partials/ruler_entry.html" with target="pack-page-items" label="Items" %}{% endif %}
+  {% include "partials/ruler_entry.html" with target="pack-page-credits" label="Credits" %}
+{% endblock %}
 {% block content %}
   <section class="pack-page space-y-5">
     <header class="page-hero space-y-3 max-w-2xl">

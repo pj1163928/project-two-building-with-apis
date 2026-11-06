@@ -21,6 +21,14 @@ from .models import Pack, PackItem
 HERO_SIZE = 18
 HERO_MINIMUM = 6
 
+# The ring sizes, as a percentage of the orbit's width: the outermost, and the
+# step in to the next.
+OUTER_RING = 86
+RING_STEP = 14
+
+# Kinds whose thumbnails are renders on a transparent background.
+CUTOUT_KINDS = ("texture", "model")
+
 # Each ring's outline is its type's colour. Written out in full so Tailwind
 # finds them; type colours mean the asset's type and nothing else.
 RING_CLASSES = {
@@ -47,6 +55,15 @@ class OrbitThumb:
     def tile(self) -> KindTile:
         return TILES_BY_KIND[self.kind]
 
+    @property
+    def is_cutout(self) -> bool:
+        """Whether the thumbnail is a render on a transparent background (the
+        providers' texture spheres and model renders), shown with no tile
+        behind it so the asset itself floats on the ring."""
+        return bool(
+            self.asset is not None and self.kind in CUTOUT_KINDS and self.asset.thumbnail_url
+        )
+
 
 @dataclass(frozen=True)
 class OrbitRing:
@@ -66,6 +83,12 @@ class OrbitRing:
     @property
     def ring_class(self) -> str:
         return RING_CLASSES[self.kind]
+
+    @property
+    def tile_rem(self) -> float:
+        """How big this ring's tiles are, in rem: bigger further out, so the
+        orbit reads with some depth."""
+        return round(2.4 + self.size / 22, 2)
 
 
 @dataclass(frozen=True)
@@ -121,7 +144,7 @@ def _rings(chosen: dict[str, list[OrbitThumb]]) -> list[OrbitRing]:
     return [
         OrbitRing(
             kind=kind,
-            size=100 - (count - 1 - index) * 20,
+            size=OUTER_RING - (count - 1 - index) * RING_STEP,
             spin=70 + index * 20,
             reverse=index % 2 == 1,
             thumbs=chosen[kind],

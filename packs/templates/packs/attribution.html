@@ -30,6 +30,15 @@
 {# plain words (catalog.licenses), for everyone. Each card gives the formal terms (you   #}
 {# may, you must, you may not) and how to meet them. A member's own pack and asset       #}
 {# attribution are separate pages (packs/attribution.py). Monochrome throughout.         #}
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="page-top" label="Licenses" %}
+  {% include "partials/ruler_entry.html" with target="attribution-symbols" label="Symbols" %}
+  {% include "partials/ruler_entry.html" with target="attribution-glance" label="At a glance" %}
+  {% include "partials/ruler_entry.html" with target="attribution-guide" label="The licenses" %}
+  {% include "partials/ruler_entry.html" with target="attribution-how" label="How to credit" %}
+  {% include "partials/ruler_entry.html" with target="attribution-optional" label="Optional credits" %}
+{% endblock %}
 {% block content %}
   <section class="attribution space-y-8">
     {% include "partials/page_header.html" with label="Attribution center" heading="License guide" lead="What each license lets you do, what it asks in return, and what it forbids. A plain-language guide, not legal advice: the license itself is what counts." compact=True %}

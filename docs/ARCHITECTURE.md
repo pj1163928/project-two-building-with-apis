@@ -596,8 +596,7 @@ workflows), `packs/forms.py` and `packs/views.py`.
 - **`HomeView`** (everyone) answers the gallery's HTMX requests (not
   boosted, not a history restore) with `packs/partials/gallery_results.html`
   and `HX-Push-Url`, as `LibraryView` does. Any other request gets the whole
-  page in the same state, with the orbit hero and the scroll ruler
-  (`home_ruler_sections()`). It sets `panel_start = "collapsed"` (see
+  page in the same state, with the orbit hero. It sets `panel_start = "collapsed"` (see
   FRONTEND.md, "Main page").
 - **The orbit hero** *(Phase 12)*: `packs/hero.py`, `hero_orbit(rng=None)`,
   gives a `HeroOrbit` (its `OrbitRing`s innermost first, each holding
@@ -612,10 +611,13 @@ workflows), `packs/forms.py` and `packs/views.py`.
     can't crowd out the rest: a kind runs short only when it has no more.
     Pass a seeded `random.Random` for a repeatable pick.
   - **The rings:** one per kind with tiles, ordered by how many tiles it holds
-    (the busiest outermost, ties in Discover's order), 20 % steps up to 100 %
-    of the orbit, alternating directions; tiles evenly spaced from a random
-    start. `RING_CLASSES` holds the `border-<kind>` classes in full for
-    Tailwind.
+    (the busiest outermost, ties in Discover's order), `RING_STEP` (14 %) steps
+    up to `OUTER_RING` (86 %) of the orbit, alternating directions, each with its
+    `tile_rem` (bigger further out); tiles evenly spaced from a random start.
+    `RING_CLASSES` holds the `border-<kind>` classes in full for Tailwind.
+    `OrbitThumb.is_cutout` marks textures and models with an image
+    (`CUTOUT_KINDS`), whose renders sit on a transparent background, so the
+    page shows them with no tile behind.
   - **The fallback:** with fewer than `HERO_MINIMUM` (6) distinct assets, four
     rings, one type-icon tile each, opening Discover for that type
     (`discover_url()`).

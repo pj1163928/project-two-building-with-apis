@@ -6,11 +6,17 @@
 {# The same body as the drawer (catalog/partials/entry_detail.html).                         #}
 {# Centred, like the rest of the content: the entry in the main column and what's around #}
 {# it (similar entries, featuring packs, Find more) in a side column on wide screens.     #}
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="entry-title" label="Entry" %}
+  {% include "partials/ruler_entry.html" with target="entry-related" label="Related" %}
+  {% include "partials/ruler_entry.html" with target="page-footer" label="End" %}
+{% endblock %}
 {% block content %}
   <section class="entry-layout">
     {% url 'catalog:library' as library_url %}
     <a href="{{ library_url }}" class="btn btn-quiet btn-sm entry-back">Back to your library</a>
     <div class="entry-page">{% include "catalog/partials/entry_detail.html" with as_page=True %}</div>
-    <aside class="entry-aside" aria-label="Related">{% include "catalog/partials/entry_related.html" with as_page=True %}</aside>
+    <aside class="entry-aside" id="entry-related" aria-label="Related">{% include "catalog/partials/entry_related.html" with as_page=True %}</aside>
   </section>
 {% endblock %}

@@ -28,6 +28,81 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Phase 12 polish: the ruler on every page, an Artcraft-style hero, textures as cut-outs
+
+### Prompts
+
+1. Ok so a few things the rule does not show up in all tabs it only shows up
+   in the home tab can we have it accross all pages, additionally the main hero
+   does not look very detailes and does not show actual textures. wehn showing
+   textures please make sure that the background is removed. I want the text to
+   be in the front and the spinning wheel in the back similar to artcraft
+   (with a screenshot of Artcraft's hero and its right-edge ruler).
+
+### Summary
+
+- **Outcome:**
+  - The scroll ruler is on every page from 80 rem: a full-height scale like
+    Artcraft's (minor ticks, numbered majors, a cursor and ink fill), with the
+    page's own section index. Pages without one get Top and End.
+  - The main page's hero follows Artcraft's: the text centred in front, the
+    rings large behind it, with grey guide rings for depth, bigger tiles further
+    out, faded at the top and bottom and cropped at the page's sides.
+  - Textures and models float as cut-outs (their transparent renders with no
+    tile behind them, a shadow following the shape). HDRIs stay framed.
+  - 1,230 tests pass. `ruff check` and `ruff format` are clean.
+- **Changes:**
+  - `templates/base.html`: the ruler (`nav#scroll-ruler` with `{% block
+    ruler_sections %}`), `#page-top` and `.content-gutter` on the content and
+    footer wrappers.
+  - `templates/partials/ruler_entry.html` and `ruler_scale.html` (new);
+    `partials/scroll_ruler.html` removed.
+  - `ruler_sections` blocks in the main page, Discover, the library, an entry's
+    page, Your packs, the builder, a pack's page, the license guide, a pack's
+    and an asset's attribution, and Settings; `#entry-related` on the entry
+    page's aside.
+  - `packs/views.py` and `catalog/discover.py`/`views.py`: the view-level
+    ruler section functions removed (templates own them now).
+  - `packs/hero.py`: `OUTER_RING`, `RING_STEP`, `CUTOUT_KINDS`,
+    `OrbitRing.tile_rem` and `OrbitThumb.is_cutout`.
+  - `packs/partials/hero_orbit.html` and `packs/home.html`: guide rings,
+    cut-out tiles, the caption at the hero's foot, the text centred in front.
+  - `static/js/scroll-ruler.js`: entries placed level with their sections,
+    missing ones hidden.
+  - `styles/source.css`: the new hero and ruler styles.
+  - `tests/test_scroll_ruler.py` (rewritten for every page) and
+    `tests/test_home_hero.py` (cut-outs, the new pause selector, ring sizes).
+  - `docs/FRONTEND.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md` and the
+    plan's "Phase 12 polish".
+- **Decisions:**
+  - "Background removed" was read as: the providers' texture and model
+    renders already have transparent backgrounds, so drop the tile behind them.
+    Showing the flat colour map instead would mean a 0.5 MB+ file per tile.
+  - Each template declares its own ruler entries beside its sections, under
+    the same conditions, so no entry points at a missing section.
+  - The page's faint mark stays on the main page (the "mark on every page"
+    test from 2026-11-05) but moves below the hero, so the orbit stays free of
+    logos.
+- **Deviations:** the PRD puts the ruler on the main page and Discover only;
+  the user asked for every page.
+- **Sideways:**
+  - A `{% block %}` inside an included partial can't be overridden, so the
+    ruler's markup moved into `base.html` itself.
+  - First tries, caught by headless Firefox screenshots (scratch database):
+    - hiding the mark broke the mark-on-every-page test
+    - the hero's negative top margin was reset by Tailwind's `space-y-8`
+      (fixed with an unlayered rule)
+    - the hero overflowed at phone width
+    - the fade mask clipped tiles at the hero's sides, because a mask paints
+      only inside its own box (the layer now reaches past them)
+    - the ruler's numbers were faint over the glow
+  - Two palette tests refused a mask written with `#000` and then `black`; it
+    uses `ink`.
+  - `test_shell`'s regex reads the first `.hero-atmosphere {` rule, so the new
+    rule moved below the original.
+  - Not checked in a real browser: dragging the pointer over tiles to pause,
+    and the ruler's placement while scrolling.
+
 ## 2026-11-06 — Axcenity Toolbox: Phase 12/13, Orbit hero and scroll ruler
 
 ### Prompts

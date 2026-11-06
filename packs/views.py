@@ -58,7 +58,7 @@ class HomeView(TemplateView):
     through filter_public_packs(), which lists public packs only. The
     gallery's HTMX requests get only the results, with the tidy URL pushed,
     as the library does; any other request gets the whole page in the same state,
-    with the orbit hero (hero_orbit(), public packs only) and the scroll ruler.
+    with the orbit hero (hero_orbit(), public packs only).
     """
 
     template_name = "packs/home.html"
@@ -84,17 +84,10 @@ class HomeView(TemplateView):
         if _wants_fragment(request):
             response = render(request, self.results_template_name, context)
             return push_url(response, context["gallery"].url)
-        # The whole page also gets the orbit hero (public packs only) and the
-        # scroll ruler's sections; a gallery swap needs neither.
-        context.update(hero=hero_orbit(), ruler_sections=home_ruler_sections(request.user))
+        # The whole page also gets the orbit hero (public packs only); a gallery
+        # swap doesn't need it.
+        context["hero"] = hero_orbit()
         return self.render_to_response(context)
-
-
-def home_ruler_sections(user) -> list[tuple[str, str]]:
-    """The main page's sections for the scroll ruler, as (element id, label):
-    the hero, How it works (visitors only, as the page shows it), the gallery."""
-    steps = [] if user.is_authenticated else [("home-steps", "How it works")]
-    return [("home-hero", "Toolbox"), *steps, ("gallery", "Public packs")]
 
 
 class PacksPageMixin(LoginRequiredMixin):

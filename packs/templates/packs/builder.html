@@ -11,6 +11,14 @@
 {# item's Download are zipped in the browser from the providers' URLs (packs:files).     #}
 {# Suggested for this pack reloads on packItemsChanged and on packTagsChanged (a tags     #}
 {# save), and ends with Find more from providers.                                         #}
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="pack-title" label="Pack" %}
+  {% include "partials/ruler_entry.html" with target="pack-details-title" label="Details" %}
+  {% include "partials/ruler_entry.html" with target="pack-items" label="Items" %}
+  {% include "partials/ruler_entry.html" with target="pack-suggestions-title" label="Suggested" %}
+  {% include "partials/ruler_entry.html" with target="pack-add-title" label="Add from library" %}
+{% endblock %}
 {% block content %}
   {% url 'packs:details' pack.pk as details_url %}{% url 'packs:library_search' pack.pk as search_url %}
   <section class="space-y-5">

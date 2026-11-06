@@ -85,7 +85,7 @@ It's a throwaway prototype, so take its look, not its code.
     icon under its thumbnail (Phase 9)
   - the main page's orbit hero (Phase 12): each ring's outline
     (`border-<kind>`, from `packs.hero.RING_CLASSES`), each tile's type
-    icon, and the legend's icons
+    icon, and the legend's icons (never the grey guide rings)
 
   `test_shell.py` keeps them out of the chrome on every page, out of every
   other page's own content (on the main page, out of everything but the
@@ -1069,39 +1069,49 @@ open pack current. With none: "The packs you create are listed here."
     - nothing from anyone's library. Hovering inverts the edge, behind the
       hover gate.
 
-- **Orbit hero** (`#home-orbit`, `packs/partials/hero_orbit.html`, Phase 12):
-  `#home-hero` is two columns from 80 rem (`.home-hero`: the header, search
-  and buttons, then the orbit), stacked below that. From `packs.hero.hero_orbit()`
-  (see ARCHITECTURE.md, "Main page and gallery"):
-  - **Rings:** one `<ul class="orbit-ring border-<kind>">` per type with
-    tiles, a 1 px circle in the type colour, sized `--ring-size` (the busiest
-    outermost, 20 % steps) and turning once per `--spin` (70 s inner, 20 s
-    slower each ring out), neighbours turning opposite ways (`.is-reverse`).
-  - **Tiles:** each `.orbit-arm` (`--angle`) turns its `.orbit-thumb` to its
-    place on the ring; the thumb turns back and its `.orbit-face` counter-spins
-    against the ring, so a 3 rem square tile (2.25 rem on a phone) stays
-    upright while it circles. The face is the provider's thumbnail
-    (`loading="eager"`, as the hero is above the fold; `referrerpolicy=
-    "no-referrer"`, `data-thumb-fallback`) over the type icon. Each tile links
-    to the newest public pack holding the asset, named in `aria-label` and
-    `title` ("<asset>, in <pack>").
-  - **Pausing:** hovering the orbit or keyboard focus inside it
-    (`:focus-within`) pauses every ring and face (`animation-play-state:
-    paused`), so a tile holds still to be clicked. Reduced motion stills them
-    (`animation: none`). Tile hover (behind the hover gate) and focus put an
-    ink edge round the face.
-  - **No logo:** nothing in the orbit is the mark or the wordmark, and a
-    panel-coloured disc (`.orbit-stage::before`) sits behind the rings, so the
-    page's faint `.hero-mark` never shows through near a thumbnail.
-  - **Legend and note:** `#home-orbit-legend` names each ring's type with its
-    icon; `#home-orbit-note` reads "42 assets from 6 public packs, one ring per
-    type. Click a thumbnail to open its pack."
-  - **Fallback** (`.orbit.is-fallback`, fewer than 6 assets in public
-    packs): four rings, one type-icon tile each, opening Discover for that
-    type; the note says "Public packs will orbit here."
-- **Scroll ruler** (`#scroll-ruler`, Phase 12): see "Scroll ruler" below.
-  Its sections are Toolbox (`#home-hero`), How it works (`#home-steps`,
-  visitors only) and Public packs (`#gallery`).
+- **Orbit hero** (`#home-orbit`, `packs/partials/hero_orbit.html`, Phase 12; after
+  Artcraft's hero at the user's request, 2026-11-06): the text is centred in
+  front (`#home-hero-text`: the header, search and buttons, on a soft
+  panel-coloured pool so it reads over the rings) and the orbit turns behind it,
+  filling the hero. The hero reaches up to the content's top edge (an unlayered
+  `margin-top`, as `space-y-8` would reset a component one), clips the rings
+  above and below with a soft fade (a mask on `.orbit`), and the page clips them
+  at its sides (`.content-stage` gets `overflow-x: clip` on this page). The text
+  comes first in the HTML, so the keyboard reaches the search before the orbit.
+  From `packs.hero.hero_orbit()` (see ARCHITECTURE.md, "Main page and gallery"):
+  - **Rings:** a square stage (`clamp(46rem, 84vw, 104rem)`) centred just above
+    the hero's middle. Seven faint grey `.orbit-guide` rings (some dashed) for
+    depth; over them one `<ul class="orbit-ring border-<kind>">` per type with
+    tiles, a 1.5 px circle in the type colour, sized `--ring-size` (44–86 %, the
+    busiest outermost) and turning once per `--spin` (70 s inner, 20 s slower each
+    ring out), neighbours turning opposite ways (`.is-reverse`).
+  - **Tiles:** `--tile` rem across (`OrbitRing.tile_rem`, bigger further out;
+    × 0.62 on a phone). Each `.orbit-arm` (`--angle`) turns its `.orbit-thumb` to
+    its place; the thumb turns back and its `.orbit-face` counter-spins against
+    the ring, so it stays upright. Textures and models are **cut-outs**
+    (`.is-cutout`, `OrbitThumb.is_cutout`): the providers' renders on a
+    transparent background, 1.3× bigger, with no tile behind them and a
+    drop-shadow that follows their shape (user request: "the background is
+    removed"). If the image is missing or fails, the framed tile and type icon
+    come back (`:has(img)`). HDRIs are framed squares; an asset with no image
+    (most sounds) shows its type icon. Images load eagerly (`referrerpolicy=
+    "no-referrer"`, `data-thumb-fallback`). Each tile links to the newest public
+    pack holding the asset, named in `aria-label` and `title`.
+  - **Pausing:** hovering a tile (`.orbit:has(.orbit-thumb:hover)`) or keyboard
+    focus inside the orbit pauses every ring and face. Reduced motion stills them.
+    Only the tiles and the caption take the pointer; the text's own controls sit
+    above.
+  - **No logo:** nothing in the orbit is the mark or the wordmark. The page's
+    faint `.hero-mark` stays (every page has it) but moves below the hero here
+    (`translate: 0 58rem`), so it never shows among the thumbnails.
+  - **Caption** (`.orbit-caption`, at the hero's foot): `#home-orbit-legend` names
+    each ring's type with its icon; `#home-orbit-note` reads "42 assets from 6
+    public packs, one ring per type. Click a thumbnail to open its pack."
+  - **Fallback** (`.orbit.is-fallback`, fewer than 6 assets in public packs):
+    four rings, one type-icon tile each, opening Discover for that type; the note
+    says "Public packs will orbit here."
+- **Scroll ruler:** see "Scroll ruler". Its sections are Toolbox (`#home-hero`),
+  How it works (`#home-steps`, visitors only) and Public packs (`#gallery`).
 
 **The side panel starts collapsed here** (PRD), whatever the member chose
 elsewhere:
@@ -1117,31 +1127,39 @@ elsewhere:
 
 ## Scroll ruler
 
-*(Phase 12.)* `templates/partials/scroll_ruler.html` and
-`static/js/scroll-ruler.js`, on the main page and Discover only. A view
-passes `ruler_sections`, (element id, label) pairs in page order
-(`packs.views.home_ruler_sections()`, `catalog.discover.discover_ruler_sections()`).
+*(Phase 12; on every page at the user's request, 2026-11-06.)* In `base.html`,
+from 80 rem only (`hidden xl:flex`), with `static/js/scroll-ruler.js`.
 
 - **Where:** `nav#scroll-ruler` (`aria-label="Sections on this page"`), fixed
-  to the right edge of the content, centred vertically, 18 rem tall at most.
-  Wide screens only (`hidden xl:flex`, 80 rem). While it's on the page,
-  `.content-body` (the shell's content wrapper) gets 6 rem of right padding
-  from 80 rem, so nothing runs under it (an unlayered rule, as the wrapper's
-  `lg:px-12` utility would beat a component one).
-- **What:** an `<ol>` of `.scroll-ruler-link`s, each a number (`01`…), a short
-  tick, and a label that slides out to the left on hover (behind the hover
-  gate) or keyboard focus; beside them a ticked `.scroll-ruler-track` whose
-  2 px ink `.scroll-ruler-fill` grows with the scroll (`--ruler-progress`).
-  Monochrome: it's chrome.
-- **Without JavaScript:** each link is a plain `#id` anchor (htmx never
-  boosts those, and the nav says `hx-boost="false"`), so it still jumps.
-- **With it:** `scroll-ruler.js` follows `#content`'s scroll (the page's
-  scroll container; a capture-phase listener, as scroll doesn't bubble) and
-  each swap (`htmx.onLoad`): the fill, and `aria-current="true"` on the
-  section in view (the last whose top has passed a third of the way down, or
-  the last at the very end). A click scrolls smoothly (instantly under
-  reduced motion), focuses the section and puts its `#id` in the address
-  bar. Targets have `scroll-margin-top: 1.5rem`.
+  down the content's right edge between the title and status bars. The content
+  and the footer (`.content-gutter`) get 6 rem of right padding from 80 rem, so
+  nothing runs under it (an unlayered rule, as `lg:px-12` would beat a component
+  one). A panel-coloured halo keeps its text readable over the glow.
+- **The scale** (`partials/ruler_scale.html`, after Artcraft's ruler): a spine
+  with a minor tick every 2 % and a numbered major every 10 % (0, 5 … 50), an
+  ink fill and a cursor at the scroll position (`--ruler-progress`). Monochrome.
+- **The section index:** each page lists its sections in `{% block
+  ruler_sections %}`, one `partials/ruler_entry.html` each (`target`, `label`),
+  under the same `{% if %}` as the sections themselves, so an entry is only there
+  when its section is. The default is Top (`#page-top`, the content wrapper) and
+  End (`#page-footer`). Today: the main page; Discover (Search, Types, each
+  shelf); the library (Library, Results); an entry's page (Entry, Related, End);
+  Your packs; the builder (Pack, Details, Items, Suggested, Add from library); a
+  pack's page (Pack, Items when it has any, Credits); the license guide; a pack's
+  and an asset's attribution; Settings (Settings, Appearance, Download defaults).
+  Numbers are a CSS counter (`01`, `02`…); a label slides out on hover (behind
+  the hover gate) or keyboard focus. Every `[id]` in the content has
+  `scroll-margin-top: 1.5rem`.
+- **Without JavaScript:** each entry is a plain `#id` anchor (htmx never boosts
+  those, and the nav says `hx-boost="false"`), evenly spaced down the ruler, and
+  still jumps.
+- **With it:** `scroll-ruler.js` follows `#content`'s scroll (a capture-phase
+  listener) and each swap (`htmx.onLoad`): the fill and cursor; each entry placed
+  level with where its section starts in the page (`--at`, `[data-placed]`), at
+  least 28 px apart; an entry whose section isn't on the page hidden; and
+  `aria-current="true"` on the section in view. A click scrolls smoothly
+  (instantly under reduced motion), focuses the section and puts its `#id` in the
+  address bar.
 
 ## Discover
 

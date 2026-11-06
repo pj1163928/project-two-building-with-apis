@@ -6,6 +6,12 @@
 {# 2026-11-06). The Grid and List switch in the toolbar are links (?layout=), and  #}
 {# the choice is kept in the member's session (packs.views.pack_layout). Both show #}
 {# the same facts; the title opens the builder and View page the pack's page.      #}
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="page-top" label="Your packs" %}
+  {% if packs %}{% include "partials/ruler_entry.html" with target="pack-list" label="Packs" %}{% endif %}
+  {% include "partials/ruler_entry.html" with target="page-footer" label="End" %}
+{% endblock %}
 {% block content %}
   {% url 'packs:create' as new_pack_url %}{% url 'packs:list' as list_url %}
   <section class="space-y-5">

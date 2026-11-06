@@ -753,58 +753,96 @@
   .gallery-card-summary { margin-top: auto; padding-top: 0.25rem; }
   .pack-card-page { position: relative; z-index: 1; color: var(--color-fg-secondary); text-decoration: underline; text-underline-offset: 2px; }
   html[data-pointer] .pack-card-page:hover, .pack-card-page:focus-visible { color: var(--color-fg-strong); outline: none; }
-  /* The orbit hero (Phase 12): the main page's hero is two columns from 80 rem (the text
-     and search, then the orbit), stacked below that. One ring per type, outlined in its
-     type colour (the ring's border-<kind> class), the busiest outermost. Each arm turns
-     its tile to its angle on the ring; the tile turns back, and its face counter-spins
-     against the ring, so every thumbnail stays upright as the ring goes round. Hover or
-     keyboard focus anywhere in the orbit pauses it, so a tile holds still to be clicked;
-     reduced motion stills it. Square tiles, never a logo. */
-  .home-hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2.5rem; align-items: center; }
-  @media (min-width: 80rem) { .home-hero { grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem); } }
-  .orbit { display: grid; justify-items: center; gap: 0.9rem; padding-block: 1.75rem 0; }
-  /* The outer ring's tiles reach 1.6 rem past the stage, so it leaves them room. */
-  .orbit-stage { position: relative; width: min(100% - 3.5rem, 30rem); aspect-ratio: 1 / 1; margin-bottom: 1.75rem; }
-  /* A disc of the panel colour behind the rings, so the page's faint mark (and the glow)
-     never shows inside the orbit: no logo near a thumbnail. */
-  .orbit-stage::before { content: ""; position: absolute; inset: -2.5rem; border-radius: 50%;
-    background: radial-gradient(circle closest-side, var(--color-panel) 80%, transparent); pointer-events: none; }
-  .orbit-ring { position: absolute; left: 50%; top: 50%; width: var(--ring-size); aspect-ratio: 1 / 1; margin: 0; padding: 0;
-    list-style: none; translate: -50% -50%; border-width: 1px; border-style: solid; border-radius: 50%;
+  /* The orbit hero (Phase 12; after Artcraft's hero, user request 2026-11-06). The text
+     sits centred in front (.home-hero-text, on a soft panel-coloured pool so it reads over
+     the rings); the orbit (#home-orbit) fills the hero behind it. The hero reaches the top
+     of the content and clips the rings above and below; the page clips them at its sides.
+     The stage is a square wider than the hero, centred on the text: grey guide rings for
+     depth, then one ring per type, outlined in its type colour (border-<kind>), the busiest
+     outermost, its tiles --tile rem across (bigger further out). Each arm turns its tile to
+     its angle; the tile turns back, and its face counter-spins against the ring, so every
+     thumbnail stays upright as the ring goes round. Textures and models float as cut-outs
+     (.is-cutout: their transparent renders, no tile, a shadow that follows the shape);
+     HDRIs are framed squares; no image shows the type icon. A hovered tile, or keyboard
+     focus in the orbit, pauses it; reduced motion stills it. No logo: the page's faint
+     mark sits below the hero here. Only the tiles and the caption take the pointer, and the text's
+     own controls sit above them. */
+  .home-hero { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center;
+    min-height: clamp(38rem, 86vh, 54rem); padding: 6rem 0 9rem; overflow-x: visible; overflow-y: clip; }
+  #content:has(#home-orbit) .content-stage { overflow-x: clip; }
+  .home-hero-text { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2rem;
+    width: 100%; max-width: 46rem; text-align: center; pointer-events: none; }
+  .home-hero-text::before { content: ""; position: absolute; inset: -6rem -9rem; z-index: -1; pointer-events: none;
+    background: radial-gradient(closest-side, var(--color-panel) 45%, color-mix(in srgb, var(--color-panel) 70%, transparent) 70%, transparent); }
+  .home-hero-text :is(a, button, input, label, form) { pointer-events: auto; }
+  .home-hero-text .page-hero { margin-inline: auto; }
+  .home-hero-text .page-hero > div:first-child { justify-content: center; }
+  .home-hero-text .page-hero p { margin-inline: auto; }
+  .home-hero-text .hero-search { width: 100%; }
+  /* The layer reaches past the hero's sides (a mask paints only inside its own box); the
+     page clips it at the content's edges. */
+  .orbit { position: absolute; inset: 0 -50vw; z-index: 1; pointer-events: none;
+    mask-image: linear-gradient(to bottom, transparent, var(--color-ink) 5rem, var(--color-ink) calc(100% - 5rem), transparent); }
+  .orbit-stage { position: absolute; left: 50%; top: 44%; width: clamp(46rem, 84vw, 104rem); aspect-ratio: 1 / 1; translate: -50% -50%; }
+  .orbit-guide, .orbit-ring { position: absolute; left: 50%; top: 50%; width: var(--ring-size); aspect-ratio: 1 / 1;
+    translate: -50% -50%; border-radius: 50%; }
+  .orbit-guide { border: 1px solid var(--color-line); }
+  .orbit-guide.is-dashed { border-style: dashed; border-color: var(--color-line-strong); opacity: 0.6; }
+  .orbit-ring { margin: 0; padding: 0; list-style: none; border-width: 1.5px; border-style: solid;
     animation: orbit-spin var(--spin) linear infinite; }
   .orbit-ring.is-reverse { animation-direction: reverse; }
   .orbit-arm { position: absolute; inset: 0; rotate: var(--angle); pointer-events: none; }
-  .orbit-thumb { position: absolute; left: 50%; top: 0; display: block; width: 3rem; height: 3rem;
+  .orbit-thumb { --size: calc(var(--tile) * var(--tile-scale, 1) * 1rem);
+    position: absolute; left: 50%; top: 0; display: block; width: var(--size); height: var(--size);
     translate: -50% -50%; rotate: calc(-1 * var(--angle)); pointer-events: auto; outline: none; }
   .orbit-face { position: relative; display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden;
-    background: var(--color-inset); box-shadow: 0 0 0 1px var(--color-line-strong), 0 6px 18px var(--color-shade);
+    background: var(--color-inset); box-shadow: 0 0 0 1px var(--color-line-strong), 0 10px 26px var(--color-shade);
     animation: orbit-spin var(--spin) linear infinite reverse; transition: box-shadow 0.15s; }
   .orbit-ring.is-reverse .orbit-face { animation-direction: normal; }
-  .orbit-face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  html[data-pointer] .orbit-thumb:hover .orbit-face { box-shadow: 0 0 0 2px var(--color-ink), 0 6px 18px var(--color-shade); }
+  .orbit-face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: scale 0.2s; }
+  .orbit-face .result-fallback { opacity: 0.9; }
+  html[data-pointer] .orbit-thumb:hover .orbit-face { box-shadow: 0 0 0 2px var(--color-ink), 0 10px 26px var(--color-shade); }
   .orbit-thumb:focus-visible .orbit-face { box-shadow: 0 0 0 2px var(--color-ink), 0 0 0 4px var(--color-panel); }
-  .orbit:hover .orbit-ring, .orbit:hover .orbit-face,
+  /* Cut-outs: the render alone, a little bigger, its shadow following its shape. If its
+     image is missing or fails (shell.js removes it), the framed tile and type icon return. */
+  .orbit-thumb.is-cutout { --size: calc(var(--tile) * var(--tile-scale, 1) * 1.3rem); }
+  .orbit-thumb.is-cutout .orbit-face:has(img) { overflow: visible; background: none; box-shadow: none; }
+  .orbit-thumb.is-cutout .orbit-face:has(img) .result-fallback { display: none; }
+  .orbit-thumb.is-cutout img { object-fit: contain; filter: drop-shadow(0 12px 16px var(--color-shade)); }
+  html[data-pointer] .orbit-thumb.is-cutout:hover img { scale: 1.08; }
+  .orbit-thumb.is-cutout:focus-visible .orbit-face:has(img) { box-shadow: none; outline: 2px solid var(--color-ink); outline-offset: 2px; }
+  .orbit:has(.orbit-thumb:hover) .orbit-ring, .orbit:has(.orbit-thumb:hover) .orbit-face,
   .orbit:focus-within .orbit-ring, .orbit:focus-within .orbit-face { animation-play-state: paused; }
-  .orbit.is-fallback .orbit-thumb { width: 2.75rem; height: 2.75rem; }
-  @media (max-width: 40rem) { .orbit-thumb { width: 2.25rem; height: 2.25rem; } }
   .orbit.is-fallback .orbit-face .result-fallback { opacity: 1; }
+  @media (max-width: 40rem) { .orbit { --tile-scale: 0.62; } }
+  .orbit-caption { position: absolute; left: 50%; bottom: 2.25rem; z-index: 2; display: grid; justify-items: center; gap: 0.6rem;
+    width: min(100%, 34rem); translate: -50% 0; padding: 0.75rem 1rem; pointer-events: auto;
+    background: radial-gradient(closest-side, var(--color-panel) 55%, transparent); }
   .orbit-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem 1rem; margin: 0; padding: 0;
     list-style: none; color: var(--color-fg-secondary); }
   .orbit-legend li { display: inline-flex; align-items: center; gap: 0.4rem; }
-  .orbit-note { max-width: 26rem; text-align: center; text-shadow: 0 1px 6px var(--color-shade); }
+  .orbit-note { max-width: 30rem; text-align: center; }
   @keyframes orbit-spin { to { transform: rotate(360deg); } }
-  /* The scroll ruler (Phase 12), on the main page and Discover, wide screens only
-     (xl:flex): fixed to the content's right edge, a column of numbered section links
-     beside a ticked track whose ink fill follows the scroll (--ruler-progress, set by
-     scroll-ruler.js). A link's label slides out on hover or keyboard focus; the section
-     in view gets aria-current="true". Monochrome chrome. */
-  .scroll-ruler { position: fixed; right: 1.1rem; top: 50%; z-index: 15; gap: 0.55rem; height: min(18rem, 56vh);
-    translate: 0 -50%; pointer-events: none; }
-  .scroll-ruler-index { display: flex; flex-direction: column; justify-content: space-between; margin: 0; padding: 0; list-style: none; }
-  .scroll-ruler-link { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 0.45rem; height: 1.5rem;
+  /* The scroll ruler (Phase 12; on every page at the user's request, 2026-11-06), from
+     80 rem only (xl:flex): fixed down the content's right edge, between the title and
+     status bars. The scale (partials/ruler_scale.html) has a minor tick every 2 % and a
+     numbered major every 10 %, an ink fill and a cursor at the scroll position
+     (--ruler-progress, from scroll-ruler.js). Left of it, the page's section index:
+     evenly spaced without JavaScript; scroll-ruler.js places each entry level with its
+     section's place in the page ([data-placed], --at). An entry's number is a CSS
+     counter; its label slides out on hover or keyboard focus; the section in view gets
+     aria-current="true". Monochrome chrome. */
+  .scroll-ruler { position: fixed; right: 0.75rem; top: 4.25rem; bottom: 2.75rem; z-index: 15; gap: 0.5rem; pointer-events: none;
+    text-shadow: 0 0 4px var(--color-panel), 0 0 10px var(--color-panel); }
+  .scroll-ruler-index { position: relative; display: flex; flex-direction: column; justify-content: space-between;
+    margin: 0; padding: 0; list-style: none; counter-reset: ruler; }
+  .scroll-ruler[data-placed] .scroll-ruler-index { display: block; width: 2.6rem; }
+  .scroll-ruler[data-placed] .scroll-ruler-index > li { position: absolute; right: 0; top: var(--at, 0); translate: 0 -50%; }
+  .scroll-ruler-link { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; height: 1.5rem;
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1;
-    color: var(--color-fg-muted); pointer-events: auto; outline: none; }
-  .scroll-ruler-label { position: absolute; right: calc(100% + 0.4rem); padding: 0.4rem 0.5rem 0.3rem; white-space: nowrap;
+    color: var(--color-fg-secondary); pointer-events: auto; outline: none; counter-increment: ruler; }
+  .scroll-ruler-number::before { content: counter(ruler, decimal-leading-zero); }
+  .scroll-ruler-label { position: absolute; right: calc(100% + 0.4rem); padding: 0.4rem 0.5rem 0.3rem; white-space: nowrap; text-shadow: none;
     background: var(--color-ink); color: var(--color-on-ink); opacity: 0; translate: 0.35rem 0; pointer-events: none;
     transition: opacity 0.15s, translate 0.15s; }
   html[data-pointer] .scroll-ruler-link:hover .scroll-ruler-label, .scroll-ruler-link:focus-visible .scroll-ruler-label { opacity: 1; translate: 0 0; }
@@ -812,13 +850,18 @@
   .scroll-ruler-link:focus-visible .scroll-ruler-number { box-shadow: 0 2px 0 var(--color-ink); }
   .scroll-ruler-tick { width: 0.5rem; height: 1px; background: currentColor; transition: width 0.15s; }
   .scroll-ruler-link[aria-current="true"] .scroll-ruler-tick { width: 0.9rem; background: var(--color-ink); }
-  .scroll-ruler-track { position: relative; width: 0.4rem;
-    background: repeating-linear-gradient(to bottom, var(--color-line-strong) 0 1px, transparent 1px 0.6rem); }
-  .scroll-ruler-track::before { content: ""; position: absolute; inset: 0 0 0 auto; width: 1px; background: var(--color-line-strong); }
-  .scroll-ruler-fill { position: absolute; inset: 0 0 0 auto; width: 2px; background: var(--color-ink);
+  .scroll-ruler-scale { position: relative; width: 1.6rem;
+    background: repeating-linear-gradient(to bottom, var(--color-line-strong) 0 1px, transparent 1px 2%) left / 0.35rem 100% no-repeat; }
+  .scroll-ruler-scale::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 1px; background: var(--color-line-strong); }
+  .scroll-ruler-major { position: absolute; left: 0; top: var(--at); display: flex; align-items: center; gap: 0.3rem; translate: 0 -50%;
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; line-height: 1; color: var(--color-fg-muted); }
+  .scroll-ruler-major::before { content: ""; width: 0.65rem; height: 1px; background: var(--color-fg-muted); }
+  .scroll-ruler-fill { position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--color-ink);
     transform: scaleY(var(--ruler-progress, 0)); transform-origin: top; }
-  #home-hero, #home-steps, #gallery, #discover-search, #type-tiles, .shelf { scroll-margin-top: 1.5rem; }
-  #home-hero:focus, #home-steps:focus, #gallery:focus, #type-tiles:focus, .shelf:focus { outline: none; }
+  .scroll-ruler-cursor { position: absolute; left: -0.3rem; top: calc(var(--ruler-progress, 0) * 100%); width: 0.95rem; height: 2px;
+    translate: 0 -50%; background: var(--color-ink); }
+  .content-body [id] { scroll-margin-top: 1.5rem; }
+  .content-body [tabindex="-1"]:focus { outline: none; }
   /* Your packs as a list (user request, 2026-11-06): one row per pack, the same facts as a
      card, the title's link stretched over the row. The toolbar's Grid / List switch is
      two square options, the current one inverted. */
@@ -1344,11 +1387,17 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
 #content[data-surface="showcase"] .ambient { opacity: 0.52; }
 #content[data-surface="work"] .hero-atmosphere { height: 18rem; }
 #content[data-surface="work"] .hero-mark { top: -3.5rem; right: -3rem; width: min(22rem, 30%); opacity: 0.06; }
+/* The main page's hero (Phase 12) reaches up to the content's top edge. Outside the layers,
+   so space-y-8's margin utility doesn't reset it. */
+.content-body > .home-hero { margin-top: -3.5rem; }
+/* The main page (Phase 12): the faint mark stays (every page has it) but moves below the
+   hero, so it never shows among the orbit's thumbnails. The hero is at most about 54 rem. */
+#content:has(#home-orbit) .hero-atmosphere { translate: 0 58rem; }
 #content[data-surface="work"] .ambient-blob { animation-duration: calc(var(--drift) * 1.15); }
 
-/* A page with the scroll ruler (Phase 12) keeps its content clear of it. Outside the
-   layers, so it beats the wrapper's lg:px-12 utility. */
-@media (min-width: 80rem) { #content:has(#scroll-ruler) .content-body { padding-right: 6rem; } }
+/* The scroll ruler (Phase 12) is on every page from 80 rem, so the content and footer
+   keep clear of it. Outside the layers, so it beats the wrappers' lg:px-12 utility. */
+@media (min-width: 80rem) { .content-gutter { padding-right: 6rem; } }
 
 /* Keep the brand signature readable over the brightest ink. The filter
    sits on the wrapper because the wordmark's own mask would clip it. */
@@ -1366,6 +1415,7 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .card-action, .card-tip, .picker-close, .picker-pack, .pack-card, .gallery-card, .panel-action { transition: none; }
   .orbit-ring, .orbit-face { animation: none; }
   .orbit-face, .scroll-ruler-label, .scroll-ruler-tick { transition: none; }
+  .orbit-thumb img { transition: none; }
   .card-actions .htmx-request .card-action, .card-actions .htmx-request.card-action { animation: none; }
   .drawer-dialog[open] { animation: none; }
   .rate-star, .entry-notes, .entry-link { transition: none; }

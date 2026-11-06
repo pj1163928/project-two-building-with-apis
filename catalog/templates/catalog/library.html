@@ -34,6 +34,11 @@
   </section>
 {% endblock %}
 
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="page-top" label="Library" %}
+  {% include "partials/ruler_entry.html" with target="library-results" label="Results" %}
+{% endblock %}
 {% block content %}
   <section class="space-y-5">
     {% include "partials/page_header.html" with label="Library" heading="Your library." lead="Everything you save from Discover lands here, with your notes, ratings and statuses." compact=True %}

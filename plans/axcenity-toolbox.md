@@ -1254,7 +1254,28 @@ section index.
 > counts sit in a note under the legend (in the centre they collided with the
 > inner ring). Checked in headless Firefox, light and dark, at 1600, 1100 and
 > 420 px against a scratch copy of the seeded demo.
->
+
+### Phase 12 polish (2026-11-06, at the user's request)
+
+Added after the phase. It goes beyond the PRD's ruler on "the main page and
+Discover".
+
+- [x] **Ruler on every page:** the ruler is in `base.html`, a full-height scale
+  after Artcraft's (minor ticks, numbered majors, a cursor), with each page's
+  section index in `{% block ruler_sections %}` (Top and End by default). The
+  content and footer keep a 6 rem gutter from 80 rem.
+- [x] **Hero after Artcraft's:** the text centred in front, the rings big behind
+  it (grey guide rings for depth, the type rings 44–86 %), bigger tiles further
+  out, faded at the top and bottom and cropped at the page's sides.
+- [x] **Textures with no background:** textures and models float as cut-outs
+  (their transparent renders, no tile, a shadow that follows the shape); HDRIs
+  stay framed.
+- [x] The page's faint mark stays on the main page but moves below the hero, so
+  it never sits among the thumbnails (the 2026-11-05 "mark on every page" test
+  still holds).
+- [x] Standard gate (see top). Access rules: unchanged; the ruler is chrome and
+  shows nothing from anyone's library.
+
 > **For Phase 13:** the orbit and the ruler already turn their motion off under
 > reduced motion; Phase 13's sweep should keep them in its list. **Still open
 > from Phase 7:** after Add to pack on Discover saves a result, its Save corner

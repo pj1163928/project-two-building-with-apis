@@ -8,6 +8,12 @@
 {# Download defaults: one form per group of chips, each posting only its own field to    #}
 {# accounts:download_preferences on change, so there's no Save button. The maps group   #}
 {# sends maps_posted too, so unticking every map is still a change (and refused).       #}
+{# The scroll ruler's section index (base.html). #}
+{% block ruler_sections %}
+  {% include "partials/ruler_entry.html" with target="page-top" label="Settings" %}
+  {% include "partials/ruler_entry.html" with target="appearance" label="Appearance" %}
+  {% include "partials/ruler_entry.html" with target="download-defaults" label="Download defaults" %}
+{% endblock %}
 {% block content %}
 <div class="account-page max-w-3xl mx-auto w-full space-y-8">
   {% include "partials/page_header.html" with label="Settings" heading="Settings." compact=True %}

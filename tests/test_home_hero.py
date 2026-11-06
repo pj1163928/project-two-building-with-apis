@@ -6,12 +6,13 @@ App tests, so provider functions are never reached.
 """
 
 import random
+import re
 from itertools import pairwise
 
 import pytest
 
 from catalog.models import SavedAsset
-from packs.hero import hero_orbit
+from packs.hero import OUTER_RING, hero_orbit
 from packs.models import Pack
 from packs.services import add_to_pack
 
@@ -178,7 +179,7 @@ def test_the_busiest_ring_is_outermost_and_each_ring_is_its_type_colour(asset_ma
     orbit = hero_orbit(random.Random(3))
     assert [ring.kind for ring in orbit.rings] == ["sound", "texture", "hdri", "model"]
     sizes = [ring.size for ring in orbit.rings]
-    assert sizes == sorted(sizes) and sizes[-1] == 100 and len(set(sizes)) == 4
+    assert sizes == sorted(sizes) and sizes[-1] == OUTER_RING and len(set(sizes)) == 4
     assert [ring.ring_class for ring in orbit.rings] == [
         "border-sound",
         "border-texture",
@@ -220,7 +221,9 @@ def test_the_page_shows_the_orbit_to_visitors_and_members(client, member, public
     if signed_in:
         client.force_login(member)
     orbit = _orbit_html(client.get("/").content.decode())
-    assert orbit.count('class="orbit-thumb"') == 7
+    assert len(re.findall(r'class="orbit-thumb[ "]', orbit)) == 7
+    # Textures float as cut-outs; sounds (no image here) keep their framed tile.
+    assert orbit.count('class="orbit-thumb is-cutout"') == 4
     assert orbit.count(f'href="{public_kit.get_public_url()}"') == 7
     assert 'referrerpolicy="no-referrer"' in orbit
     assert "7 assets from 1 public pack, one ring per type." in orbit
@@ -280,8 +283,6 @@ def test_with_few_assets_the_page_shows_the_four_type_tiles(client, asset_maker,
 
 
 def test_type_colour_in_the_orbit_is_only_its_rings_icons_and_legend(client, public_kit):
-    import re
-
     orbit = _orbit_html(client.get("/").content.decode())
     classes = " ".join(re.findall(r'class="([^"]*)"', orbit))
     tokens = re.findall(r"\b[\w:-]*-(?:texture|hdri|model|sound)\b", classes)
@@ -300,7 +301,8 @@ def test_the_orbit_pauses_on_hover_and_focus_and_stills_for_reduced_motion():
     from django.conf import settings
 
     css = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
-    assert ".orbit:hover .orbit-ring" in css and ".orbit:focus-within .orbit-ring" in css
+    assert ".orbit:has(.orbit-thumb:hover) .orbit-ring" in css
+    assert ".orbit:focus-within .orbit-ring" in css
     assert "animation-play-state: paused" in css
     reduced = css.split("@media (prefers-reduced-motion: reduce)")
     assert any(".orbit-ring, .orbit-face { animation: none; }" in block for block in reduced[1:])
