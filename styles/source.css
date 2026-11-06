@@ -753,6 +753,72 @@
   .gallery-card-summary { margin-top: auto; padding-top: 0.25rem; }
   .pack-card-page { position: relative; z-index: 1; color: var(--color-fg-secondary); text-decoration: underline; text-underline-offset: 2px; }
   html[data-pointer] .pack-card-page:hover, .pack-card-page:focus-visible { color: var(--color-fg-strong); outline: none; }
+  /* The orbit hero (Phase 12): the main page's hero is two columns from 80 rem (the text
+     and search, then the orbit), stacked below that. One ring per type, outlined in its
+     type colour (the ring's border-<kind> class), the busiest outermost. Each arm turns
+     its tile to its angle on the ring; the tile turns back, and its face counter-spins
+     against the ring, so every thumbnail stays upright as the ring goes round. Hover or
+     keyboard focus anywhere in the orbit pauses it, so a tile holds still to be clicked;
+     reduced motion stills it. Square tiles, never a logo. */
+  .home-hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2.5rem; align-items: center; }
+  @media (min-width: 80rem) { .home-hero { grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem); } }
+  .orbit { display: grid; justify-items: center; gap: 0.9rem; padding-block: 1.75rem 0; }
+  /* The outer ring's tiles reach 1.6 rem past the stage, so it leaves them room. */
+  .orbit-stage { position: relative; width: min(100% - 3.5rem, 30rem); aspect-ratio: 1 / 1; margin-bottom: 1.75rem; }
+  /* A disc of the panel colour behind the rings, so the page's faint mark (and the glow)
+     never shows inside the orbit: no logo near a thumbnail. */
+  .orbit-stage::before { content: ""; position: absolute; inset: -2.5rem; border-radius: 50%;
+    background: radial-gradient(circle closest-side, var(--color-panel) 80%, transparent); pointer-events: none; }
+  .orbit-ring { position: absolute; left: 50%; top: 50%; width: var(--ring-size); aspect-ratio: 1 / 1; margin: 0; padding: 0;
+    list-style: none; translate: -50% -50%; border-width: 1px; border-style: solid; border-radius: 50%;
+    animation: orbit-spin var(--spin) linear infinite; }
+  .orbit-ring.is-reverse { animation-direction: reverse; }
+  .orbit-arm { position: absolute; inset: 0; rotate: var(--angle); pointer-events: none; }
+  .orbit-thumb { position: absolute; left: 50%; top: 0; display: block; width: 3rem; height: 3rem;
+    translate: -50% -50%; rotate: calc(-1 * var(--angle)); pointer-events: auto; outline: none; }
+  .orbit-face { position: relative; display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden;
+    background: var(--color-inset); box-shadow: 0 0 0 1px var(--color-line-strong), 0 6px 18px var(--color-shade);
+    animation: orbit-spin var(--spin) linear infinite reverse; transition: box-shadow 0.15s; }
+  .orbit-ring.is-reverse .orbit-face { animation-direction: normal; }
+  .orbit-face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  html[data-pointer] .orbit-thumb:hover .orbit-face { box-shadow: 0 0 0 2px var(--color-ink), 0 6px 18px var(--color-shade); }
+  .orbit-thumb:focus-visible .orbit-face { box-shadow: 0 0 0 2px var(--color-ink), 0 0 0 4px var(--color-panel); }
+  .orbit:hover .orbit-ring, .orbit:hover .orbit-face,
+  .orbit:focus-within .orbit-ring, .orbit:focus-within .orbit-face { animation-play-state: paused; }
+  .orbit.is-fallback .orbit-thumb { width: 2.75rem; height: 2.75rem; }
+  @media (max-width: 40rem) { .orbit-thumb { width: 2.25rem; height: 2.25rem; } }
+  .orbit.is-fallback .orbit-face .result-fallback { opacity: 1; }
+  .orbit-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem 1rem; margin: 0; padding: 0;
+    list-style: none; color: var(--color-fg-secondary); }
+  .orbit-legend li { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .orbit-note { max-width: 26rem; text-align: center; text-shadow: 0 1px 6px var(--color-shade); }
+  @keyframes orbit-spin { to { transform: rotate(360deg); } }
+  /* The scroll ruler (Phase 12), on the main page and Discover, wide screens only
+     (xl:flex): fixed to the content's right edge, a column of numbered section links
+     beside a ticked track whose ink fill follows the scroll (--ruler-progress, set by
+     scroll-ruler.js). A link's label slides out on hover or keyboard focus; the section
+     in view gets aria-current="true". Monochrome chrome. */
+  .scroll-ruler { position: fixed; right: 1.1rem; top: 50%; z-index: 15; gap: 0.55rem; height: min(18rem, 56vh);
+    translate: 0 -50%; pointer-events: none; }
+  .scroll-ruler-index { display: flex; flex-direction: column; justify-content: space-between; margin: 0; padding: 0; list-style: none; }
+  .scroll-ruler-link { position: relative; display: flex; align-items: center; justify-content: flex-end; gap: 0.45rem; height: 1.5rem;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1;
+    color: var(--color-fg-muted); pointer-events: auto; outline: none; }
+  .scroll-ruler-label { position: absolute; right: calc(100% + 0.4rem); padding: 0.4rem 0.5rem 0.3rem; white-space: nowrap;
+    background: var(--color-ink); color: var(--color-on-ink); opacity: 0; translate: 0.35rem 0; pointer-events: none;
+    transition: opacity 0.15s, translate 0.15s; }
+  html[data-pointer] .scroll-ruler-link:hover .scroll-ruler-label, .scroll-ruler-link:focus-visible .scroll-ruler-label { opacity: 1; translate: 0 0; }
+  html[data-pointer] .scroll-ruler-link:hover, .scroll-ruler-link:focus-visible, .scroll-ruler-link[aria-current="true"] { color: var(--color-fg-strong); }
+  .scroll-ruler-link:focus-visible .scroll-ruler-number { box-shadow: 0 2px 0 var(--color-ink); }
+  .scroll-ruler-tick { width: 0.5rem; height: 1px; background: currentColor; transition: width 0.15s; }
+  .scroll-ruler-link[aria-current="true"] .scroll-ruler-tick { width: 0.9rem; background: var(--color-ink); }
+  .scroll-ruler-track { position: relative; width: 0.4rem;
+    background: repeating-linear-gradient(to bottom, var(--color-line-strong) 0 1px, transparent 1px 0.6rem); }
+  .scroll-ruler-track::before { content: ""; position: absolute; inset: 0 0 0 auto; width: 1px; background: var(--color-line-strong); }
+  .scroll-ruler-fill { position: absolute; inset: 0 0 0 auto; width: 2px; background: var(--color-ink);
+    transform: scaleY(var(--ruler-progress, 0)); transform-origin: top; }
+  #home-hero, #home-steps, #gallery, #discover-search, #type-tiles, .shelf { scroll-margin-top: 1.5rem; }
+  #home-hero:focus, #home-steps:focus, #gallery:focus, #type-tiles:focus, .shelf:focus { outline: none; }
   /* Your packs as a list (user request, 2026-11-06): one row per pack, the same facts as a
      card, the title's link stretched over the row. The toolbar's Grid / List switch is
      two square options, the current one inverted. */
@@ -1280,6 +1346,10 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
 #content[data-surface="work"] .hero-mark { top: -3.5rem; right: -3rem; width: min(22rem, 30%); opacity: 0.06; }
 #content[data-surface="work"] .ambient-blob { animation-duration: calc(var(--drift) * 1.15); }
 
+/* A page with the scroll ruler (Phase 12) keeps its content clear of it. Outside the
+   layers, so it beats the wrapper's lg:px-12 utility. */
+@media (min-width: 80rem) { #content:has(#scroll-ruler) .content-body { padding-right: 6rem; } }
+
 /* Keep the brand signature readable over the brightest ink. The filter
    sits on the wrapper because the wordmark's own mask would clip it. */
 .brand-signature { filter: drop-shadow(0 1px 8px color-mix(in srgb, var(--color-shade) 80%, transparent)); }
@@ -1294,6 +1364,8 @@ html[data-panel="collapsed"] .when-collapsed { display: grid; }
   .result-details, .sound-play { transition: none; }
   [data-sound-card][data-sound="loading"] .sound-play { animation: none; }
   .card-action, .card-tip, .picker-close, .picker-pack, .pack-card, .gallery-card, .panel-action { transition: none; }
+  .orbit-ring, .orbit-face { animation: none; }
+  .orbit-face, .scroll-ruler-label, .scroll-ruler-tick { transition: none; }
   .card-actions .htmx-request .card-action, .card-actions .htmx-request.card-action { animation: none; }
   .drawer-dialog[open] { animation: none; }
   .rate-star, .entry-notes, .entry-link { transition: none; }

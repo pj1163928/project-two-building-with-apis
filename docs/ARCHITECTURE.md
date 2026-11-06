@@ -596,8 +596,31 @@ workflows), `packs/forms.py` and `packs/views.py`.
 - **`HomeView`** (everyone) answers the gallery's HTMX requests (not
   boosted, not a history restore) with `packs/partials/gallery_results.html`
   and `HX-Push-Url`, as `LibraryView` does. Any other request gets the whole
-  page in the same state. It sets `panel_start = "collapsed"` (see
+  page in the same state, with the orbit hero and the scroll ruler
+  (`home_ruler_sections()`). It sets `panel_start = "collapsed"` (see
   FRONTEND.md, "Main page").
+- **The orbit hero** *(Phase 12)*: `packs/hero.py`, `hero_orbit(rng=None)`,
+  gives a `HeroOrbit` (its `OrbitRing`s innermost first, each holding
+  `OrbitThumb`s; `is_fallback`; `asset_count` and `pack_count` for the note).
+  - **Only public packs:** the distinct Assets held by items of
+    `Pack.objects.public()` packs, so a private or unlisted pack's asset never
+    gets in, and each tile links to the **newest public pack** holding its
+    asset (`_newest_public_packs()`, which also reads only public packs), so a
+    private or unlisted pack is never the link either.
+  - **The pick:** up to `HERO_SIZE` (18), taken from each kind in turn in
+    Discover's order, each kind's assets shuffled, so a library of textures
+    can't crowd out the rest: a kind runs short only when it has no more.
+    Pass a seeded `random.Random` for a repeatable pick.
+  - **The rings:** one per kind with tiles, ordered by how many tiles it holds
+    (the busiest outermost, ties in Discover's order), 20 % steps up to 100 %
+    of the orbit, alternating directions; tiles evenly spaced from a random
+    start. `RING_CLASSES` holds the `border-<kind>` classes in full for
+    Tailwind.
+  - **The fallback:** with fewer than `HERO_MINIMUM` (6) distinct assets, four
+    rings, one type-icon tile each, opening Discover for that type
+    (`discover_url()`).
+  - It reads Pack, PackItem and Asset rows only: nothing from anyone's
+    library (notes, ratings, statuses). The gallery's HTMX swaps don't build it.
 
 ## Demo data
 
@@ -862,6 +885,7 @@ the API. All are built:
 | `seed_demo(snapshot=None)` | Built (Phase 9), `packs/demo.py`. The demo members, libraries and packs from the committed snapshot, offline and safe to run again (see "Demo data") |
 | `pack_credits(items)` | Built (user request, 2026-11-05), `packs/credits.py`. A pack's licenses, required and optional credits and warnings, and the formal notice (see "Licenses and credits") |
 | `license_info(name)` | Built (user request, 2026-11-05), `catalog/licenses.py`. What a license allows and asks |
+| `hero_orbit(rng=None)` | Built (Phase 12), `packs/hero.py`. The main page's orbit: up to 18 distinct assets from public packs only, from each type in turn, on one ring per type (the busiest outermost), each linking to the newest public pack holding it; the type-icon tiles below 6 (see "Main page and gallery") |
 | `suggest_assets(pack, limit)` | Built (Phase 10), `packs/suggestions.py`. Stored Assets ranked by shared tags with the pack, ties by title then id, never the pack's own (see "Packs") |
 | `copy_pack(pack, user)` | Built (Phase 11), `packs/services.py`. A private copy for `user` in one transaction: title, `copied_from`, tags, and each item's variant, import path and position, on the copier's own entries (missing ones To review, theirs untouched) (see "Packs") |
 | `add_to_pack(pack, saved_asset)` | Built (Phase 7), `packs/services.py`. Adds an item at the end on the default variant, once per entry, and refuses another member's entry (see "Packs") |

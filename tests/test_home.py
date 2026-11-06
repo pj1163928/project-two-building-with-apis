@@ -176,7 +176,10 @@ def test_type_colour_appears_only_on_the_mosaics_type_icons(client, other, make_
     make_pack(other, "Kit", "texture", "hdri", "model", "sound")
     content = _content(client.get(HOME).content.decode())
     gallery = content.split('id="gallery"', 1)[1]
-    outside = content.replace(gallery, "")
+    # The orbit hero's rings and icons show type too (Phase 12): test_home_hero.py
+    # checks them, so they're set aside here.
+    orbit = content.split('<div id="home-orbit"', 1)[1].split("</section>", 1)[0]
+    outside = content.replace(gallery, "").replace(orbit, "")
     assert not TYPE_TOKEN.search(outside)
     tiles = re.findall(
         r'<span class="gallery-tile"[^>]*>.*?</span>\s*(?:<img[^>]*>)?', gallery, re.S

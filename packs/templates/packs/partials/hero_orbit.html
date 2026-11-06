@@ -1,0 +1,31 @@
+{# The orbit hero (packs.hero.hero_orbit, Phase 12): one ring per asset type, outlined   #}
+{# in that type's colour (type colour means type here, as on Discover's tiles), the     #}
+{# busiest ring outermost. Each tile is a thumbnail of an asset from a public pack,      #}
+{# the provider's image over its type icon, opening the newest public pack holding it;  #}
+{# below six such assets, one type icon per ring opens Discover for that type. The      #}
+{# rings turn (CSS only) and pause while the orbit is hovered or holds keyboard focus;   #}
+{# reduced motion stills them. Never a logo in here: a solid disc behind the rings     #}
+{# hides the page's faint mark. Each ring is a list, so a screen reader hears its type.  #}
+<div id="home-orbit" class="orbit{% if orbit.is_fallback %} is-fallback{% endif %}">
+  <div class="orbit-stage">
+    {% for ring in orbit.rings %}
+      <ul class="orbit-ring {{ ring.ring_class }}{% if ring.reverse %} is-reverse{% endif %}" data-kind="{{ ring.kind }}"
+          style="--ring-size: {{ ring.size }}%; --spin: {{ ring.spin }}s;" aria-label="{{ ring.tile.label }}">
+        {% for thumb in ring.thumbs %}
+          <li class="orbit-arm" style="--angle: {{ thumb.angle }}deg;">
+            <a href="{{ thumb.url }}" class="orbit-thumb" aria-label="{{ thumb.label }}" title="{{ thumb.label }}" data-kind="{{ thumb.kind }}">
+              <span class="orbit-face">
+                <span class="result-fallback {{ thumb.tile.text_class }}">{% include "partials/icon.html" with name=thumb.kind size=20 %}</span>
+                {% if thumb.asset.thumbnail_url %}<img src="{{ thumb.asset.thumbnail_url }}" alt="" loading="eager" decoding="async" referrerpolicy="no-referrer" data-thumb-fallback>{% endif %}
+              </span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  </div>
+  <ul id="home-orbit-legend" class="orbit-legend micro" aria-label="Ring colours">
+    {% for ring in orbit.rings %}<li><span class="{{ ring.tile.text_class }}" aria-hidden="true">{% include "partials/icon.html" with name=ring.kind size=13 %}</span>{{ ring.tile.label }}</li>{% endfor %}
+  </ul>
+  <p id="home-orbit-note" class="orbit-note text-xs text-fg-secondary">{% if orbit.is_fallback %}Public packs will orbit here. Once they hold six assets, their thumbnails circle here; for now each type opens Discover.{% else %}{{ orbit.asset_count }} asset{{ orbit.asset_count|pluralize }} from {{ orbit.pack_count }} public pack{{ orbit.pack_count|pluralize }}, one ring per type. Click a thumbnail to open its pack.{% endif %}</p>
+</div>

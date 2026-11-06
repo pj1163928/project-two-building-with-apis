@@ -1228,18 +1228,37 @@ section index.
 
 ### Acceptance criteria
 
-- [ ] Hero thumbnails come only from assets in public packs, and each one
+- [x] Hero thumbnails come only from assets in public packs, and each one
   links to a public pack that contains it.
-- [ ] With fewer than 6 such assets, the type-icon tiles show instead.
-- [ ] Ring colours use only the four type colours. The logo never sits on
+- [x] With fewer than 6 such assets, the type-icon tiles show instead.
+- [x] Ring colours use only the four type colours. The logo never sits on
   a thumbnail.
-- [ ] The ruler's section index jumps to each section on the main page
+- [x] The ruler's section index jumps to each section on the main page
   and on Discover.
 
 ### Completion gate
 
-- [ ] Standard gate (see top). Access rules: a test proves that no asset
+- [x] Standard gate (see top). Access rules: a test proves that no asset
   from a private pack can reach the hero.
+
+> **Built as (2026-11-06):** `packs/hero.py`'s `hero_orbit()` reads the distinct
+> Assets of `Pack.objects.public()` packs only (unlisted ones are left out too),
+> and each tile links to the newest public pack holding its asset. At the
+> user's request the 18 are picked from each type in turn (so textures can't
+> crowd out the rest), the busiest ring is outermost, nothing in the orbit is a
+> logo (a panel-coloured disc hides the page's faint mark behind the rings),
+> hover and keyboard focus pause it, reduced motion stills it, the ruler works
+> through plain `#anchors` without JavaScript, and it shows only from 80 rem
+> (`xl`), where ruler pages get a 6 rem right gutter. The fallback is four
+> rings, one type-icon tile each, opening Discover for that type. The orbit's
+> counts sit in a note under the legend (in the centre they collided with the
+> inner ring). Checked in headless Firefox, light and dark, at 1600, 1100 and
+> 420 px against a scratch copy of the seeded demo.
+>
+> **For Phase 13:** the orbit and the ruler already turn their motion off under
+> reduced motion; Phase 13's sweep should keep them in its list. **Still open
+> from Phase 7:** after Add to pack on Discover saves a result, its Save corner
+> still says Save until the next search.
 
 ---
 

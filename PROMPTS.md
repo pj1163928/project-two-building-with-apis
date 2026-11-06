@@ -28,6 +28,100 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Axcenity Toolbox: Phase 12/13, Orbit hero and scroll ruler
+
+### Prompts
+
+1. The `/implement` skill, given `axcenity-toolbox phase 12`.
+2. Looks good just keep in mind these requirements (approving the brief, and
+   pasting eight requirements: keep the four types distinct in their colours;
+   spread thumbnails across types so textures don't dominate; the most
+   populated ring outside; no logos in the orbit; pause on hover and keyboard
+   focus; respect reduced motion; the ruler working through plain anchors
+   without JavaScript; the ruler on wide screens only).
+3. Ok looks good move to next test (approving TDD 1's red test).
+4. Looks good move to next (approving TDD 2's red test).
+5. Looks good move to building (approving TDD 3's red test).
+
+### Summary
+
+- **Outcome:** the main page has an animated orbit hero and both the main page
+  and Discover have a right-edge scroll ruler.
+  - Up to 18 random thumbnails from public packs circle on one ring per type,
+    each ring in its type colour, the busiest outermost. Each opens the newest
+    public pack holding it. Hover or focus pauses it; reduced motion stills it.
+  - Below 6 assets in public packs, four rings with one type-icon tile each
+    (opening Discover for that type) show instead.
+  - The ruler's numbered index jumps to each section (plain `#anchors`), marks
+    the one in view and fills as the page scrolls, from 80 rem only.
+  - 1,227 tests pass (1,196 before; 31 new). `ruff check` and `ruff format`
+    are clean.
+- **Changes:**
+  - `packs/hero.py` (new): `hero_orbit()` with `HeroOrbit`, `OrbitRing`,
+    `OrbitThumb`, the pick, the rings and the fallback.
+  - `packs/views.py`: `HomeView` adds the hero and the ruler on full pages
+    only; `home_ruler_sections()`.
+  - `catalog/discover.py`: `discover_ruler_sections()`; `catalog/views.py`
+    passes it to Discover.
+  - Templates:
+    - `packs/partials/hero_orbit.html` (new): rings, tiles, legend and note
+    - `partials/scroll_ruler.html` (new)
+    - `packs/home.html`: `#home-hero` in two columns with the orbit, and the
+      ruler
+    - `catalog/discover.html`: the ruler
+    - `base.html`: loads `scroll-ruler.js`; the content wrapper gains a
+      `content-body` class
+  - `static/js/scroll-ruler.js` (new): progress fill, the section in view,
+    smooth (or instant) jumps.
+  - `styles/source.css`: the orbit and ruler styles, the ruler pages' 6 rem
+    gutter (unlayered), scroll margins, and both in the reduced-motion block.
+  - `tests/test_home_hero.py` and `tests/test_scroll_ruler.py` (new).
+  - `tests/test_home.py` and `tests/test_shell.py`: the main page's
+    type-colour checks now allow the orbit (all four types in its fallback)
+    and nothing else.
+  - `docs/ARCHITECTURE.md`, `docs/FRONTEND.md` and `docs/TESTING.md`: the
+    hero, the ruler, the type-colour list and the new test files.
+  - `plans/axcenity-toolbox.md`: Phase 12 ticked, with a "Built as" note.
+- **TDD:** three behaviours, each red on an assertion before green:
+  1. Assets only in private or unlisted packs never reach the hero, and their
+     type gets no ring.
+  2. Each thumbnail links to a public pack that holds it: the newest, never a
+     newer private or unlisted pack holding the same asset.
+  3. 5 distinct assets give the fallback and 6 the thumbnails; with many
+     more, exactly 18 distinct, each on its own type's ring.
+- **Decisions:**
+  - Rings exist only for types with thumbnails; the fallback always has four.
+  - The pick takes from each type in turn (the user's "don't let textures
+    dominate"), and the rings are ordered by tile count, busiest outermost.
+  - A thumbnail links to the newest public pack holding it.
+  - The fallback's tiles open Discover for their type.
+  - Counts ("42 assets from 6 public packs") go in the note under the legend.
+  - The ruler's sections: Toolbox, How it works (visitors only), Public
+    packs; on Discover, Search, Types and each shelf.
+  - Hero thumbnails load eagerly, as the hero is above the fold.
+- **Deviations:** none. The user's eight requirements matched the brief and
+  were built as given.
+- **Sideways:**
+  - TDD 2's first run errored (`AttributeError` on `None.is_public`), not an
+    assertion; `assert thumb.pack is not None` was added first, a mechanical
+    fix reported at the time.
+  - A Python re-indent of `home.html` duplicated two lines and didn't take;
+    it was repaired with the Edit tool.
+  - Headless Firefox screenshots (light and dark, 1600, 1100 and 420 px,
+    against a scratch copy of the seeded demo, so the local database was
+    untouched) caught four layout bugs the tests couldn't: the counts in the
+    orbit's centre collided with the inner ring; the page's faint mark showed
+    through inside the rings (now hidden by a panel-coloured disc); on
+    Discover the ruler ran over the tiles, because the gutter rule sat in the
+    components layer and `lg:px-12` beat it (moved out of the layers); and at
+    phone width the one-column grid grew to the search bar's width, cutting
+    off the headline.
+  - The scratch server ran with `--noreload`, so it served cached templates
+    until it was restarted.
+  - Not checked in a real browser: the smooth jump and the "in view" marker
+    while scrolling (screenshots can't scroll), and pausing on hover. Check
+    them by hand with the guide.
+
 ## 2026-11-06 — Axcenity Toolbox: Phase 11/13, Save single items and Copy pack
 
 ### Prompts

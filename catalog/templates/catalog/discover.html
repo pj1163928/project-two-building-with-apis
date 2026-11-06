@@ -26,6 +26,7 @@
 {% endblock %}
 
 {% block content %}
+  {% include "partials/scroll_ruler.html" %}
   {% include "partials/page_header.html" with label="Discover" heading="Find assets for your next pack." lead="Search free CC0 and Creative Commons libraries, save what fits, and build packs your Axcenity projects can import." %}
 
   {# The command bar. "/" focuses it (shell.js) unless the cursor is already in a text field. #}

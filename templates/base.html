@@ -73,6 +73,7 @@
   <script src="{% versioned_static 'js/bundle-download.js' %}" defer></script>
   <script src="{% versioned_static 'js/pack-sort.js' %}" defer></script>
   <script src="{% versioned_static 'js/ambient.js' %}" defer></script>
+  <script src="{% versioned_static 'js/scroll-ruler.js' %}" defer></script>
 </head>
 <body class="bg-app text-fg" hx-boost="true">
 {# The CSRF header lives on #app, not <body>: a boosted swap replaces #app but keeps <body>, #}
@@ -192,7 +193,7 @@
       <div class="content-stage">
       <div class="ambient" aria-hidden="true" data-ambient></div>
       <div class="hero-atmosphere" aria-hidden="true"><i class="mark hero-mark"></i></div>
-      <div class="relative w-full max-w-[1500px] mx-auto px-8 lg:px-12 pt-14 pb-12 space-y-8">
+      <div class="content-body relative w-full max-w-[1500px] mx-auto px-8 lg:px-12 pt-14 pb-12 space-y-8">
         {% block content %}{% endblock %}
       </div>
 

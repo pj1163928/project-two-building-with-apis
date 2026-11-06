@@ -23,6 +23,7 @@ from .discover import (
     clean_page,
     clean_query,
     discover_filter_groups,
+    discover_ruler_sections,
     discover_url,
     featured_query,
     load_shelf,
@@ -67,6 +68,7 @@ class DiscoverView(TemplateView):
         query = clean_query(self.request.GET.get("q"))
         filters = clean_filters(self.request.GET)
         featured = "" if query else featured_query(kind, after=self.request.GET.get("shuffle", ""))
+        shelves = pending_shelves(kind, query or featured, filters)
         context.update(
             kind=kind,
             query=query,
@@ -77,7 +79,8 @@ class DiscoverView(TemplateView):
             shuffle_url=shuffle_url(kind, featured, filters) if featured else "",
             tile=TILES_BY_KIND[kind],
             tiles=[(tile, discover_url(tile.key, query, filters)) for tile in KIND_TILES],
-            shelves=pending_shelves(kind, query or featured, filters),
+            shelves=shelves,
+            ruler_sections=discover_ruler_sections(shelves),
         )
         return context
 

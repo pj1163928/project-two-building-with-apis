@@ -1,0 +1,16 @@
+{# The right-edge scroll ruler with its section index (Phase 12), on the main page and   #}
+{# Discover. Takes `ruler_sections`: (id, label) pairs, in page order. From 80 rem only.  #}
+{# Each entry is a plain #anchor (htmx never boosts those; hx-boost="false" makes sure),  #}
+{# so the index jumps without JavaScript. static/js/scroll-ruler.js adds the progress    #}
+{# fill, marks the section in view (aria-current="true") and scrolls smoothly unless    #}
+{# reduced motion is asked for. Monochrome: it's chrome.                                  #}
+{% if ruler_sections %}
+<nav id="scroll-ruler" class="scroll-ruler hidden xl:flex" aria-label="Sections on this page" hx-boost="false" data-scroll-ruler>
+  <ol class="scroll-ruler-index">
+    {% for section_id, label in ruler_sections %}
+      <li><a href="#{{ section_id }}" class="scroll-ruler-link" data-ruler-target="{{ section_id }}"><span class="scroll-ruler-label">{{ label }}</span><span class="scroll-ruler-number">{{ forloop.counter|stringformat:"02d" }}</span><span class="scroll-ruler-tick" aria-hidden="true"></span></a></li>
+    {% endfor %}
+  </ol>
+  <span class="scroll-ruler-track" aria-hidden="true"><span class="scroll-ruler-fill"></span></span>
+</nav>
+{% endif %}

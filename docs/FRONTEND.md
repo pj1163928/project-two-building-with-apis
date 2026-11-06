@@ -83,10 +83,13 @@ It's a throwaway prototype, so take its look, not its code.
     (2026-11-05)
   - each gallery card's mosaic tiles on the main page: the asset's type
     icon under its thumbnail (Phase 9)
+  - the main page's orbit hero (Phase 12): each ring's outline
+    (`border-<kind>`, from `packs.hero.RING_CLASSES`), each tile's type
+    icon, and the legend's icons
 
   `test_shell.py` keeps them out of the chrome on every page, out of every
-  other page's own content, and on library cards and pack items to those
-  two icons only.
+  other page's own content (on the main page, out of everything but the
+  orbit), and on library cards and pack items to those two icons only.
 - **Page drop colours (the one exception):** each page's content area has
   an ambient glow in three vivid colours, drifting behind the whole page
   (see "Ambient glow"). The colours are chosen by `#content[data-drop="<active_nav>"]` in
@@ -388,7 +391,7 @@ An `aria-invalid` input has a red edge and a red-tinted ring.
   per-page scripts block. Scripts listen on the `document` (delegation)
   rather than binding to elements a swap replaces, as `shell.js`,
   `password-toggle.js`, `sound-preview.js`, `card-actions.js`,
-  `entry-drawer.js`, `entry-files.js`, `bundle-download.js`, `pack-sort.js` and `ambient.js`
+  `entry-drawer.js`, `entry-files.js`, `bundle-download.js`, `pack-sort.js`, `scroll-ruler.js` and `ambient.js`
   do (the last sets itself up through `htmx.onLoad`).
 - **Preserved:** the title-bar logo link (`#brand-link`) is
   `hx-preserve`, so it isn't rebuilt on each swap. A rebuilt image left a
@@ -1066,6 +1069,40 @@ open pack current. With none: "The packs you create are listed here."
     - nothing from anyone's library. Hovering inverts the edge, behind the
       hover gate.
 
+- **Orbit hero** (`#home-orbit`, `packs/partials/hero_orbit.html`, Phase 12):
+  `#home-hero` is two columns from 80 rem (`.home-hero`: the header, search
+  and buttons, then the orbit), stacked below that. From `packs.hero.hero_orbit()`
+  (see ARCHITECTURE.md, "Main page and gallery"):
+  - **Rings:** one `<ul class="orbit-ring border-<kind>">` per type with
+    tiles, a 1 px circle in the type colour, sized `--ring-size` (the busiest
+    outermost, 20 % steps) and turning once per `--spin` (70 s inner, 20 s
+    slower each ring out), neighbours turning opposite ways (`.is-reverse`).
+  - **Tiles:** each `.orbit-arm` (`--angle`) turns its `.orbit-thumb` to its
+    place on the ring; the thumb turns back and its `.orbit-face` counter-spins
+    against the ring, so a 3 rem square tile (2.25 rem on a phone) stays
+    upright while it circles. The face is the provider's thumbnail
+    (`loading="eager"`, as the hero is above the fold; `referrerpolicy=
+    "no-referrer"`, `data-thumb-fallback`) over the type icon. Each tile links
+    to the newest public pack holding the asset, named in `aria-label` and
+    `title` ("<asset>, in <pack>").
+  - **Pausing:** hovering the orbit or keyboard focus inside it
+    (`:focus-within`) pauses every ring and face (`animation-play-state:
+    paused`), so a tile holds still to be clicked. Reduced motion stills them
+    (`animation: none`). Tile hover (behind the hover gate) and focus put an
+    ink edge round the face.
+  - **No logo:** nothing in the orbit is the mark or the wordmark, and a
+    panel-coloured disc (`.orbit-stage::before`) sits behind the rings, so the
+    page's faint `.hero-mark` never shows through near a thumbnail.
+  - **Legend and note:** `#home-orbit-legend` names each ring's type with its
+    icon; `#home-orbit-note` reads "42 assets from 6 public packs, one ring per
+    type. Click a thumbnail to open its pack."
+  - **Fallback** (`.orbit.is-fallback`, fewer than 6 assets in public
+    packs): four rings, one type-icon tile each, opening Discover for that
+    type; the note says "Public packs will orbit here."
+- **Scroll ruler** (`#scroll-ruler`, Phase 12): see "Scroll ruler" below.
+  Its sections are Toolbox (`#home-hero`), How it works (`#home-steps`,
+  visitors only) and Public packs (`#gallery`).
+
 **The side panel starts collapsed here** (PRD), whatever the member chose
 elsewhere:
 
@@ -1078,9 +1115,40 @@ elsewhere:
   main page restores it.
 - The toggle still works on the main page and still saves the choice.
 
+## Scroll ruler
+
+*(Phase 12.)* `templates/partials/scroll_ruler.html` and
+`static/js/scroll-ruler.js`, on the main page and Discover only. A view
+passes `ruler_sections`, (element id, label) pairs in page order
+(`packs.views.home_ruler_sections()`, `catalog.discover.discover_ruler_sections()`).
+
+- **Where:** `nav#scroll-ruler` (`aria-label="Sections on this page"`), fixed
+  to the right edge of the content, centred vertically, 18 rem tall at most.
+  Wide screens only (`hidden xl:flex`, 80 rem). While it's on the page,
+  `.content-body` (the shell's content wrapper) gets 6 rem of right padding
+  from 80 rem, so nothing runs under it (an unlayered rule, as the wrapper's
+  `lg:px-12` utility would beat a component one).
+- **What:** an `<ol>` of `.scroll-ruler-link`s, each a number (`01`…), a short
+  tick, and a label that slides out to the left on hover (behind the hover
+  gate) or keyboard focus; beside them a ticked `.scroll-ruler-track` whose
+  2 px ink `.scroll-ruler-fill` grows with the scroll (`--ruler-progress`).
+  Monochrome: it's chrome.
+- **Without JavaScript:** each link is a plain `#id` anchor (htmx never
+  boosts those, and the nav says `hx-boost="false"`), so it still jumps.
+- **With it:** `scroll-ruler.js` follows `#content`'s scroll (the page's
+  scroll container; a capture-phase listener, as scroll doesn't bubble) and
+  each swap (`htmx.onLoad`): the fill, and `aria-current="true"` on the
+  section in view (the last whose top has passed a third of the way down, or
+  the last at the very end). A click scrolls smoothly (instantly under
+  reduced motion), focuses the section and puts its `#id` in the address
+  bar. Targets have `scroll-margin-top: 1.5rem`.
+
 ## Discover
 
 `catalog/discover.html` is a showcase surface. From the top:
+
+- **Scroll ruler** (Phase 12): Search (`#discover-search`), Types
+  (`#type-tiles`), then each provider's shelf (`#shelf-<provider>`, its name).
 
 - **Header:** the usual page header.
 - **Command bar:** `#discover-search`, a `.command-bar`. It's a GET form
