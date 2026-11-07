@@ -28,6 +28,8 @@ urlpatterns = [
         name="download_preferences",
     ),
     path("token/", views.TokenView.as_view(), name="token"),
+    # POST only: replaces the token, so the old key stops working.
+    path("token/rotate/", views.RotateTokenView.as_view(), name="rotate_token"),
     # POST only, for everyone: sets the colour scheme (system, light or dark).
     path("theme/", views.ThemeView.as_view(), name="theme"),
 ]

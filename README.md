@@ -25,8 +25,10 @@ import. It searches three free providers. None of them needs an API key.
   license notice for a pack.
 - **The main page** shows a gallery of public packs.
 - **The REST API** lets your own scripts work with your library and read
-  packs.
-- **The console script** from Project 1 (`asset_search.py`) still works.
+  packs. Your token is on the API token page, where you can also replace it.
+- **Two console scripts.** `asset_search.py` (Project 1) still searches the
+  providers directly. `library_client.py` calls the Toolbox's own API to
+  list your library and change an entry.
 
 The PRD is [prd/axcenity-toolbox.md](prd/axcenity-toolbox.md), and the build
 plan is [plans/axcenity-toolbox.md](plans/axcenity-toolbox.md). How the code
@@ -40,10 +42,12 @@ fits together: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 4. [Using the site](#using-the-site)
 5. [Testing](#testing)
 6. [Using the API with a token](#using-the-api-with-a-token)
-7. [The console script (Project 1)](#the-console-script-project-1)
-8. [Troubleshooting](#troubleshooting)
-9. [Demo snapshot (maintainers only)](#demo-snapshot-maintainers-only)
-10. [Layout](#layout)
+7. [The console scripts at a glance](#the-console-scripts-at-a-glance)
+8. [The library client (`library_client.py`)](#the-library-client-library_clientpy)
+9. [The console script (Project 1)](#the-console-script-project-1)
+10. [Troubleshooting](#troubleshooting)
+11. [Demo snapshot (maintainers only)](#demo-snapshot-maintainers-only)
+12. [Layout](#layout)
 
 ## Setup
 
@@ -184,7 +188,7 @@ checklist for the console script against the live APIs (see
 ### Running the suite
 
 ```sh
-uv run pytest                         # the whole suite (about 1,260 tests, around 15 s)
+uv run pytest                         # the whole suite (about 1,300 tests, around 15 s)
 uv run pytest -q                      # quieter output
 uv run pytest -x --lf                 # stop at the first failure, rerun only last failures
 uv run pytest -k "share_link"         # only tests whose names match
@@ -228,10 +232,11 @@ The suite must pass, and Ruff must be clean, before any commit.
 | REST API | `test_api_library.py`, `test_api_packs.py` |
 | Demo data | `test_seed_demo.py` |
 | Page shell, motion, scroll ruler | `test_shell.py`, `test_motion.py`, `test_scroll_ruler.py` |
-| Project 1 console script | `test_console_regression.py` |
+| Console scripts | `test_console_regression.py` (Project 1), `test_library_client.py` (the library client) |
 
-[docs/TESTING.md](docs/TESTING.md) describes each file in detail, along
-with the fixtures and when to use each mocking tool.
+[docs/TESTING.md](docs/TESTING.md) covers the fixtures and when to use
+each mocking tool, and [docs/testing/test-files.md](docs/testing/test-files.md)
+describes what each file covers.
 
 > `test_seed_demo.py` checks that this README lists the demo usernames and
 > password in the table above. If you change them in `packs/demo.py`,
@@ -240,9 +245,32 @@ with the fixtures and when to use each mocking tool.
 ## Using the API with a token
 
 1. Sign in, then open **Account → API token** (`/accounts/token/`). The
-   site creates your token the first time you open the page.
+   site creates your token the first time you open the page. **Copy
+   token** puts it on your clipboard.
 2. Send it in the `Authorization` header as `Token <key>`. Requests that
    use a token don't need a CSRF token.
+3. Keep it private: anyone holding it can read and change your library.
+
+### Replacing your token
+
+If your token has leaked (pasted in a chat, committed to Git, shown on a
+shared screen), or you just want a fresh one, press **New token** on the
+API token page and confirm. Then:
+
+- **The old token stops working at once.** Any request signed with it gets
+  **401**, including from `library_client.py`.
+- **The page shows the new token**, with "New token made. The old one no
+  longer works, so update your scripts." That message shows once.
+- **Nothing else changes.** Your library, packs, sign-in and other members'
+  tokens are untouched.
+- **Update anything that stores the old key**, such as a `TOKEN` or
+  `TOOLBOX_TOKEN` variable, a `.env` file or a saved curl command.
+
+The button posts to `/accounts/token/rotate/` (members only, POST only,
+with CSRF). There's no API endpoint for it, so a stolen token can't be used
+to replace itself and lock you out.
+
+### Calling the API
 
 ```sh
 TOKEN=<your key>
@@ -284,6 +312,208 @@ Saving an asset that's already in your library returns **400** with
 returns **502** with a friendly `detail` message. Packs are read-only
 through the API, so any write gets **405**.
 
+## The console scripts at a glance
+
+The project has two console scripts. Both run with `uv run` from the
+project folder and need no extra install.
+
+| | `asset_search.py` (Project 1) | `library_client.py` |
+|---|---|---|
+| Talks to | ambientCG, Poly Haven and Openverse directly | your running Toolbox site's API |
+| Needs | the internet | the site running, and your API token |
+| Does | searches providers, looks up one asset by ID, shows files and downloads | lists your library, changes one entry's status, rating or notes |
+| Writes anything? | no | yes: one entry per run, through `PATCH /api/library/<id>/` |
+| Run | `uv run asset_search.py` | `uv run library_client.py` |
+| Tests | `tests/test_console_regression.py` | `tests/test_library_client.py` |
+
+They work well together:
+
+1. **Find** an asset with `asset_search.py`. Its details view shows the ID
+   in brackets, for example `[red_bricks_02]`.
+2. **Save** it to your library, either from Discover on the site or by ID
+   through the API (no script needed):
+
+   ```sh
+   curl -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+        -d '{"provider": "polyhaven", "external_id": "red_bricks_02"}' \
+        http://127.0.0.1:8000/api/library/
+   ```
+
+   The provider keys are `ambientcg`, `polyhaven` and `openverse`.
+3. **Review** it with `library_client.py`. Move it from To review to
+   Testing, rate it, or add notes, from the console.
+
+## The library client (`library_client.py`)
+
+`library_client.py` is a console script that uses the Toolbox's own REST
+API, the same one your own scripts can use. It:
+
+1. lists every entry in your library (`GET /api/library/`, following each
+   page of 12)
+2. lets you pick one, and a new status, rating or notes for it
+3. prints the entry before the change, sends `PATCH /api/library/<id>/`,
+   and prints the entry the server sends back
+
+It uses `requests`, which the project already installs, and signs each
+request with `Authorization: Token <key>`.
+
+### Before you run it
+
+1. **Start the site** in another terminal:
+
+   ```sh
+   uv run python manage.py tailwind runserver   # or plain: uv run python manage.py runserver
+   ```
+
+2. **Have something in your library.** Sign in and save a few assets from
+   Discover, or load the demo data with `uv run python manage.py seed_demo`
+   and sign in as a demo member (see [Demo sign-in](#demo-sign-in)).
+3. **Copy your token** from **Account → API token**
+   (<http://127.0.0.1:8000/accounts/token/>).
+
+### Running it
+
+```sh
+uv run library_client.py
+```
+
+It asks for:
+
+1. **Server:** press Enter for `http://127.0.0.1:8000`, or type another
+   address such as `127.0.0.1:8001` (`http://` is added if you leave it
+   off).
+2. **API token:** paste it. It isn't shown as you type.
+3. **Entry:** the number of the entry to change, or Enter to quit without
+   changing anything.
+4. **Field:** `1` Status, `2` Rating or `3` Notes.
+5. **New value:**
+   - **Status:** `1` To review, `2` Testing, `3` Approved, `4` Rejected.
+     The current one is marked. Then an optional **reason**, which the
+     site records with the change and shows in the entry's status history.
+   - **Rating:** `1` to `5`, or Enter to clear the rating.
+   - **Notes:** the new notes, or Enter to clear them. The current notes
+     are shown first. This replaces the notes; it doesn't add to them.
+
+A number that's out of range gets "Please enter a number from 1 to N." and
+the same prompt again. Ctrl+C at any prompt exits cleanly. Each run changes
+one field of one entry; run it again for the next change.
+
+### Skipping the prompts with environment variables
+
+Set these and the script skips the matching prompt. That's handy when you
+run it often, or when you'd rather not paste the token each time.
+
+| Variable | Instead of | Example |
+|---|---|---|
+| `TOOLBOX_URL` | the Server prompt | `http://127.0.0.1:8001` |
+| `TOOLBOX_TOKEN` | the API token prompt | your key from the token page |
+
+macOS, Linux or Git Bash:
+
+```sh
+export TOOLBOX_TOKEN=<your key>
+export TOOLBOX_URL=http://127.0.0.1:8000            # optional
+uv run library_client.py
+
+TOOLBOX_TOKEN=<your key> uv run library_client.py   # for one run only
+unset TOOLBOX_TOKEN                                 # forget it
+```
+
+Windows PowerShell:
+
+```powershell
+$env:TOOLBOX_TOKEN = "<your key>"
+$env:TOOLBOX_URL = "http://127.0.0.1:8000"   # optional
+uv run library_client.py
+Remove-Item Env:TOOLBOX_TOKEN                # forget it
+```
+
+A variable set this way lasts until you close the terminal. Don't commit a
+token to the repo. If one ends up somewhere it shouldn't, replace it (see
+[Replacing your token](#replacing-your-token)).
+
+With both variables set, the only prompts left are the entry, field and
+value, so you can pipe the answers in. This approves entry 2 with a
+reason (macOS, Linux or Git Bash):
+
+```sh
+printf '2\n1\n3\nLooks right in engine\n' | uv run library_client.py
+```
+
+In PowerShell: `"2","1","3","Looks right in engine" | uv run library_client.py`.
+The numbers follow the list's order, which is newest saved first, so check
+the list before you script a change.
+
+### Sample run
+
+```
+Axcenity Toolbox library client
+Server [http://127.0.0.1:8000]:
+
+Your library (3 entries):
+    1) Red Bricks 02  [texture, polyhaven]  Approved, 5/5
+    2) Rogland Sunset  [hdri, polyhaven]  Testing, 4/5
+    3) Footsteps, Stones, A.wav  [sound, openverse]  To review, unrated
+Choose an entry (blank to quit): 2
+
+What do you want to change?
+  1) Status
+  2) Rating
+  3) Notes
+Field: 1
+New status:
+  1) To review
+  2) Testing  (current)
+  3) Approved
+  4) Rejected
+Status: 3
+Reason (optional): Lights the courtyard scene well
+
+Before:
+  #7  Rogland Sunset (hdri, polyhaven)
+  Status:  Testing
+  Rating:  4/5
+  Notes:   (none)
+
+Sending PATCH /api/library/7/ {'status': 'approved', 'status_reason': 'Lights the courtyard scene well'}
+
+After:
+  #7  Rogland Sunset (hdri, polyhaven)
+  Status:  Approved
+           set by demo_member via api: Lights the courtyard scene well
+  Rating:  4/5
+  Notes:   (none)
+```
+
+Open the entry on the site's Library page afterwards: the change is
+there, and its status history shows it came through the API.
+
+### When something goes wrong
+
+Every failure prints one `Error:` line and exits with code 1, so a script
+that calls it can tell.
+
+| You see | Why | Fix |
+|---|---|---|
+| `Can't reach the Toolbox at ... Is the server running?` | Nothing is listening at that address | Start the site, or check the port in `TOOLBOX_URL` |
+| `The server didn't accept that token.` | The token is wrong, has a typo, or was replaced | Copy it again from the token page; update `TOOLBOX_TOKEN` |
+| `Your library is empty.` | You haven't saved anything yet | Save assets from Discover, or run `seed_demo` and sign in as a demo member |
+| `The server rejected the change:` and a field's reason | The value broke a rule, such as notes over 10,000 characters or a status reason over 300 | Shorten it and run again |
+| `That entry isn't in your library any more.` | It was removed (on the site, or by another script) after the list loaded | Run again for a fresh list |
+| `... didn't answer like the Toolbox API` | The address points at something else | Check the server address |
+| `... took too long to answer.` | The server didn't reply within 10 s | Check the site's terminal for errors and try again |
+
+### Its tests
+
+```sh
+uv run pytest tests/test_library_client.py -v
+```
+
+They run offline. Most answer the script's requests with canned
+`responses`. Two hand each request to Django's test client, so the script
+runs against the real API views: one saves a rating, and one checks that
+a wrong token changes nothing.
+
 ## The console script (Project 1)
 
 The original console script still works, unchanged. It searches the same
@@ -324,6 +554,34 @@ The script asks:
 6. **Search again?** Enter or `y` to go back to the provider menu, `n` to exit.
 
 Ctrl+C at any prompt exits cleanly.
+
+### Getting the most out of it
+
+- **Look up by ID** (`i`) when you already know the asset. It skips the
+  search and goes straight to the details: every map, bundle, resolution,
+  format and download size, with direct URLs.
+- **Use the type filter** on ambientCG and Poly Haven to cut the noise:
+  `3` HDRIs for `sky` or `sunset`, `4` Models for `chair` or `barrel`.
+- **Try more than one phrase.** Each provider names things its own way
+  (`brick`, `bricks`, `wall`), and Poly Haven's search is semantic, so it
+  returns its closest matches rather than nothing.
+- **Copy an ID into the Toolbox.** The ID in brackets is the
+  `external_id` the API's save takes (see
+  [The console scripts at a glance](#the-console-scripts-at-a-glance)).
+- **Pipe the answers in** to repeat a lookup without typing. The script
+  stops cleanly when the input runs out:
+
+  ```sh
+  printf '2\ni\nrogland_sunset\nn\n' | uv run asset_search.py   # Poly Haven, ID lookup
+  printf '1\n\nbrick\n\n1\nn\n' | uv run asset_search.py        # ambientCG, search, details of #1
+  ```
+
+  In PowerShell: `"2","i","rogland_sunset","n" | uv run asset_search.py`.
+- **Save the output** to a file by adding `> results.txt` to any of those
+  commands. The prompts go into the file too.
+- **Mind Openverse's limits:** 20 requests a minute and 200 a day for
+  anonymous clients. Each search is one request, and each details view is
+  one more.
 
 Asset IDs for the lookup look like `Bricks097` (ambientCG), `red_bricks_02`
 (Poly Haven) and `a8783d20-f1af-4c4b-b9ec-a8c212f67fee` (Openverse). The
@@ -495,6 +753,9 @@ Notes:
 | Port 8000 is in use | `uv run python manage.py tailwind runserver 8001` |
 | The demo packs have changed | Run `uv run python manage.py seed_demo` again |
 | A demo password doesn't work | Run `seed_demo` again. It resets the demo passwords |
+| `library_client.py` can't reach the Toolbox | Start the site first. If it runs on another port, set `TOOLBOX_URL` or type the address at the prompt |
+| `library_client.py` says the token wasn't accepted | Copy it again from the token page. If you pressed New token, the old one no longer works |
+| A token may have leaked | Press **New token** on the API token page. The old one stops working at once |
 
 ## Demo snapshot (maintainers only)
 
@@ -522,6 +783,8 @@ templates/    the shared shell (base.html) and partials
 static/       branding, fonts and scripts
 styles/       source.css, Tailwind's source
 tests/        every test, with one shared conftest
-docs/         architecture, testing, front-end and provider notes
-asset_search.py   the Project 1 console script
+docs/         ARCHITECTURE.md, FRONTEND.md and TESTING.md (indexes), with
+              one topic file per area in architecture/, frontend/ and testing/
+asset_search.py   the Project 1 console script (calls the providers)
+library_client.py the library client (calls the Toolbox's own API)
 ```

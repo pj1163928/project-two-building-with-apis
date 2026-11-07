@@ -28,6 +28,126 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Docs split into short indexes and topic files for progressive disclosure
+
+### Prompts
+
+1. Alright the Docs pages are far too long and likely should be cut down to
+   optimize AI usage and progressive disclosure please read through all docs
+   files seperate and reformat as neccesary updating CLAUDE.md as necessary.
+   After all changes have completed please post changes in PROMPTS.md
+   according to sounrce formatting, please include changes in CLAUDE.md to
+   seperate and keep and organized codebase going forward.
+
+### Summary
+
+- **Outcome:** `docs/ARCHITECTURE.md` (947 lines), `docs/FRONTEND.md`
+  (1,509) and `docs/TESTING.md` (136, with one-paragraph table rows) are now
+  short indexes of 98, 94 and 87 lines. Each index keeps only the rules
+  that apply everywhere, plus a "read this file before you touch…" table.
+  Detail moved into one file per area:
+  - `docs/architecture/`: `urls`, `providers`, `discover`, `library`,
+    `packs`, `exports`, `home-and-demo`, `api`
+  - `docs/frontend/`: `theme`, `shell`, `htmx`, `motion`, `discover`,
+    `library`, `packs`, `attribution`, `home`, `accounts`
+  - `docs/testing/test-files.md`: the per-file catalogue, grouped by area
+
+  Across all three, the text went from about 27,800 words to 19,100. One
+  task now reads an index plus one topic file: a template change loads
+  about 1,600 words where it used to load 14,000. The topic files cut dated
+  provenance, "used to" history and phase markers, and keep every
+  identifier, rule, status code and the short reasons that guard against
+  known regressions. The indexes keep their paths, so every link from code
+  comments, tests, the README and the plan still works.
+
+  `CLAUDE.md`'s "Read before…" table now says to read the index, then only
+  the topic file it points to. A new "Keeping the docs organized" section
+  sets the rules for later work:
+  - indexes stay about 150 lines at most, and a topic file splits past
+    about 200
+  - docs describe what the code does now; history lives in PROMPTS.md and
+    git
+  - docs are updated in the same change as the code (new URL, shared
+    function or test file: its listing)
+  - each fact is said once
+  - research files and the walkthrough are left as dated records
+
+  The `/implement` skill reads indexes then topic files and updates the
+  docs per those rules. Two README pointers were updated.
+  `code-walkthrough.md` and `research/game-asset-apis.md` are unchanged.
+- **Deviations:** none asked for. Kept on my own judgement:
+  - the three index paths, so existing links don't break
+  - the research doc and the walkthrough, both dated, cited records
+  - `plans/axcenity-toolbox.md`, which still names old section headings
+    such as "Status history". Its phases are a historical record, so it
+    wasn't rewritten.
+- **Sideways:** a first draft of the test catalogue put
+  `test_token_page.py` and `test_api_library.py` under "Main page and
+  demo data". It was moved to its own "APIs and tokens" section. A
+  scripted check confirmed every `tests/test_*.py` file has a row and every
+  relative link in the docs resolves. Its one flagged link was a code
+  sample in the walkthrough. Two summarised signatures (`save_to_library`,
+  `copied_from`) were checked against the code before they went in. Only
+  Markdown changed: the README test passes and Ruff is clean. The full
+  suite wasn't rerun.
+
+## 2026-11-06 — A library client script for the Toolbox's own API, replaceable API tokens, and console script docs
+
+### Prompts
+
+1. Can you do the following (pasted: an earlier review's finding that the
+   repo had no script calling its own Django API, with a proposal for
+   `library_client.py`: read the token and server address, list
+   `GET /api/library/` as a numbered list, pick an entry and a new value
+   for one field, print it before and after `PATCH /api/library/<id>/`,
+   clear messages for a stopped server, a wrong token, an empty library or
+   a rejected update, using `requests`, with tests that don't reach the
+   network).
+2. Ok what I would like you to do is include this in a the README, as well
+   as in PROMPTS.md, then add a way for the users to cycle their API token
+   if they would like. Detail all useful and relevant commands for both
+   Python scripts and how to use them effectively and to their fullest
+   potential.
+
+### Summary
+
+- **Outcome:** `library_client.py` sits next to `asset_search.py`. It
+  reads the server (default `http://127.0.0.1:8000`, or `TOOLBOX_URL`) and
+  the token (typed without echo, or `TOOLBOX_TOKEN`), lists every library
+  page, and changes one entry's status (with an optional reason), rating
+  (or clears it) or notes, showing the entry before and after the PATCH.
+  Every failure is one `Error:` line and exit code 1.
+  `tests/test_library_client.py` (11 tests) uses `responses`, plus two
+  end-to-end tests that hand each request to Django's test client so the
+  script runs against the real API views offline. The API token page
+  gained **Copy token** and **New token**: a confirm dialog (the same
+  `[data-dialog-open]` pattern as a pack's New link) posts to
+  `accounts:rotate_token`, which calls the new `rotate_token()`
+  (`accounts/tokens.py`, one transaction) and goes back to the page with
+  a one-time message. The old key is a 401 at once; 8 new tests in
+  `test_token_page.py` cover that, the message, a first token, other
+  members untouched, POST only, CSRF and sign-in. The README gained a
+  token-replacement section, a side-by-side of both scripts and how they
+  work together, a full library client section (prompts, environment
+  variables for sh and PowerShell, piped answers, a sample run, every
+  error and its fix, its tests), tips for `asset_search.py` (ID lookups,
+  type filters, piped answers, saving output, Openverse's limits), and new
+  Troubleshooting rows. ARCHITECTURE.md and TESTING.md list the new URL,
+  function and tests. 1,302 tests pass and Ruff is clean.
+- **Deviations:** none. The token page also gained a short "From the
+  console" note pointing at `library_client.py`, and the README's test
+  count went from about 1,260 to about 1,300.
+- **Sideways:** a live run of the client against the dev server would
+  have needed one of the user's real tokens; reading it from the database
+  was refused, so the live check covered only the "server not running"
+  message, and the real-API path is proven by the end-to-end tests. A
+  first README draft said notes are capped at 2,000 characters; checking
+  `NOTES_MAX_LENGTH` showed 10,000, so the README and a test's canned
+  message were fixed. An unverified claim about how each provider matches
+  phrases was dropped. A long shell heredoc for the README patch failed
+  on quoting and was rerun as a script file. The piped `asset_search.py`
+  example was checked live against ambientCG before it went in.
+
 ## 2026-11-06 — Post-phase polish: prototype loader and hover, section icons, an all-cover main page, a storm-grey light theme
 
 ### Prompts

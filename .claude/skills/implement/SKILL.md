@@ -32,7 +32,12 @@ reading the plan through to the commit.
   sections behind the phase's user stories. Where the plan says "per the
   PRD", the PRD's wording is authoritative.
 - Read [docs/TESTING.md](../../../docs/TESTING.md), and every
-  "Read before…" doc in `CLAUDE.md` that covers an area this phase touches.
+  "Read before…" index in `CLAUDE.md` that covers an area this phase
+  touches. Then open only the topic files those indexes point to for this
+  phase's areas, not whole doc folders.
+- When the phase is built, update the docs as `CLAUDE.md`'s "Keeping the
+  docs organized" says: the area's topic file, plus any new URL, shared
+  function or test file in its listing.
 - Read the code that earlier phases built, and the existing pattern closest
   to the one this phase needs. The plan often names that pattern, such as the
   wishlist's template tag.

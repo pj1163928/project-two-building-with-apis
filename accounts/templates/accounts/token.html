@@ -11,7 +11,11 @@
   <div class="bg-surface border border-line rounded-xl px-5 py-4 space-y-2">
     <label class="micro text-fg-secondary block" for="api-token">Token</label>
     <input id="api-token" class="input w-full font-mono text-sm" type="text" value="{{ token.key }}" readonly spellcheck="false" autocomplete="off">
-    <p class="text-xs text-fg-muted">Created {{ token.created|date:"j M Y" }}.</p>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <button type="button" class="btn btn-quiet btn-sm" data-copy="api-token">Copy token</button>
+      <button type="button" class="btn btn-quiet btn-sm" data-dialog-open="token-rotate-dialog" aria-haspopup="dialog">New token</button>
+      <p id="token-note" class="text-xs text-fg-muted inline-flex items-center gap-1.5" role="status">{% if messages %}{% for message in messages %}{% include "partials/icon.html" with name="check" size=13 %} {{ message }}{% endfor %}{% else %}Created {{ token.created|date:"j M Y" }}. If it reached the wrong people, make a new one.{% endif %}</p>
+    </div>
   </div>
   <section class="space-y-3" aria-labelledby="token-usage">
     <h2 id="token-usage" class="micro text-fg-secondary">Signing requests</h2>
@@ -25,5 +29,26 @@ curl -X POST -H "Authorization: Token {{ token.key }}" \
      "{{ api_url }}"</code></pre>
     <p class="text-sm text-fg-secondary leading-relaxed">The list takes the library page's search, filters, sort and page. Each entry is at <code class="font-mono">/api/library/&lt;id&gt;/</code>, where GET reads it, PATCH or PUT changes its notes, rating and status, and DELETE removes it from your library and from your packs.</p>
   </section>
+  <section class="space-y-3" aria-labelledby="token-script">
+    <h2 id="token-script" class="micro text-fg-secondary">From the console</h2>
+    <p class="text-sm text-fg-secondary leading-relaxed"><code class="font-mono">library_client.py</code>, in the project folder, lists your library and changes an entry's status, rating or notes through this API. It asks for the token, or reads it from <code class="font-mono">TOOLBOX_TOKEN</code>.</p>
+    <pre class="bg-surface border border-line rounded-xl px-5 py-4 text-xs font-mono overflow-x-auto"><code>uv run library_client.py</code></pre>
+  </section>
 </div>
+<dialog id="token-rotate-dialog" class="picker-dialog" aria-labelledby="token-rotate-title">
+  <div class="picker-panel">
+    <header class="picker-head">
+      <div class="min-w-0 space-y-1"><p class="micro text-fg-muted">API token</p><h2 id="token-rotate-title" class="picker-title">Make a new token?</h2></div>
+      <form method="dialog"><button type="submit" value="close" class="picker-close" aria-label="Close">{% include "partials/icon.html" with name="close" size=16 %}</button></form>
+    </header>
+    <div class="picker-body">
+      <p class="text-sm text-fg">The current token stops working at once. Any script that uses it will need the new one.</p>
+      <p class="picker-note">{% include "partials/icon.html" with name="info" size=14 %}<span>Your library and packs don't change.</span></p>
+    </div>
+    <footer class="picker-foot gap-2">
+      <form method="dialog"><button type="submit" value="close" class="btn btn-quiet btn-sm">Cancel</button></form>
+      <form method="post" action="{% url 'accounts:rotate_token' %}">{% csrf_token %}<button type="submit" class="btn btn-primary btn-sm">Make a new token</button></form>
+    </footer>
+  </div>
+</dialog>
 {% endblock %}

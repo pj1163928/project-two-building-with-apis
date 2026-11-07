@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
@@ -16,6 +17,9 @@ from rest_framework.authtoken.models import Token
 from .forms import DownloadPreferencesForm, SignUpForm
 from .models import DownloadPreferences, preference_groups
 from .theme import COOKIE_MAX_AGE, COOKIE_NAME, THEME_CHOICES, THEME_LABELS, theme_choice
+from .tokens import rotate_token
+
+ROTATED_MESSAGE = "New token made. The old one no longer works, so update your scripts."
 
 
 class SignUpView(CreateView):
@@ -119,6 +123,21 @@ class TokenView(LoginRequiredMixin, TemplateView):
         context["token"], _created = Token.objects.get_or_create(user=self.request.user)
         context["api_url"] = self.request.build_absolute_uri(reverse("catalog:api_library"))
         return context
+
+
+class RotateTokenView(LoginRequiredMixin, View):
+    """New token: replace the member's API token, so the old key stops working.
+
+    POST only, with CSRF. The member confirms first (the token page's dialog),
+    then goes back to the token page, which shows the new key.
+    """
+
+    http_method_names = ["post"]
+
+    def post(self, request):
+        rotate_token(request.user)
+        messages.success(request, ROTATED_MESSAGE)
+        return redirect("accounts:token")
 
 
 class ThemeView(View):
