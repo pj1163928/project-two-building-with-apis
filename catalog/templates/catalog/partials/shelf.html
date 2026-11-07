@@ -11,9 +11,14 @@
     {% if not shelf.loaded %}<span class="micro text-fg-weak shelf-searching">{% include "partials/loader.html" with label="Searching" small=True %}</span>{% elif shelf.filtered_out %}<span class="micro text-fg-weak">Filtered out</span>{% elif shelf.error %}<span class="micro text-fg-weak">Unavailable</span>{% else %}{% include "catalog/partials/shelf_count.html" %}{% endif %}
   </header>
   {% if not shelf.loaded %}
-    <ul class="result-grid" aria-label="Loading {{ shelf.name }} results">
-      {% for _ in "123456" %}<li class="result-skeleton" aria-hidden="true"></li>{% endfor %}
-    </ul>
+    {# Skeleton cards (a thumbnail and two lines, fading along the row) hold the layout, #}
+    {# and a badge with the logo loader floats over their middle, as in the prototype.  #}
+    <div class="shelf-loading">
+      <ul class="result-grid" aria-label="Loading {{ shelf.name }} results">
+        {% for _ in "123456" %}<li class="result-skeleton" aria-hidden="true"><span class="result-skeleton-thumb"></span><span class="result-skeleton-line"></span><span class="result-skeleton-line is-short"></span></li>{% endfor %}
+      </ul>
+      <div class="shelf-loading-badge" aria-hidden="true">{% include "partials/loader.html" with label="Searching "|add:shelf.name %}</div>
+    </div>
   {% elif shelf.error %}
     <div role="alert" class="alert alert-error shelf-alert">
       {% include "partials/icon.html" with name="alert" size=20 %}

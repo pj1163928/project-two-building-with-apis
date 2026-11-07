@@ -29,25 +29,29 @@ EDITOR_PALETTE = {
     "#F07178",  # error
 }
 TYPE_COLOURS = {"texture": "#F2A15A", "hdri": "#6C8CFF", "model": "#4CC38A", "sound": "#A48AFF"}
-# The same palette's light values (theme.rs, Palette::new with dark = false).
+# The light theme: a light storm grey (user request, 2026-11-06). It began as the
+# engine's light palette (theme.rs, Palette::new with dark = false), which the user
+# found too bright; the surfaces are now a cool mid grey, the text and lines darker.
 LIGHT_PALETTE = {
-    "app": "#F4F4F5",
-    "panel": "#FFFFFF",
-    "surface": "#F7F7F8",
-    "elevated": "#FFFFFF",
-    "inset": "#FFFFFF",
-    "control": "#F1F1F3",
-    "control-hover": "#E9E9EC",
-    "control-active": "#E0E0E4",
-    "line": "#E4E4E7",
-    "line-strong": "#D1D1D6",
-    "fg": "#27272A",
-    "fg-strong": "#18181B",
-    "fg-secondary": "#52525B",
-    "fg-weak": "#6B6B73",
-    "fg-muted": "#A1A1AA",
+    "app": "#BEC0C2",
+    "panel": "#CACCCE",
+    "surface": "#D3D5D7",
+    "elevated": "#DCDEE0",
+    "inset": "#C4C6C8",
+    "control": "#BABCBE",
+    "control-hover": "#B2B4B6",
+    "control-active": "#A9ABAD",
+    "line": "#B5B7B9",
+    "line-strong": "#9FA1A3",
+    "fg": "#1F2022",
+    "fg-strong": "#111214",
+    "fg-secondary": "#3D3F43",
+    "fg-weak": "#45474B",
+    "fg-muted": "#6E7075",
+    "shade": "#2B2D31",
+    "ink": "#18181B",
 }
-LIGHT_STATUS = {"success": "#1C7547", "warning": "#8F5F00", "error": "#C42B2B"}
+LIGHT_STATUS = {"success": "#145A36", "warning": "#6B4800", "error": "#931F1F"}
 # The engine's on-light accents for the four types (4.5:1 on white).
 LIGHT_TYPE_COLOURS = {
     "texture": "#A8460B",
@@ -161,7 +165,7 @@ def test_light_mode_is_chosen_on_html(css, light_block):
 
 
 @pytest.mark.parametrize(("token", "hex_value"), LIGHT_PALETTE.items())
-def test_light_mode_uses_the_engines_light_palette(light_block, token, hex_value):
+def test_light_mode_uses_the_storm_grey_palette(light_block, token, hex_value):
     assert f"--color-{token}: {hex_value};" in light_block
 
 
@@ -184,6 +188,35 @@ def test_light_mode_keeps_the_chrome_monochrome(light_block):
         value = re.search(rf"--color-{token}: (#[0-9A-Fa-f]{{6}});", light_block).group(1)
         r, g, b = (int(value[i : i + 2], 16) for i in (1, 3, 5))
         assert max(r, g, b) - min(r, g, b) <= 4, f"{token} {value} is not grey"
+
+
+def _luminance(hex_value: str) -> float:
+    channels = [int(hex_value[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast(a: str, b: str) -> float:
+    high, low = sorted((_luminance(a), _luminance(b)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
+
+
+def test_light_mode_is_a_storm_grey_not_white():
+    """The surfaces are a mid grey, so the theme is no longer bright white."""
+    for token in ("app", "panel", "surface", "elevated", "inset"):
+        assert _luminance(LIGHT_PALETTE[token]) < 0.75, token
+
+
+@pytest.mark.parametrize("background", ["app", "panel", "surface", "inset"])
+def test_light_mode_text_keeps_its_contrast_on_the_grey(background):
+    surface = LIGHT_PALETTE[background]
+    for token in ("fg", "fg-strong", "fg-secondary", "fg-weak"):
+        assert _contrast(LIGHT_PALETTE[token], surface) >= 4.5, (token, background)
+    for status, hex_value in LIGHT_STATUS.items():
+        assert _contrast(hex_value, surface) >= 4.5, (status, background)
+    # The type colours are only ever icons, which need 3:1.
+    for kind, hex_value in LIGHT_TYPE_COLOURS.items():
+        assert _contrast(hex_value, surface) >= 3, (kind, background)
 
 
 def test_light_mode_inverts_the_logo_and_tints_the_glow(light_block):

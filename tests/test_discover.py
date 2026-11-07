@@ -834,6 +834,12 @@ def test_hovering_a_card_shows_its_full_details(client, monkeypatch):
     assert "html[data-pointer] .result-card:hover .result-details" in css
     # The panel lets clicks through to the card's link.
     assert re.search(r"\.result-details \{[^}]*pointer-events: none;", css)
+    # The label column fits the longest label, so "Commercial" never runs into its value.
+    assert re.search(
+        r"\.result-details-list \{[^}]*grid-template-columns: max-content minmax\(0, 1fr\);", css
+    )
+    assert ".result-details-list > div { display: contents; }" in css
+    assert re.search(r"\.result-details-list dt \{[^}]*white-space: nowrap;", css)
 
 
 def test_the_details_go_away_after_a_click_unless_details_keeps_them_open(client, monkeypatch):

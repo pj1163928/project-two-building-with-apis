@@ -150,6 +150,10 @@
     {# pt-1, and the icon keeps the same 3.5rem cell in both states, so nothing jumps.     #}
     {# relative z-20 lifts the tooltips over the content. User request, 2026-11-05.        #}
     <aside id="side-panel" aria-label="Sidebar" class="sidebar relative z-20 shrink-0 flex flex-col bg-app border-r border-line">
+      {# The section's icon, large and faint, whole and centred low in the open sidebar,  #}
+      {# behind its rows; it draws itself in (user requests, 2026-11-06). It clips itself, #}
+      {# so the tooltips still stick out.                                                  #}
+      {% with icon=active_nav|page_icon %}{% if icon %}<div class="side-watermark" aria-hidden="true">{% include "partials/icon.html" with name=icon size=24 %}</div>{% endif %}{% endwith %}
       <nav id="activity-bar" aria-label="Main" class="shrink-0">
         <div class="h-14 shrink-0 flex items-center border-b border-line">
           <span class="act-icon"><button type="button" id="panel-toggle" class="act panel-toggle w-10 h-10 grid place-items-center"

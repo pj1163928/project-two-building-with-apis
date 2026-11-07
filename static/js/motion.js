@@ -73,6 +73,37 @@
     else root.dataset.swap = "fragment";
   });
 
+  // ---------- Past the main page's cover ----------
+  // The main page tucks its title bar and sidebar away while its cover is in view
+  // (CSS, "The main page is all cover"). Once the cover's bottom edge rises above the
+  // middle of the window, this sets <html data-cover="past"> and the bars come in;
+  // back down past 60 % it clears it and they leave. The gap between the two lines
+  // stops them flickering at the edge. Scroll events don't bubble, so this listens
+  // in the capture phase, which catches #content's scrolling, whatever page is in.
+  var coverFrame = 0;
+
+  function checkCover() {
+    coverFrame = 0;
+    var hero = document.getElementById("home-hero");
+    if (!hero) {
+      delete root.dataset.cover;
+      return;
+    }
+    var bottom = hero.getBoundingClientRect().bottom;
+    var height = window.innerHeight;
+    if (bottom < height * 0.5) root.dataset.cover = "past";
+    else if (bottom > height * 0.6) delete root.dataset.cover;
+  }
+
+  function queueCover() {
+    if (!coverFrame) coverFrame = requestAnimationFrame(checkCover);
+  }
+
+  document.addEventListener("scroll", queueCover, { capture: true, passive: true });
+  window.addEventListener("resize", queueCover, { passive: true });
+  document.addEventListener("htmx:afterSettle", queueCover);
+  checkCover();
+
   // ---------- Cursor spotlight ----------
   // The card or tile under the mouse gets data-spot and the pointer's position in
   // --spot-x and --spot-y, once per frame. Mouse only: a touch has no hover.

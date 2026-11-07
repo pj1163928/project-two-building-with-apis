@@ -135,8 +135,15 @@ def test_pending_shelves_show_the_loader(client, monkeypatch):
         head = shelf.split("</header>", 1)[0]
         assert "ax-loader" in head and '<span class="ax-loader-label">Searching</span>' in head
         # The skeleton tiles hold the layout; the loader isn't on them.
-        grid = shelf.split("</header>", 1)[1]
+        body = shelf.split("</header>", 1)[1]
+        grid = body.split('<ul class="result-grid"', 1)[1].split("</ul>", 1)[0]
         assert "ax-loader" not in grid
+        assert grid.count('<span class="result-skeleton-thumb"></span>') == 6
+        # A badge floats over their middle with the loader and the provider's name.
+        badge = body.split('<div class="shelf-loading-badge" aria-hidden="true">', 1)[1]
+        name = re.search(r'<h2 id="[^"]+" class="micro text-fg-strong">([^<]+)</h2>', head)[1]
+        assert '<i class="ax-loader-mark" aria-hidden="true"></i>' in badge
+        assert f'<span class="ax-loader-label">Searching {name}</span>' in badge
 
 
 def test_load_more_shows_the_loader_while_it_runs():
@@ -248,6 +255,37 @@ def test_cards_blur_up_one_after_another():
     for position in range(2, 13):
         assert f":nth-child(12n+{position}) {{ --stagger: {position - 1}; }}" in css()
     assert "filter: blur(10px)" in keyframes("card-in")
+
+
+def test_cards_lift_on_hover_in_monochrome_behind_the_gate():
+    cards = ".result-card, .gallery-card, .pack-card"
+    lift = rule(f"html[data-pointer] :is({cards}):hover")
+    assert "transform: translateY(-4px);" in lift and "z-index: 2;" in lift
+    # The strip under a risen card keeps the hover, so it never jitters.
+    assert "inset: 100% 0 auto; height: 4px;" in rule(
+        f"html[data-pointer] :is({cards}):hover::after"
+    )
+    shadows = [
+        rule("html[data-pointer] .result-card:hover"),
+        rule("html[data-pointer] .result-card:hover:has(.result-link:focus-visible)"),
+        rule("html[data-pointer] :is(.gallery-card, .pack-card):hover"),
+    ]
+    shadows += [
+        line
+        for line in css().splitlines()
+        if line.startswith(("html { --lift-shadow:", 'html[data-scheme="light"] { --lift-shadow:'))
+    ]
+    assert len(shadows) == 5
+    for shadow in shadows:
+        assert "--lift-shadow" in shadow
+        assert not re.search(r"#[0-9A-Fa-f]{3,8}|--color-(texture|hdri|model|sound)", shadow)
+    assert "transform: scale(1.07);" in rule(
+        "html[data-pointer] .result-card:hover .result-thumb img"
+    )
+    assert any(
+        f"html[data-pointer] :is({cards}):hover," in block and "transform: none;" in block
+        for block in reduced_blocks()
+    )
 
 
 def test_library_and_gallery_cards_sit_in_the_animated_grids(member_client, member, make_asset):

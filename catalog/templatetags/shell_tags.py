@@ -24,3 +24,22 @@ def versioned_static(path: str) -> str:
     if not found:
         return url
     return f"{url}?v={int(os.path.getmtime(found))}"
+
+
+# Each section's icon (the same one as its sidebar entry), drawn large and faint as the
+# page's watermark and on the page header's icon tile. The main page has none: its
+# orbit fills the first screen.
+PAGE_ICONS = {
+    "discover": "search",
+    "library": "library",
+    "packs": "pack",
+    "attribution": "license",
+    "account": "user",
+    "settings": "gear",
+}
+
+
+@register.filter
+def page_icon(active_nav: str | None) -> str:
+    """The icon name for the section `active_nav`, or "" when it has none."""
+    return PAGE_ICONS.get(active_nav or "", "")

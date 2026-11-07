@@ -1,8 +1,16 @@
-{# Page heading: a mono micro-label above a display-font title.                    #}
-{# Pass compact=True on working surfaces (Library, Packs, Account): a smaller      #}
-{# headline sitting tight to its controls, so the content leads, not the header.   #}
-<div class="page-hero {% if compact %}space-y-3 max-w-2xl{% else %}space-y-4 max-w-3xl{% endif %}">
-  <div class="micro text-fg-secondary flex items-center gap-2"><i class="mark w-3" aria-hidden="true"></i>{{ label }}</div>
-  <h1 class="headline {% if compact %}text-[1.75rem] md:text-[2rem]{% else %}text-[2.25rem] md:text-[2.75rem]{% endif %} text-fg-strong">{{ heading }}</h1>
-  {% if lead %}<p class="{% if compact %}text-sm{% else %}text-[15px]{% endif %} leading-relaxed text-fg-secondary max-w-xl">{{ lead }}</p>{% endif %}
-</div>
+{% load shell_tags %}{# Page heading. On a section page (catalog/templatetags/shell_tags.PAGE_ICONS) it's two  #}
+{# columns (user request, 2026-11-06): the section's icon on the left, a line drawing in #}
+{# a square frame that draws itself in, then the text: a kicker row (the small mark, the #}
+{# mono label, and a hairline running out and fading), the display-font title and the   #}
+{# lead. A page with no section icon (the main page) has the text alone.                 #}
+{# Pass compact=True on working surfaces (Library, Packs, Account): a smaller headline   #}
+{# sitting tight to its controls, so the content leads, not the header. The block spans #}
+{# the content's width (for the kicker's rule); the headline and lead keep their measure.#}
+{% with icon=active_nav|page_icon %}<div class="page-hero{% if icon %} has-glyph{% endif %}{% if compact %} is-compact{% endif %}">
+  {% if icon %}<div class="page-hero-glyph" aria-hidden="true" data-icon="{{ icon }}">{% include "partials/icon.html" with name=icon size=24 %}</div>{% endif %}
+  <div class="page-hero-text {% if compact %}space-y-3{% else %}space-y-4{% endif %}">
+    <div class="page-hero-kicker micro text-fg-secondary flex items-center gap-2"><i class="mark w-3" aria-hidden="true"></i><span>{{ label }}</span><span class="page-hero-rule" aria-hidden="true"></span></div>
+    <h1 class="headline {% if compact %}max-w-2xl text-[1.75rem] md:text-[2rem]{% else %}max-w-3xl text-[2.25rem] md:text-[2.75rem]{% endif %} text-fg-strong">{{ heading }}</h1>
+    {% if lead %}<p class="{% if compact %}text-sm{% else %}text-[15px]{% endif %} leading-relaxed text-fg-secondary max-w-xl">{{ lead }}</p>{% endif %}
+  </div>
+</div>{% endwith %}

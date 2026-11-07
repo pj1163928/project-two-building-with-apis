@@ -285,7 +285,10 @@ def test_the_hero_is_a_cover_with_the_rings_blended_in():
 
     css = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
     hero = re.search(r"\.home-hero \{([^}]*)\}", css).group(1)
-    assert "min-height: calc(100dvh - 4.5rem);" in hero  # the window less both bars
+    # The window less both bars, or less only the status bar where the title bar and
+    # sidebar tuck away (a mouse; user request, 2026-11-06).
+    assert "min-height: calc(100dvh - var(--cover-offset, 4.5rem));" in hero
+    assert "#app:has(#home-orbit) { --cover-offset: 1.5rem;" in css
     orbit = re.search(r"  \.orbit \{([^}]*)\}", css).group(1)
     assert "mask-image: linear-gradient(" in orbit and "transparent);" in orbit
     assert ".orbit-ring::before {" in css and "opacity: 0.4;" in css

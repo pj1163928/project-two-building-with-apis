@@ -28,6 +28,124 @@ Each entry has this shape:
     - **Deviations:** recommendations overridden, follow-up questions asked
     - **Sideways:** failures, wrong turns, and how they were caught
 
+## 2026-11-06 — Post-phase polish: prototype loader and hover, section icons, an all-cover main page, a storm-grey light theme
+
+### Prompts
+
+1. Ok I like the custom loading and hover features from the prototype can those
+   be added (a screenshot of the prototype's pending Poly Haven shelf: skeleton
+   cards under a "Searching Poly Haven" badge).
+2. Ok another thing I noticed is the text on the overview seems to be merging
+   together a bit (sent while the first request was running, with a screenshot
+   of a card's details panel where "Commercial" ran into "Usable. No
+   conditions.").
+3. Ok I noticed the axcenity logo on the bottom of the home page cuts off
+   abruptly at the top and leaves blank space when scrolling at the bottom can
+   this be fixed (a screenshot of the home page's gallery and footer).
+4. Ok I think it would be cool to add watermark icons similar to the axcenity
+   logo found it the background of other tabs for different menus and pages as
+   well as expand the header. Please adjust the site in a way you feel would
+   make it look graphically appealing in that regard.
+5. Ok the animated icons look cool I was wondering if you can have these place
+   to the left of the actual text and for the sidebar menu icon to be in full
+   view. For the home page I would like to make it to where only the cover is
+   shown not the top or the side unless I have over them treat all other pages
+   the same. I would like to have the texture Icons move based on my scrolling
+   as well
+6. Ok for the sidebar menu icon I actually like the look of when it was in the
+   bottom right corner, I still would like to see the icon. As for the home
+   menu I want all the menus to appear when I scroll passed the cover and some
+   seamless transitions to occur when they appear.
+7. Ok the light theme to me is a bit too bright I would like it to be more grey
+   almostly like a light storm grey
+8. Go ahead and update PROMPTS.md according to source formatting
+
+### Summary
+
+- **Outcome:**
+  - A pending Discover shelf shows the prototype's look: six skeleton cards (a
+    thumbnail and two lines, fading along the row) under a square, frosted
+    badge with the logo loader and "Searching <provider>".
+  - Result, library, gallery and pack cards lift 4 px onto a soft shadow on
+    hover, and a result's thumbnail zooms in 7 %. A 4 px strip under a lifted
+    card stops it jittering at its bottom edge.
+  - A card's details panel no longer overlaps: its labels sit in one
+    `max-content` column, so "Commercial" fits.
+  - The main page's faint mark no longer stretches the page into blank space
+    below the footer, and no longer shows a hard cut across its top.
+  - Each section has its sidebar icon as a line drawing that draws itself in:
+    a framed column to the left of the page header's text, and a faint
+    watermark in the open sidebar's bottom-right corner. The header's label row
+    gained a hairline that runs out to the content's right edge.
+  - With a mouse, the main page opens on its cover alone. The title bar and
+    sidebar come in once the cover is scrolled past (or while an edge is
+    hovered, or focus is inside), the bars first and then their items one after
+    another, and leave on the way back up. The content after the cover keeps
+    the sidebar's room, so nothing shifts.
+  - The orbit's rings turn further and the orbit eases in closer as the cover
+    scrolls away; each texture counter-turns to stay upright.
+  - The light theme is a light storm grey instead of near-white, with darker
+    text, lines and status colours, and dark rather than white shadows.
+  - 1,283 tests pass (1,261 before). `ruff check` and `ruff format` are clean,
+    and `tailwind build` succeeds. Nothing has been committed.
+- **Changes:**
+  - `styles/source.css`: the skeleton and loader badge, the card lift, the
+    details-list grid, `.content-stage { overflow-y: clip }` and the main
+    page's mark fade, the section icons (`.page-hero-glyph`,
+    `.side-watermark`, `watermark-draw`) and the kicker's rule, the all-cover
+    block (`--cover-offset`, `--side-reserve`, `--chrome-i`), the orbit's
+    scroll animations in the parallax's `@supports` block, and the storm-grey
+    light palette.
+  - `catalog/.../shelf.html`: the skeleton cards and the badge.
+  - `templates/partials/page_header.html`: two columns, the icon then the text.
+  - `templates/base.html`: the sidebar watermark.
+  - `catalog/templatetags/shell_tags.py`: `PAGE_ICONS` and the `page_icon`
+    filter.
+  - `static/js/motion.js`: sets `<html data-cover="past">` past the cover.
+  - Tests: `test_motion.py`, `test_discover.py`, `test_shell.py`,
+    `test_home_hero.py` and `test_theme.py`, updated and extended.
+  - `docs/FRONTEND.md`: the loader badge, the card lift, the mark's clip,
+    section icons, the page header, the all-cover main page, the orbit's scroll
+    and the light theme.
+- **Decisions:**
+  - The prototype's type-coloured hover edge and glow were left out, and its
+    rounded loader box made square, to keep the monochrome, square chrome.
+  - "Expand the header" was read as the page header, not the title bar. Its
+    headline sizes were kept, because an earlier request made them smaller.
+  - "Only the cover … not the top or the side" was read as tucking the title bar
+    and sidebar away on the main page, and "treat all other pages the same" as
+    leaving the other pages as they were. Touch screens keep both bars.
+  - The light theme no longer follows the engine's light palette; its test now
+    checks the storm-grey values and that every text and status colour keeps
+    4.5:1 contrast.
+- **Deviations:**
+  - The section icons went through three placements at the user's direction:
+    a faint background watermark behind the header, then a column beside the
+    text; in the sidebar, cropped in the corner, then centred and whole, then
+    back in the corner with less of it cropped.
+  - The main page's bars first appeared only on hover; the user then asked for
+    them to come in past the cover, with a smoother entrance.
+- **Sideways:**
+  - The loader badge's overrides were first written inside the components
+    layer, where the unlayered loader rules would beat them; moved out before
+    testing.
+  - A new `:root` block became the last one in the file and broke the loader
+    test, which reads the last `:root`; the variable moved to `html`.
+  - A light-mode override placed before the main light block broke 24 theme
+    tests, which read the first such block; its selector became
+    `:root[data-scheme="light"]`.
+  - The sidebar watermark's icon was counted as a sidebar row icon; that test
+    now leaves it out.
+  - A second scroll-timeline `@supports` block failed the degrade test, which
+    checks only the first; the orbit's rules were merged into it.
+  - A Python heredoc turned escaped newlines in new tests into real ones; fixed
+    by hand with the editor.
+  - The light palette's comment claimed 12:1 body-text contrast; measuring gave
+    10:1, and three colours (weak text, error, warning) were under 4.5:1 on the
+    darker bars. Those were darkened and a contrast test added.
+  - Nothing was checked in a browser this session, and Node isn't installed, so
+    `motion.js` wasn't syntax-checked; the user was asked to look at each change.
+
 ## 2026-11-06 — Axcenity Toolbox: Phase 13/13, Branding motion and reduced motion
 
 ### Prompts

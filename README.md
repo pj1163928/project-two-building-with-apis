@@ -12,27 +12,44 @@ import. It searches three free providers. None of them needs an API key.
 | [Poly Haven](https://api.polyhaven.com) | Textures, HDRIs, models | CC0 |
 | [Openverse Audio](https://api.openverse.org/v1/) | Sound effects and music | Per item (CC0, CC BY, ...) |
 
-- **Discover** searches the providers side by side, one shelf per provider.
-  A provider that's down shows its own error and a Retry button, and the
-  other shelves keep working.
-- **Library** keeps each saved asset with your notes, a 1–5 rating and a
-  status. You can search, filter, sort and page through it, and it works
-  with every provider offline.
+- **Discover** searches every provider at once, with one shelf per
+  provider. If one provider is down, its shelf shows an error and a Retry
+  button, and the other shelves keep working.
+- **Library** keeps each asset you save with your notes, a 1–5 rating, tags
+  and a review status. You can search, filter, sort and page through it,
+  and it works even when every provider is offline.
 - **Packs** group saved assets for one project. Each item has a file
-  variant and an import path. A pack is private, unlisted or public, and
-  exports as a JSON manifest.
-- **The main page** has a gallery of public packs.
+  variant and an import path. A pack is private, unlisted (shared by link)
+  or public. It exports as a JSON manifest, or as a zip of its files.
+- **Attribution** explains each license and builds the credits and the
+  license notice for a pack.
+- **The main page** shows a gallery of public packs.
 - **The REST API** lets your own scripts work with your library and read
   packs.
+- **The console script** from Project 1 (`asset_search.py`) still works.
 
 The PRD is [prd/axcenity-toolbox.md](prd/axcenity-toolbox.md), and the build
 plan is [plans/axcenity-toolbox.md](plans/axcenity-toolbox.md). How the code
 fits together: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Contents
+
+1. [Setup](#setup)
+2. [Running the site](#running-the-site)
+3. [Demo sign-in](#demo-sign-in)
+4. [Using the site](#using-the-site)
+5. [Testing](#testing)
+6. [Using the API with a token](#using-the-api-with-a-token)
+7. [The console script (Project 1)](#the-console-script-project-1)
+8. [Troubleshooting](#troubleshooting)
+9. [Demo snapshot (maintainers only)](#demo-snapshot-maintainers-only)
+10. [Layout](#layout)
+
 ## Setup
 
-You need [uv](https://docs.astral.sh/uv/) and nothing else: no pip, no Node.
-uv installs Python 3.13 if you don't have it, and SQLite comes with Python.
+All you need is [uv](https://docs.astral.sh/uv/). You don't need pip or
+Node. If Python 3.13 isn't installed, uv installs it, and SQLite comes with
+Python.
 
 ```sh
 git clone <this repository>
@@ -42,14 +59,18 @@ uv run python manage.py migrate           # create db.sqlite3
 uv run python manage.py seed_demo         # load the demo members, libraries and packs
 ```
 
-`seed_demo` works offline. It loads a committed snapshot of 43 real assets
-(`packs/demo_assets.json`), so it never calls a provider. You can run it
-again at any time:
+`seed_demo` works offline. It loads a saved snapshot of 43 real assets
+(`packs/demo_assets.json`), so it never calls a provider. The first run
+reports `Created 3 users, 43 assets, 53 library entries, 7 packs ...`. It's
+safe to run again at any time:
 
 - it adds only what's missing and never duplicates anything
 - it resets the demo passwords
-- it puts the demo packs back as they were defined
+- it puts the demo packs back the way they were defined
 - it leaves your own changes to library entries alone
+
+To start over with an empty database, delete `db.sqlite3` and run `migrate`
+and `seed_demo` again.
 
 ## Running the site
 
@@ -59,24 +80,20 @@ uv run python manage.py tailwind runserver
 
 Then open <http://127.0.0.1:8000/>.
 
-This runs Django and the Tailwind watcher together. The first run downloads
-Tailwind's standalone binary (with DaisyUI built in) into
-`.django_tailwind_cli/` and builds `static/css/tailwind.css`. Both are
-git-ignored. For a one-off build without the server, run
+This command starts Django and the Tailwind watcher together. On the first
+run it downloads Tailwind's standalone binary (with DaisyUI built in) into
+`.django_tailwind_cli/` and builds `static/css/tailwind.css`. Git ignores
+both. To build the CSS once without starting the server, run
 `uv run python manage.py tailwind build`.
 
-> On Windows, if Tailwind fails with **WinError 4551**, Smart App Control is
-> blocking the standalone binary. The code isn't the cause. Allow the binary,
-> or turn Smart App Control off.
-
-Discover needs the internet to search the providers. Everything else, the
-library, packs, the gallery, exports and the API included, works offline on
-the seeded data.
+Discover needs the internet to search the providers. Everything else works
+offline on the seeded data, including the library, packs, the gallery,
+exports and the API.
 
 ## Demo sign-in
 
-`seed_demo` creates three regular members (not staff). They all share an
-obviously fake password:
+`seed_demo` creates three regular members (not staff). They all share the
+same password, which is plainly a fake:
 
 | Username | Password | What they have |
 |---|---|---|
@@ -84,35 +101,148 @@ obviously fake password:
 | `demo_otto` | `toolbox-demo` | Sci-fi Corridor and Desert Outpost (public) |
 | `demo_juno` | `toolbox-demo` | Forest Ambience and Bakery Props (public; the bakery's market sound is non-commercial) |
 
-Each library holds entries with every status (To review, Testing, Approved,
-Rejected), a range of ratings and some notes. A few assets are rated by
-several members, so community ratings show. Sign in as `demo_otto` to check
-that Mira's private pack is a 404 for other members.
+Every library has entries in each status (To review, Testing, Approved,
+Rejected), a range of ratings, and some notes. Several members rated the
+same few assets, so those assets show a community rating.
 
 There's also a regular test account for trying the site by hand,
-`test_user` with the password `5eMN9sKdr6cvJB`. It isn't seeded. On a
-fresh clone, create it at `/accounts/signup/` with those details. The
-automated tests never use it.
+`test_user` with the password `5eMN9sKdr6cvJB`. `seed_demo` doesn't create
+it. On a fresh clone, create it at `/accounts/signup/` with those details.
+The automated tests never use it.
 
-## Tests and linting
+## Using the site
+
+The left side panel holds each page's navigation and filters. The title bar
+has the colour scheme switch (System, Light or Dark). Visitors can browse
+the main page, Discover, public packs and the license guide. Saving
+anything requires an account.
+
+### A ten-minute tour
+
+1. **Browse as a visitor.** Open <http://127.0.0.1:8000/>. The main page
+   shows the public pack gallery. Search it, filter it by asset type, and
+   sort it by newest or most items. Open **Medieval Village** to see a pack
+   page.
+2. **Sign in** as `demo_mira` / `toolbox-demo` (or sign up at
+   `/accounts/signup/`).
+3. **Discover** (`/discover/`). Pick a type tile (Textures, HDRIs, Models or
+   Sounds) and search, for example `brick` or `footsteps`. Each provider
+   gets its own shelf. Use **Load more** to page a shelf and **Shuffle** to
+   get a random suggestion. Open a result with **Details**, or play a
+   sound. The side panel filters results by license and commercial use.
+4. **Save** a result. The corner check means it's in your library, and the
+   saved count in the status bar goes up. **Add to pack** saves the asset
+   first if you haven't already.
+5. **Library** (`/library/`). Search, filter by type, provider, status,
+   minimum rating or tag, sort, and page through 12 cards at a time. Open a card to change its status (with an optional reason), rating
+   or notes. Each change saves by itself, so there's no Save button. The
+   drawer also shows the asset's license, files, status history, similar
+   entries, and public packs that use it. **Download bundle** zips the files
+   you chose in Settings.
+6. **Packs** (`/packs/`). Choose **New pack**, give it a title, then add
+   items with **Add from my library** or from **Suggested for this pack**.
+   In the builder, choose each item's file variant and import path, drag
+   items to reorder them (or use an automatic sort), and set the pack to
+   Private, Unlisted or Public. An unlisted pack gets a share link, and
+   **New link** retires the old one.
+7. **Pack page** (`/packs/<slug>/`). This is the read-only view everyone
+   else sees. It has **Download manifest** (the
+   `<slug>.axcenity-pack.json` the engine imports), **Download files** (a
+   zip built in your browser that holds each file under its import path,
+   plus `CREDITS.txt` and the manifest), and the pack's attribution. Other
+   members can **Save** single items or **Copy pack** into their own
+   account.
+8. **Attribution** (`/attribution/`). A guide to every license the
+   providers use: what you may do, what you must do and what you may not
+   do, with a verdict for commercial, personal and internal use. Members
+   also get attribution for their own packs and their saved assets. A pack
+   with a non-commercial item gets a warning.
+9. **Account**. **Profile**, **Settings** (colour scheme and the default
+   download resolution, format and maps) and **API token** (see
+   [Using the API with a token](#using-the-api-with-a-token)).
+
+### Checking access by hand
+
+These are quick checks you can run in a browser:
+
+| Try | Expected |
+|---|---|
+| Sign out, then open `/library/` or `/packs/` | Redirected to sign in, then back to that page |
+| As `demo_otto`, open Mira's private pack (`/packs/castle-siege-work-in-progress/`) | 404 page |
+| As `demo_otto`, open `/library/<id>/` for an entry that isn't his | 404 page |
+| Make a pack Unlisted and open its share link in a private window | The pack page opens; the slug URL is a 404 for anyone but you |
+| Press **New link**, then reload the old link | 404 page |
+| Open Juno's Bakery Props attribution | A warning that the pack isn't cleared for commercial use |
+
+## Testing
+
+The project has two kinds of tests: an automated pytest suite that covers
+the site, the API, the providers and the console script, and a manual
+checklist for the console script against the live APIs (see
+[How to verify by hand](#how-to-verify-by-hand)).
+
+### Running the suite
 
 ```sh
-uv run pytest                         # the whole suite; must pass before any commit
+uv run pytest                         # the whole suite (about 1,260 tests, around 15 s)
+uv run pytest -q                      # quieter output
+uv run pytest -x --lf                 # stop at the first failure, rerun only last failures
+uv run pytest -k "share_link"         # only tests whose names match
+uv run pytest tests/test_api_packs.py # one file
 uv run pytest --cov                   # with coverage
 uv run ruff check .                   # lint
 uv run ruff format --check .          # formatting (drop --check to apply it)
 ```
 
-No test reaches the network. An autouse guard in `tests/conftest.py` fails
-any test that tries, and provider code is tested against faked responses.
-See [docs/TESTING.md](docs/TESTING.md).
+The suite must pass, and Ruff must be clean, before any commit.
+
+### Rules the suite follows
+
+- **No test reaches the network.** An autouse guard in `tests/conftest.py`
+  blocks every socket connection and fails any test that tries one.
+  Nothing can switch it off. So the suite runs offline and gives the same
+  result every time.
+- **Provider clients** (`providers/`) are tested against faked HTTP
+  responses from the [`responses`](https://github.com/getsentry/responses)
+  library. The site's views and services are tested by replacing provider
+  functions with `monkeypatch`.
+- **Every access rule is tested** on the website and the API: sign-in
+  redirects, **404** for anything the caller doesn't own, **401** for a
+  signed-out API call, and **403** for a write without a CSRF token.
+- **All tests live in `tests/`**, one file per area, with one shared
+  `conftest.py` for fixtures (`member`, `member_client`, `make_asset`,
+  `mocked_responses` and more).
+
+### What each file covers
+
+| Area | Files |
+|---|---|
+| Access rules and CSRF, page by page | `test_access_control.py` |
+| Accounts, sign-in pages, theme, API token page | `test_accounts.py`, `test_auth_pages.py`, `test_theme.py`, `test_theme_switch.py`, `test_token_page.py` |
+| Providers | `test_provider_records.py`, `test_provider_fetch.py`, `test_provider_failures.py`, `test_network_guard.py` |
+| Discover | `test_discover.py`, `test_discover_drawer.py`, `test_discover_licenses.py` |
+| Library | `test_library_page.py`, `test_library_filter.py`, `test_library_drawer.py`, `test_library_save.py`, `test_status_history.py`, `test_community_rating.py`, `test_entry_related.py`, `test_tags.py`, `test_downloads.py`, `test_sound_playback.py` |
+| Packs | `test_packs.py`, `test_pack_builder.py`, `test_pack_public.py`, `test_pack_share.py`, `test_pack_copy.py`, `test_pack_downloads.py`, `test_pack_suggestions.py`, `test_pack_layout.py` |
+| Attribution and licenses | `test_attribution.py` |
+| Main page and gallery | `test_home.py`, `test_home_hero.py`, `test_gallery.py` |
+| REST API | `test_api_library.py`, `test_api_packs.py` |
+| Demo data | `test_seed_demo.py` |
+| Page shell, motion, scroll ruler | `test_shell.py`, `test_motion.py`, `test_scroll_ruler.py` |
+| Project 1 console script | `test_console_regression.py` |
+
+[docs/TESTING.md](docs/TESTING.md) describes each file in detail, along
+with the fixtures and when to use each mocking tool.
+
+> `test_seed_demo.py` checks that this README lists the demo usernames and
+> password in the table above. If you change them in `packs/demo.py`,
+> update the table too.
 
 ## Using the API with a token
 
-1. Sign in, then open **Account → API token** (`/accounts/token/`). Your
-   token is created on your first visit.
-2. Send it in the `Authorization` header as `Token <key>`. Requests signed
-   with a token need no CSRF token.
+1. Sign in, then open **Account → API token** (`/accounts/token/`). The
+   site creates your token the first time you open the page.
+2. Send it in the `Authorization` header as `Token <key>`. Requests that
+   use a token don't need a CSRF token.
 
 ```sh
 TOKEN=<your key>
@@ -138,6 +268,10 @@ curl "$BASE/api/packs/1/"
 curl "$BASE/api/packs/1/export/"
 ```
 
+On Windows PowerShell, use `curl.exe` (plain `curl` is an alias for
+`Invoke-WebRequest`) and `$env:TOKEN` in place of `$TOKEN`. The API
+answers in JSON only.
+
 | Endpoint | Methods | Who |
 |---|---|---|
 | `/api/library/` | GET, POST | Signed in (401 otherwise) |
@@ -145,36 +279,10 @@ curl "$BASE/api/packs/1/export/"
 | `/api/packs/` | GET | Anyone. `?mine=1` needs sign-in |
 | `/api/packs/<id>/`, `/api/packs/<id>/export/` | GET | Anyone for a public pack, only the owner for a private or unlisted one (404 otherwise) |
 
-Saving an asset you already have is a **400** with "Already in your
-library.". A provider failure during a save is a **502** with a friendly
-`detail`. Packs are read-only through the API (**405** for writes).
-
-## Demo snapshot (maintainers only)
-
-`packs/demo.py` names each demo asset, pack and review. The snapshot was
-captured once, online, with:
-
-```sh
-uv run python manage.py capture_demo_assets
-```
-
-It calls each provider's `fetch_record()` for every demo asset and rewrites
-`packs/demo_assets.json`. It writes nothing unless every asset was fetched.
-Graders don't need to run it.
-
-## Layout
-
-```
-config/       settings, root URLs, the shell's context processor
-providers/    API clients for ambientCG, Poly Haven and Openverse (plain Python)
-catalog/      Discover, the library, saving, and the library API
-packs/        packs, the builder, pack pages, export, the gallery, the pack API, demo data
-accounts/     sign-up, sign-in, profile, settings and the API token page
-templates/    the shared shell (base.html) and partials
-static/       branding, fonts and scripts; styles/source.css is Tailwind's source
-tests/        every test, with one shared conftest
-asset_search.py   the Project 1 console script (below)
-```
+Saving an asset that's already in your library returns **400** with
+"Already in your library.". If the provider fails during a save, the API
+returns **502** with a friendly `detail` message. Packs are read-only
+through the API, so any write gets **405**.
 
 ## The console script (Project 1)
 
@@ -191,7 +299,12 @@ providers/
   openverse.py           search() and get_details() for Openverse Audio
 ```
 
-Openverse caps anonymous clients at 20 requests per minute and 200 per day.
+The website reuses these same provider modules. Its own functions
+(`search_records()`, `fetch_record()`) sit next to the original `search()`
+and `get_details()`, which never change.
+
+Openverse limits anonymous clients to 20 requests per minute and 200 per
+day.
 
 ### How to run
 
@@ -210,14 +323,44 @@ The script asks:
 5. **Details:** the number of a result to see its details, or Enter to skip.
 6. **Search again?** Enter or `y` to go back to the provider menu, `n` to exit.
 
+Ctrl+C at any prompt exits cleanly.
+
 Asset IDs for the lookup look like `Bricks097` (ambientCG), `red_bricks_02`
 (Poly Haven) and `a8783d20-f1af-4c4b-b9ec-a8c212f67fee` (Openverse). The
 ID of every result is shown in brackets in its details view.
 
-### How to verify
+### Automated tests
 
-Verification is manual: run the script and try each case below. Live
-data changes over time, so names and counts may differ from the samples.
+`tests/test_console_regression.py` checks the script and its provider calls
+against canned responses, so it runs offline:
+
+```sh
+uv run pytest tests/test_console_regression.py -v
+```
+
+It covers:
+
+- **Each provider's `search()`:** the query and filters it sends, the rows
+  it returns, and an empty result. This includes Poly Haven's rule that
+  zero keyword matches means no results.
+- **Each provider's `get_details()`:** the fields, files and downloads it
+  summarizes, and Openverse's license labels.
+- **Failures:** a timeout, a connection error, a 429 that mentions
+  retrying later, a Poly Haven 404, an unknown ambientCG ID, and an
+  Openverse 500 whose HTML body never reaches the user. Each one becomes a
+  `ProviderError` with a friendly message.
+- **The script end to end, with typed answers:** a search then details, a
+  provider error that prints `Error:` and keeps the script running, and
+  quitting straight away.
+
+These tests are the guarantee that the website's changes to `providers/`
+never broke Project 1.
+
+### How to verify by hand
+
+To check the script against the live APIs, run it and try each case below.
+Live data changes over time, so names and counts may differ from the
+samples.
 
 | # | Provider | Input | Expected |
 |---|---|---|---|
@@ -232,10 +375,13 @@ data changes over time, so names and counts may differ from the samples.
 | 9 | any | `9` at the provider menu, `x` at search/ID, blank phrase, `abc` at a number prompt | a "Please enter..." message and the same prompt again |
 | 10 | any | unplug the network and search | `Error: Could not connect to ...` |
 
-Other failures are reported the same way, as one `Error:` line followed
-by the "Search again?" prompt. These are a timeout after 10 s, HTTP 429
-(with a note about Openverse's 20/min and 200/day caps), other HTTP 5xx,
-and a response that isn't JSON.
+The script reports other failures the same way: one `Error:` line, then the
+"Search again?" prompt. These failures are:
+
+- a timeout after 10 s
+- HTTP 429, with a note about Openverse's limits of 20 a minute and 200 a day
+- any other HTTP 5xx
+- a response that isn't JSON
 
 #### Sample output
 
@@ -331,10 +477,51 @@ Error: Poly Haven has nothing at that address (HTTP 404). If you entered an asse
 
 Notes:
 
-- Poly Haven's search is semantic and never returns an empty list. The
+- Poly Haven's search is semantic, so it never returns an empty list. The
   script treats a search with zero keyword matches as "no results".
-- ambientCG doesn't document the unit of `dimensions`, so the numbers are
-  shown exactly as the API returns them.
+- ambientCG doesn't document the unit of `dimensions`, so the script shows
+  the numbers exactly as the API returns them.
 - Openverse can be slow. On 2026-10-30 some uncached searches took 30 to
   60 seconds, so the 10 s timeout fired and the script printed a timeout
-  error. Try again later or try a different phrase.
+  error. If that happens, try again later or try a different phrase.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| Tailwind fails with **WinError 4551** on Windows | Windows Smart App Control is blocking the standalone binary in `.django_tailwind_cli/`; the code isn't the cause. Allow the binary, or turn Smart App Control off |
+| The page has no styles | Run `uv run python manage.py tailwind build`, or start the site with `tailwind runserver` rather than plain `runserver` |
+| Discover shows an error on one shelf | That provider is down, slow or rate-limited. Press Retry, or wait. Openverse allows 20 requests a minute and 200 a day |
+| Port 8000 is in use | `uv run python manage.py tailwind runserver 8001` |
+| The demo packs have changed | Run `uv run python manage.py seed_demo` again |
+| A demo password doesn't work | Run `seed_demo` again. It resets the demo passwords |
+
+## Demo snapshot (maintainers only)
+
+`packs/demo.py` names each demo asset, pack and review. The snapshot was
+captured once, online, with:
+
+```sh
+uv run python manage.py capture_demo_assets
+```
+
+It calls each provider's `fetch_record()` for every demo asset and rewrites
+`packs/demo_assets.json`. If any asset fails to fetch, it writes nothing.
+Graders don't need to run it.
+
+## Layout
+
+```
+config/       settings, root URLs, the shell's context processor
+providers/    API clients for ambientCG, Poly Haven and Openverse (plain Python)
+catalog/      Discover, the library, saving, and the library API
+packs/        packs, the builder, pack pages, export, the gallery, attribution,
+              the pack API, demo data
+accounts/     sign-up, sign-in, profile, settings and the API token page
+templates/    the shared shell (base.html) and partials
+static/       branding, fonts and scripts
+styles/       source.css, Tailwind's source
+tests/        every test, with one shared conftest
+docs/         architecture, testing, front-end and provider notes
+asset_search.py   the Project 1 console script
+```

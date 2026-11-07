@@ -636,6 +636,8 @@ def test_icons_share_one_size_per_bar(member_client):
     html = member_client.get(reverse("catalog:discover")).content.decode()
     title_bar = html.split('id="title-bar"', 1)[1].split("</header>", 1)[0]
     sidebar = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
+    # The section's watermark is decoration, sized by CSS, not one of the bar's icons.
+    sidebar = re.sub(r'<div class="side-watermark".*?</svg>\s*</div>', "", sidebar, flags=re.S)
     activity = sidebar.split('<div class="side-panel-inner', 1)[0]
     account = sidebar.split('<nav aria-label="Account"', 1)[1]
     assert set(re.findall(r'<svg width="(\d+)"', title_bar)) == {"16"}
@@ -757,6 +759,18 @@ def test_side_panel_inputs_stay_inside_their_chips():
     source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
     chip = re.search(r"\.filter-chip \{([^}]*)\}", source).group(1)
     assert "position: relative;" in chip
+
+
+def test_the_sinking_mark_never_stretches_the_page_or_shows_a_hard_edge():
+    """The mark's layer sinks as the page scrolls. Unclipped, it stretched the page past
+    the footer; on the main page, where the layer sits mid-page, its top edge cut the
+    mark off in a straight line (user report, 2026-11-06)."""
+    source = (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+    stage = re.search(r"\n\.content-stage \{([^}]*)\}", source).group(1)
+    assert "overflow-y: clip;" in stage
+    home = re.search(r"#content:has\(#home-orbit\) \.hero-atmosphere \{([^}]*)\}", source).group(1)
+    assert "mask-image: linear-gradient(to bottom, transparent, black 30%" in home
+    assert "#content:has(#home-orbit) .hero-mark { top: 4rem; }" in source
 
 
 def test_oversized_mark_renders_once_behind_the_content(client):
@@ -1073,3 +1087,150 @@ def test_a_newer_stylesheet_or_script_loads_the_page_in_full():
     assert "arriving === loadedAssets()" in script
     assert "detail.shouldSwap = false;" in script
     assert 'detail.requestConfig.verb !== "get"' in script
+
+
+# ---------- Section icons, the cover's chrome and the orbit (user requests, 2026-11-06) ----------
+
+SECTION_PAGES = [
+    ("catalog:discover", "search"),
+    ("catalog:library", "library"),
+    ("packs:list", "pack"),
+    ("packs:attribution", "license"),
+    ("accounts:profile", "user"),
+    ("accounts:settings", "gear"),
+]
+
+
+def _icon_body(name: str) -> str:
+    """The icon's drawing (what sits inside its <svg>), to find it in a page."""
+    svg = render_to_string("partials/icon.html", {"name": name, "size": 24})
+    return svg.split(">", 1)[1].rsplit("</svg>", 1)[0].strip()
+
+
+def _css() -> str:
+    return (settings.BASE_DIR / "styles" / "source.css").read_text(encoding="utf-8")
+
+
+def test_page_icon_names_each_sections_sidebar_icon():
+    from catalog.templatetags.shell_tags import page_icon
+
+    for active_nav, icon in [
+        ("discover", "search"),
+        ("attribution", "license"),
+        ("settings", "gear"),
+    ]:
+        assert page_icon(active_nav) == icon
+    assert page_icon("home") == "" and page_icon(None) == ""
+
+
+@pytest.mark.parametrize(("name", "icon"), SECTION_PAGES)
+def test_each_sections_icon_sits_left_of_its_header_and_in_the_sidebar(member_client, name, icon):
+    html = member_client.get(reverse(name)).content.decode()
+    drawing = _icon_body(icon)
+    hero = html.split('<div class="page-hero has-glyph', 1)[1]
+    # The icon is the header's first column, before the text.
+    glyph = hero.split(f'<div class="page-hero-glyph" aria-hidden="true" data-icon="{icon}">', 1)[1]
+    assert drawing in glyph.split("</div>", 1)[0]
+    assert hero.index('class="page-hero-glyph"') < hero.index('class="page-hero-text')
+    assert hero.index('class="page-hero-text') < hero.index("<h1")
+    kicker = hero.split('class="page-hero-kicker', 1)[1].split("</div>", 1)[0]
+    assert '<span class="page-hero-rule" aria-hidden="true"></span>' in kicker
+    # No background copy of it any more: it sits beside the text, not behind it.
+    assert "page-watermark" not in html
+    sidebar = html.split('id="side-panel"', 1)[1].split("</aside>", 1)[0]
+    side = sidebar.split('<div class="side-watermark" aria-hidden="true">', 1)[1]
+    assert drawing in side.split("</div>", 1)[0]
+
+
+def test_the_main_page_has_no_section_icon(client):
+    html = client.get(reverse("packs:home")).content.decode()
+    assert "page-hero-glyph" not in html and "side-watermark" not in html
+    assert '<div class="page-hero">' in html
+
+
+def test_section_icons_are_ink_line_drawings_that_draw_themselves_in():
+    source = _css()
+    glyph = re.search(r"\n\.page-hero-glyph \{([^}]*)\}", source).group(1)
+    assert "color: var(--color-fg-secondary);" in glyph
+    assert (
+        ".page-hero.has-glyph { display: grid; grid-template-columns: auto minmax(0, 1fr);"
+        in source
+    )
+    side = re.search(r"\n\.side-watermark \{([^}]*)\}", source).group(1)
+    assert "pointer-events: none;" in side and "z-index: -1;" in side
+    assert "color: var(--color-ink);" in side
+    # In the open sidebar's bottom right corner, only a little of it past the edge, so
+    # it's still easy to make out (user requests, 2026-11-06).
+    side_svg = re.search(r"\n\.side-watermark svg \{([^}]*)\}", source).group(1)
+    assert "right: -2.25rem; bottom: 6.75rem; width: 13rem;" in side_svg
+    assert 'html[data-panel="collapsed"] .side-watermark { opacity: 0;' in source
+    for layer in (glyph, side, side_svg):
+        assert not re.search(r"#[0-9A-Fa-f]{3,8}|--color-(texture|hdri|model|sound)", layer)
+    assert ":is(.page-hero-glyph, .side-watermark) svg > * { stroke-dasharray: 160;" in source
+    assert "@keyframes watermark-draw { from { stroke-dashoffset: 160; } }" in source
+
+
+def test_motion_marks_when_the_cover_is_scrolled_past():
+    motion = (settings.BASE_DIR / "static" / "js" / "motion.js").read_text(encoding="utf-8")
+    assert 'document.getElementById("home-hero")' in motion
+    assert 'if (bottom < height * 0.5) root.dataset.cover = "past";' in motion
+    assert "else if (bottom > height * 0.6) delete root.dataset.cover;" in motion
+    # Scroll doesn't bubble: the capture phase catches #content's scrolling.
+    assert (
+        'document.addEventListener("scroll", queueCover, { capture: true, passive: true });'
+        in motion
+    )
+    assert 'document.addEventListener("htmx:afterSettle", queueCover);' in motion
+
+
+def test_past_the_cover_the_bars_come_in_one_after_another():
+    source = _css()
+    block = source.split("@media (hover: hover) and (pointer: fine) {\n  #app:has(#home-orbit)", 1)[
+        1
+    ].split("\n}", 1)[0]
+    assert 'html[data-cover="past"] #app:has(#home-orbit) #title-bar,' in block
+    assert 'html[data-cover="past"] #app:has(#home-orbit) #side-panel,' in block
+    # Their items fade in after the bar, 35 ms apart.
+    assert 'html[data-cover="past"] #app:has(#home-orbit) #title-bar > *,' in block
+    assert 'html[data-cover="past"] #app:has(#home-orbit) #side-panel .act-row,' in block
+    assert "calc(0.18s + var(--chrome-i, 0) * 35ms)" in block
+    assert "#app:has(#home-orbit) #title-bar > :nth-child(2) { --chrome-i: 1; }" in block
+    # Room for the sidebar is kept after the cover, which stays centred on the window.
+    assert "#app:has(#home-orbit) .content-stage { padding-left: var(--side-reserve);" in block
+    assert "#app:has(#home-orbit) .home-hero { left: calc(var(--side-reserve) / -2); }" in block
+    assert 'html[data-panel="collapsed"] #app:has(#home-orbit) { --side-reserve: 3.5rem; }' in block
+
+
+def test_the_main_page_tucks_its_bars_away_until_hovered():
+    """With a mouse, the main page shows only its cover; the title bar and sidebar float
+    back while the pointer is on their edge or focus is inside them."""
+    source = _css()
+    block = source.split("@media (hover: hover) and (pointer: fine) {\n  #app:has(#home-orbit)", 1)[
+        1
+    ]
+    block = block.split("\n}", 1)[0]
+    assert "#app:has(#home-orbit) #title-bar { position: fixed;" in block
+    assert "translate: 0 -100%;" in block and "translate: -100% 0;" in block
+    # A strip on the edge they left keeps them reachable.
+    assert "#app:has(#home-orbit) #title-bar::after" in block
+    assert "#app:has(#home-orbit) #side-panel::after" in block
+    # Shown on a real hover (behind the gate) or keyboard focus, which isn't gated.
+    assert "html[data-pointer] #app:has(#home-orbit) #title-bar:hover" in block
+    assert "#app:has(#home-orbit) #side-panel:focus-within" in block
+
+
+def test_the_orbit_turns_and_closes_in_as_the_page_scrolls():
+    source = _css()
+    supports = source.split("@supports (animation-timeline: scroll()) {", 1)[1].split("\n}", 1)[0]
+    assert "orbit-scroll-turn linear both;" in supports
+    assert "orbit-scroll-unturn linear both;" in supports
+    assert "animation-timeline: auto, --page;" in supports
+    assert (
+        ".orbit-stage { animation: orbit-scroll-zoom linear both; animation-timeline: --page;"
+        in supports
+    )
+    # Hovering a tile still pauses the spin, and reverse rings still spin backwards.
+    assert "{ animation-play-state: paused, running; }" in supports
+    assert ".orbit-ring.is-reverse { animation-direction: reverse, normal; }" in supports
+    # Each texture counter-turns as far as its ring turns, so it stays upright.
+    assert "rotate: calc(var(--scroll-turn) * var(--scroll-turn-sign, 1) * -1);" in source

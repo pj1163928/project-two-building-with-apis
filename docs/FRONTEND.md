@@ -45,12 +45,21 @@ It's a throwaway prototype, so take its look, not its code.
     page (the Referer, if it's this site).
   - Dark is the default: the `@theme` values.
   - `html[data-scheme="light"] { … }` in `source.css` (nested rules, which
-    Tailwind's build flattens) sets the same tokens to the engine's light palette (`crates/editor/src/theme.rs`,
-    `Palette::new` with `dark = false`). It's still the one `axcenity`
+    Tailwind's build flattens) sets the same tokens to a **light storm
+    grey** (user request, 2026-11-06). It started as the engine's light
+    palette (`crates/editor/src/theme.rs`, `Palette::new` with `dark =
+    false`), which the user found too bright. Now the surfaces are a cool
+    mid grey (app `#BEC0C2`, panel `#CACCCE`, surface `#D3D5D7`), and the
+    text, lines and status colours are darker to keep their contrast: body
+    text 10:1 and secondary 6.6:1 on the panel, and every text and status
+    colour at least 4.5:1 even on the darker bars (`test_theme.py` checks
+    it). `shade` is a deep storm grey (`#2B2D31`), so shadows and dialog
+    backdrops darken rather than glow white; the footer's brand signature
+    takes a panel-coloured halo instead. It's still the one `axcenity`
     theme, just flipped, so every utility and component follows.
   - In light mode, the type colours become the engine's on-light accents
-    (`#A8460B`, `#3451D1`, `#1C7547`, `#6741D9`), and the status colours
-    its light ones.
+    (`#A8460B`, `#3451D1`, `#1C7547`, `#6741D9`), which only ever mark
+    icons and keep over 3:1 on the grey.
   - The ambient glow's blobs switch from `screen` to `multiply` blending,
     and the layer drops to 22 % (30 % on showcase pages), because screen
     washes out on white.
@@ -102,7 +111,7 @@ It's a throwaway prototype, so take its look, not its code.
 - `tests/test_theme.py` fails if `source.css` gains any colour outside this
   palette (dark or light), or uses a drop colour outside the
   `#content[data-drop]` rules. `static/js/ambient.js` only ever names the
-  tokens (`var(--drop-a)`…), never a hex value. It also checks the light block against the engine's values.
+  tokens (`var(--drop-a)`…), never a hex value. It also checks the light block's storm-grey values and their contrast.
 
 ## Fonts
 
@@ -152,6 +161,29 @@ this only matters on a full load or refresh.
   image URLs come from `{% static %}` through `--mark-url` and `--word-url`
   on `<html>`.
 - The ghost mark is the empty state in `partials/empty_state.html`.
+- **Section icons** (user requests, 2026-11-06): each section's sidebar
+  icon as a line drawing (`catalog/templatetags/shell_tags.py`:
+  `PAGE_ICONS` and the `page_icon` filter on `active_nav`): Discover a
+  magnifier, Library the books, Packs the box, Attribution the license,
+  Account the person, Settings the gear. The main page has none (its orbit
+  fills the cover).
+  - **In the header:** `.page-hero-glyph`, the header's left column (8.5
+    rem, 6.5 rem compact, 4 rem on a phone): the icon in `fg-secondary`
+    with 1-of-24 strokes, in a square `line-strong` frame on a 3 % ink fill,
+    with ink corner ticks top left and bottom right. The user first had it
+    as a faint background watermark behind the header, then asked for it
+    beside the text instead.
+  - **In the sidebar:** `.side-watermark`, the same icon at 13 rem in the
+    open sidebar's bottom right corner above the Account rows, only a little
+    of it past the edge (2.25 rem), 6 % ink (8 % in light mode), under
+    the rows (`z-index: -1` in the aside's stacking context; it clips
+    itself, so the tooltips still stick out). It fades out when the sidebar
+    collapses. The user liked it in the corner, first cropped by 4.5 rem,
+    then centred whole, and settled on the corner with enough of it in view
+    to read.
+  - Both draw themselves in each time a page arrives (`watermark-draw`, 2
+    s, a dash offset). Monochrome only, never a type colour, never on a
+    provider's thumbnail.
 - "In library" used to be a badge with a small `.mark` in a Save row at the
   card's foot. Since the Phase 4 polish (2026-11-05) Save lives in the
   card's top-right corner, over the thumbnail, so "In library" is a filled
@@ -301,10 +333,16 @@ positioned in the side panel needs a positioned parent inside it.
 **Partials:**
 
 - `partials/page_header.html` takes `label`, `heading`, `lead` and
-  `compact`. It's the hero: a micro-label, a `.headline`
+  `compact`. On a section page it's two columns (`.page-hero.has-glyph`):
+  the section's icon (`.page-hero-glyph`, see "Section icons"), then
+  `.page-hero-text`. The text is a kicker row (the small mark, the
+  micro-label and a `.page-hero-rule` hairline running out to the content's
+  right edge and fading; none on the main page), a `.headline`
   (`text-[2.25rem]`, `md:text-[2.75rem]`) and a 15 px lead, `space-y-4`.
   Working pages pass `compact=True`, which gives a `md:text-[2rem]`
-  headline, a 14 px lead and `space-y-3`.
+  headline, a 14 px lead and `space-y-3`. The block spans the content's
+  width so the rule can; the headline keeps `max-w-3xl` (`max-w-2xl`
+  compact) and the lead `max-w-xl`.
 - `partials/empty_state.html` takes `title`, `body`, `link_url` and
   `link_text`. It's a solid `bg-surface` panel with a `border-line-strong`
   border and `py-16`. The first version had a dashed outline that was hard
@@ -451,6 +489,14 @@ colour.
   `--page` timeline), so it drifts behind the content. It sits in `@supports
   (animation-timeline: scroll())`, so other browsers show the mark still. The
   PRD's giant wordmark stays gone (story 104).
+  - **It never stretches the page** (user report, 2026-11-06): the sinking
+    layer used to add scroll height, so each scroll to the bottom sank it
+    further and left blank space under the footer. `.content-stage` is
+    `overflow-y: clip` now, so nothing reaches past the footer.
+  - **No hard edge on the main page:** there the layer sits below the hero,
+    mid-page, so its top edge was in view and cut the mark off in a straight
+    line. On that page the layer fades in at the top as well as out at the
+    bottom, and the mark sits 4 rem into it.
 - **The logo loader** (`partials/loader.html`, `.ax-loader`): the mark in
   grey with a light band sweeping across it (`--loader-band`, `loader-sweep`),
   with a label or a screen-reader "Loading". It carries no role; the region
@@ -461,6 +507,12 @@ colour.
     `motion.js` counts from `htmx:beforeSend` to the request's own
     `loadend`, shows it after 150 ms (`<html data-busy>`) and sets
     `aria-busy` on `#content`.
+  - **A pending shelf** (user request, 2026-11-06, from the prototype): six
+    skeleton cards (`.result-skeleton`: a thumbnail block and two lines,
+    fading 10 % per card along the row) under `.shelf-loading-badge`, a
+    square frosted box centred over them with the loader at 2.5 rem over a
+    mono "Searching <provider>". The badge sits beside the `<ul>`, never on
+    a tile, and is `aria-hidden` (the shelf is `aria-busy`).
   - **In place:** a pending shelf's "Searching", Load more's "Loading…", the
     pack picker's "Loading your packs…" (`card-actions.js`) and the drawer's
     "Saving…" (`entry-drawer.js`).
@@ -472,6 +524,48 @@ colour.
   `motion.js` marks `data-spot`. It's mouse only, behind the hover gate, and
   ignores the pointer. It sits above the thumbnail but under a card's details
   and corner actions (z-index 1).
+- **The main page is all cover** (user requests, 2026-11-06): with a
+  mouse (`@media (hover: hover) and (pointer: fine)`), the main page
+  (`#app:has(#home-orbit)`) opens on its cover alone, filling the window
+  above the status bar (`--cover-offset`), with the title bar and sidebar
+  tucked away.
+  - **Past the cover they come in:** `motion.js` sets `<html
+    data-cover="past">` once the cover's bottom edge rises above the middle
+    of the window, and clears it below 60 % (the gap stops flicker). It
+    listens for scroll in the capture phase and checks again after every
+    swap.
+  - **On the cover** they still float in while the pointer rests on the edge
+    they left (a 0.75 rem `::after` strip that travels with them, behind the
+    hover gate) or keyboard focus is inside. The sidebar floats in under the
+    title bar, so showing it shows the bar too.
+  - **The transition:** the title bar glides down (0.6 s, ease-out), the
+    sidebar follows 0.08 s later, then their items (the title bar's
+    children, the sidebar's rows and its panel) fade and slide in one after
+    another (`--chrome-i`, 35 ms apart). Leaving, the items fade at once and
+    the bars slide off after 0.3 s. Hover colours keep their own undelayed
+    fades.
+  - **Nothing shifts:** the bars float (fixed). The stage keeps the
+    sidebar's room (`--side-reserve`, 16 rem, 3.5 rem collapsed) so
+    everything after the cover is laid out as on other pages, and the cover
+    is pulled back by half of it (`.home-hero { left }`) to stay centred on
+    the window.
+  - Touch screens keep both bars in place; every other page is unchanged.
+- **The orbit answers the scroll** (user request, 2026-11-06): in the
+  parallax's `@supports` block, each ring turns on past its spin over the
+  cover's height (`orbit-scroll-turn`: 28°, 42° and 58° from the inside
+  out, reverse rings the other way), each texture counter-turns as far
+  (`orbit-scroll-unturn`) to stay upright, and the stage eases in to 1.16×
+  (`orbit-scroll-zoom`). The spin's reverse and hover-pause rules are
+  restated for both animations. Reduced motion stills it.
+- **Cards lift** (user request, 2026-11-06, from the prototype): result,
+  library, gallery and pack cards rise 4 px on hover onto a soft shade drop
+  (`--lift-shadow`, lighter in light mode), and a result's thumbnail eases
+  in by 7 % over 0.6 s. The edge keeps its usual monochrome hover colour;
+  the prototype's type-coloured edge and glow are left out (type colour
+  only marks the type icons). Behind the hover gate. The hovered card gets
+  `z-index: 2` so its corner tips stay above its neighbours, and a 4 px
+  `::after` strip under it keeps the hover while it has risen off the
+  pointer. Reduced motion holds it still.
 - **Cards blur up:** cards in `.result-grid`, `.gallery-grid`, `.pack-grid`
   and `.pack-rows` rise out of a 10 px blur (`card-in`, 0.5 s), 40 ms apart.
   The stagger counts within each 12 (`:nth-child(12n+k)`), so a Load more
